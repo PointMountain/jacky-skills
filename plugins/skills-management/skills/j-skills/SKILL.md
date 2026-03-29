@@ -32,13 +32,14 @@ description: "CLI tool for managing Agent Skills - link, install, and manage ski
 # j-skills
 
 j-skills 是一个用于管理 Agent Skills 的命令行工具，支持 Claude Code、Cursor、OpenCode 等 35+ 个主流 AI 编码助手。
+以下命令基于当前 CLI（`0.3.x`）整理，优先使用 `--json` 便于自动化解析。
 
 ## 前提条件
 
 **必须先安装 j-skills npm 包：**
 
 ```bash
-npm install -g j-skills
+npm install -g @wangjs-jacky/j-skills
 ```
 
 ## 功能特性
@@ -47,7 +48,8 @@ npm install -g j-skills
 - **软链接管理** - 使用符号链接实现本地开发热更新
 - **统一管理** - 一条命令安装到多个环境
 - **交互式界面** - 友好的命令行交互体验
-- **结构化输出** - 所有命令支持 `--json` 输出，便于 LLM 解析
+- **结构化输出** - `link/install/uninstall/list` 支持 `--json` 输出，便于 LLM 解析
+- **断链修复** - `j-skills link --doctor` 可诊断并清理/修复损坏软链接
 
 ## 支持的 Agents
 
@@ -60,7 +62,7 @@ Claude Code, Cursor, OpenCode, Cline, Continue, Codex, GitHub Copilot, Augment, 
 将本地 skill 目录链接到全局注册表，使用软链接实现热更新。
 
 ```bash
-# 链接当前目录（必须包含 skill.md）
+# 链接当前目录（必须包含 SKILL.md）
 j-skills link
 
 # 链接指定目录
@@ -83,6 +85,9 @@ j-skills link --doctor --json
 
 # JSON 输出（LLM 友好）
 j-skills link --list --json
+
+# 批量链接指定目录下一级 skill（每个子目录需包含 SKILL.md）
+j-skills link /path/to/skills --all --json
 ```
 
 JSON 输出示例：
@@ -105,13 +110,16 @@ JSON 输出示例：
 
 ```bash
 # 当前项目安装（默认）
-j-skills install <skill-name> --env claude-code,cursor
+j-skills install <skill-name> --env claude-code,cursor --json
 
 # 全局安装
-j-skills install <skill-name> --global --env claude-code,cursor
+j-skills install <skill-name> --global --env claude-code,cursor --json
 
 # 交互式安装（会提示选择项目/全局与环境）
 j-skills install <skill-name>
+
+# 全环境安装（非交互）
+j-skills install <skill-name> --global --all-env --yes --json
 
 # JSON 输出
 j-skills install <skill-name> --json
@@ -123,10 +131,10 @@ j-skills install <skill-name> --json
 
 ```bash
 # 当前项目卸载
-j-skills uninstall <skill-name> --env claude-code,cursor
+j-skills uninstall <skill-name> --local --yes --json
 
 # 全局卸载
-j-skills uninstall <skill-name> --global --yes
+j-skills uninstall <skill-name> --global --yes --json
 
 # 交互式卸载
 j-skills uninstall <skill-name>
@@ -140,14 +148,14 @@ j-skills uninstall <skill-name> --json
 查看已安装的 skills。
 
 ```bash
-# 列出项目级 skills（默认）
-j-skills list
+# 列出项目级 skills（默认，可配合 --search）
+j-skills list --local --json
 
 # 列出全局 skills
-j-skills list --global
+j-skills list --global --json
 
 # 列出所有 skills（项目 + 全局）
-j-skills list --all
+j-skills list --all --json
 
 # 搜索 skills
 j-skills list --search <keyword>
@@ -185,10 +193,17 @@ JSON 输出示例：
 
 ```bash
 # 查看配置
-j-skills config
+j-skills config:list
 
-# JSON 输出
-j-skills config --json
+# 设置配置
+j-skills config:set defaultEnvironments claude-code,cursor
+j-skills config:set registry https://registry.j-skills.dev
+
+# 其他配置命令
+j-skills config:registries
+j-skills config:add-registry <name> <url>
+j-skills config:use <name>
+j-skills config:reset
 ```
 
 ## 路径规范
@@ -204,10 +219,11 @@ j-skills 遵循 [Vercel Skills 规范](https://github.com/vercel-labs/skills#ava
 
 ## 工作流程
 
-1. **创建 Skill** - 创建包含 `skill.md` 的目录
+1. **创建 Skill** - 创建包含 `SKILL.md` 的目录
 2. **链接本地** - `j-skills link`
 3. **安装到环境** - `j-skills install <skill-name>`
-4. **热更新开发** - 修改本地文件，立即生效
+4. **健康检查** - `j-skills link --doctor --json`
+5. **热更新开发** - 修改本地文件，立即生效
 
 ## 软链接优势
 

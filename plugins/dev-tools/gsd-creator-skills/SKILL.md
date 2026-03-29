@@ -12,12 +12,14 @@ description: "基于 GSD 风格的 skills 生成与指导型元技能：用于�
 </purpose>
 
 <philosophy>
-**核心理念：结构化创建，渐进式完善。**
+**核心理念：先问清楚，再动手；结构化创建，渐进式完善。**
 
+- 创建前先通过问卷确认运行模式、门禁策略、Resume 需求、LLM 依赖
 - 每个 skill 都有明确的触发条件和分阶段执行流程
 - 优先使用 j-skills 标准工具链，但不强依赖
 - 检查点驱动，关键节点必须人工确认
 - 高级特性按需引入，不过度设计
+- 需要调用大模型的 skill，必须先验证 LLM 可用性再继续
 </philosophy>
 
 <trigger>
@@ -38,24 +40,30 @@ gsd skill 创建
     <trigger>创建 skill、新 skill、gsd skill、初始化 skill、优化 skill 结构</trigger>
     <requires>Read, Write, Edit, Glob, Bash, AskUserQuestion</requires>
 
-    <!-- 执行前检查点 -->
     <checkpoints>
-      <checkpoint order="1">已确认工作区路径</checkpoint>
-      <checkpoint order="2">已获取 skill 名称和功能描述</checkpoint>
-      <checkpoint order="3">用户确认生成的 SKILL.md 内容</checkpoint>
-      <checkpoint order="4">skill 集成验证通过</checkpoint>
+      <checkpoint order="1">已完成模式选择问卷</checkpoint>
+      <checkpoint order="2">已确认工作区路径</checkpoint>
+      <checkpoint order="3">LLM 可用性验证通过（如需要）</checkpoint>
+      <checkpoint order="4">用户确认生成的 SKILL.md 内容</checkpoint>
+      <checkpoint order="5">skill 集成验证通过</checkpoint>
     </checkpoints>
 
-    <!-- 安全约束 -->
     <constraints>
       <constraint>description 必须用双引号包裹，不以 TRIGGER: 开头</constraint>
       <constraint>name 使用小写字母+连字符（kebab-case）</constraint>
-      <constraint>每个交互点必须等待用户确认后才继续</constraint>
+      <constraint>每个交互点必须等待用户确认后才继续（YOLO 模式下仅高风险步骤阻塞）</constraint>
       <constraint>不自动执行 git push 或破坏性操作</constraint>
+      <constraint>需要 LLM 的 skill，必须先验证可用性，失败时给出友好修复建议而非原始报错</constraint>
     </constraints>
   </gsd:meta>
 
-  <gsd:goal>引导用户创建符合 GSD 最佳实践的 skill，完成从创建到集成验证的全流程</gsd:goal>
+  <gsd:goal>引导用户创建符合 GSD 最佳实践的 skill，完成从模式选择到集成验证的全流程</gsd:goal>
+
+  <gsd:phase name="questionnaire" order="0">
+    <gsd:step>通过 AskUserQuestion 一次性收集所有模式偏好</gsd:step>
+    <gsd:step>根据选择结果准备模板变量</gsd:step>
+    <gsd:checkpoint>用户确认模式选择</gsd:checkpoint>
+  </gsd:phase>
 
   <gsd:phase name="workspace" order="1">
     <gsd:step>检查当前目录是否为 skill 工作区</gsd:step>
@@ -63,25 +71,32 @@ gsd skill 创建
     <gsd:checkpoint>用户确认工作区路径</gsd:checkpoint>
   </gsd:phase>
 
-  <gsd:phase name="create" order="2">
+  <gsd:phase name="llm-check" order="2" condition="skill 需要调用大模型">
+    <gsd:step>识别所需 LLM 能力</gsd:step>
+    <gsd:step>执行静默可用性测试（不暴露原始报错）</gsd:step>
+    <gsd:step>验证失败时给出友好修复建议</gsd:step>
+    <gsd:checkpoint>LLM 可用性验证通过</gsd:checkpoint>
+  </gsd:phase>
+
+  <gsd:phase name="create" order="3">
     <gsd:step>获取 skill 名称和功能描述</gsd:step>
-    <gsd:step>创建目录结构和 SKILL.md</gsd:step>
+    <gsd:step>根据 Phase 0 选择从 references/skill-templates.md 组装模板</gsd:step>
     <gsd:checkpoint>用户确认生成的模板内容</gsd:checkpoint>
   </gsd:phase>
 
-  <gsd:phase name="dependencies" order="3" condition="用户选择添加依赖">
+  <gsd:phase name="dependencies" order="4" condition="用户选择添加依赖">
     <gsd:step>选择依赖来源和安装模式</gsd:step>
     <gsd:step>执行安装并记录到 skill-deps.json</gsd:step>
     <gsd:checkpoint>依赖安装验证通过</gsd:checkpoint>
   </gsd:phase>
 
-  <gsd:phase name="integrate" order="4">
+  <gsd:phase name="integrate" order="5">
     <gsd:step>通过 j-skills 或手动方式集成到环境</gsd:step>
     <gsd:step>验证 skill 可用性</gsd:step>
     <gsd:checkpoint>安装验证通过</gsd:checkpoint>
   </gsd:phase>
 
-  <gsd:phase name="optimize" order="5" condition="用户选择优化">
+  <gsd:phase name="optimize" order="6" condition="用户选择优化">
     <gsd:step>使用 create-skills 进行第二轮优化</gsd:step>
   </gsd:phase>
 </gsd:workflow>
@@ -90,52 +105,73 @@ gsd skill 创建
 
 ## 前置依赖
 
-### j-skills CLI 工具（可选，推荐）
+| 工具 | 必需 | 安装 |
+|------|------|------|
+| **j-skills** | 推荐 | `npm install -g j-skills` |
+| **create-skills** | 可选 | 见 `references/upstream-guide.md` |
 
-```bash
-npm install -g j-skills
-```
-
-若未安装，可手动创建 `<skill-name>/SKILL.md` 并复制/软链接到目标 skills 目录。
-
-### create-skills（可选增强）
-
-基于 [daymade/claude-code-skills](https://github.com/daymade/claude-code-skills) 的第二阶段优化工具。
-
-```bash
-git clone https://github.com/daymade/claude-code-skills.git
-cd claude-code-skills/create-skills
-j-skills link
-j-skills install create-skills -g --env claude-code
-```
+若未安装 j-skills，可手动创建 `<skill-name>/SKILL.md` 并复制/软链接到目标 skills 目录。
 
 ## 执行流程
+
+### Phase 0: 模式选择问卷
+
+**目标**：一次性收集用户对 skill 运行模式的偏好
+
+使用 `AskUserQuestion` 询问以下 4 个问题：
+
+| # | 问题 | 选项 |
+|---|------|------|
+| 1 | **运行模式** | YOLO（自动推进）/ 门禁（逐步确认，推荐） |
+| 2 | **Resume 支持** | 需要（跨会话恢复）/ 不需要（单次完成） |
+| 3 | **LLM 依赖** | 需要（调用大模型）/ 不需要（纯脚本） |
+| 4 | **外部依赖** | 有（其他 GitHub skill）/ 无（独立 skill） |
+
+收集后生成配置摘要供确认：
+
+```
+📋 Skill 创建配置：
+├── 运行模式: YOLO / 门禁
+├── Resume 支持: 是 / 否
+├── LLM 依赖: 是 / 否
+└── 外部依赖: 是 / 否
+```
+
+> 🛑 **Checkpoint** — 用户确认配置后继续
 
 ### Phase 1: 确认工作区
 
 **目标**：确定 skills 工作区目录
 
 **步骤**：
-1. 检查当前目录是否已包含 SKILL.md（在某个 skill 目录内）
+1. 检查当前目录是否已包含 SKILL.md
 2. 检查当前目录是否有多个 skill 子目录
 3. 若不是工作区，询问用户确认或提供路径
 
-> 🛑 **Checkpoint** — 必须确认工作区路径后才能继续
+> 🛑 **Checkpoint** — 确认工作区路径后继续
 
-### Phase 2: 创建 Skill
+### Phase 2: LLM 可用性验证（条件执行）
 
-**目标**：生成 skill 目录结构和初始 SKILL.md
+**触发条件**：Phase 0 选择「需要 LLM」
+
+**目标**：验证 LLM 服务可用性，避免创建后才发现无法使用
+
+**核心原则**：静默测试 → 先测再走 → 友好反馈（**禁止在 CLI 中暴露原始报错**）
+
+详细步骤和错误消息映射见 `references/llm-check-guide.md`。
+
+> 🛑 **Checkpoint** — LLM 验证通过后才继续（YOLO 模式下失败也暂停）
+
+### Phase 3: 创建 Skill
+
+**目标**：根据 Phase 0 配置，组装并生成 SKILL.md
 
 > 📝 **需要用户输入**
 >
 > | 字段 | 格式 | 示例 |
 > |------|------|------|
 > | skill 名称 | 小写字母+连字符 | `my-skill` |
-> | 功能描述 | 简短说明触发条件 | "用于处理 xxx 场景" |
->
-> **description 格式要求**：
-> - **必须用双引号包裹** — 避免 YAML 解析错误
-> - 不要以 `TRIGGER:` 开头 — 直接写描述即可
+> | 功能描述 | 双引号包裹，不以 TRIGGER: 开头 | "用于处理 xxx 场景" |
 
 **步骤**：
 1. 询问 skill 名称和功能描述
@@ -143,190 +179,48 @@ j-skills install create-skills -g --env claude-code
    ```
    <skill-name>/
    ├── SKILL.md              # 必需
-   ├── scripts/              # 可选：可执行脚本
-   ├── references/           # 可选：参考文档
-   └── assets/               # 可选：资源文件
+   ├── scripts/              # 可选（Resume 模式下必需）
+   ├── references/           # 可选
+   └── assets/               # 可选
    ```
-3. 生成 SKILL.md（使用下方 GSD 模板）
+3. 从 `references/skill-templates.md` 选择并组装模板：
+   - **门禁** → 模板 A（+ 可选 Resume 块 / LLM 块）
+   - **YOLO** → 模板 B（+ 可选 Resume 块 / LLM 块）
 
-**GSD 风格 SKILL.md 模板**：
+> 🛑 **Checkpoint** — 用户确认生成的模板内容后继续
 
-```markdown
----
-name: <skill-name>
-description: "<简短描述，说明何时触发此 skill>"
----
+### Phase 4: 外部依赖管理（条件执行）
 
-<role>
-你是一个 xxx 专家。
-</role>
+**触发条件**：Phase 0 选择「有外部依赖」
 
-<purpose>
-当用户需要 xxx 时，执行 yyy。
-</purpose>
+详细步骤见 `references/dependency-management.md`。
 
-<trigger>
-触发示例
-</trigger>
+简要流程：选择来源 → 选择安装模式（j-skills / 离线）→ 执行安装 → 记录到 `skill-deps.json`
 
-<gsd:workflow>
-  <gsd:meta>
-    <name><skill-name></name>
-    <trigger>关键词列表</trigger>
-    <requires>所需工具</requires>
-    <checkpoints>
-      <checkpoint order="1">检查点 1</checkpoint>
-    </checkpoints>
-    <constraints>
-      <constraint>约束 1</constraint>
-    </constraints>
-  </gsd:meta>
+> ✅ **Checkpoint** — 依赖安装验证通过
 
-  <gsd:goal>一句话目标</gsd:goal>
-
-  <gsd:phase name="phase-1" order="1">
-    <gsd:step>步骤 1</gsd:step>
-    <gsd:checkpoint>检查点</gsd:checkpoint>
-  </gsd:phase>
-</gsd:workflow>
-
-# <Skill 标题>
-
-## 执行流程
-
-### Phase 1: <阶段名称>
-
-**目标**：<可验证目标>
-
-**步骤**：
-1. <步骤 1>
-2. <步骤 2>
-
-**Checkpoint**：<停止条件>
-
-## 验证
-
-<完成后的验证方式>
-
-## Next Up
-
-- [ ] <下一阶段目标>
-- [ ] 可复制命令: `<command>`
-```
-
-> 🛑 **Checkpoint** — 用户确认模板内容后进入下一阶段
-
-### Phase 3: 外部依赖管理（可选）
-
-**目标**：为 skill 添加外部 GitHub 仓库的 skill 依赖
-
-> 🔄 **需要用户选择**：跳过 / 添加依赖
-
-#### 3.1 选择依赖来源
-
-1. 询问 GitHub 仓库地址（如 `daymade/claude-code-skills`）
-2. 询问仓库内 skill 路径（如 `create-skills`）
-3. 询问 Git 引用（默认 `main`）
-
-#### 3.2 选择安装模式
-
-| 模式 | 说明 | 适用场景 |
-|------|------|----------|
-| **j-skills 模式** | `j-skills link + install` | 开发环境、频繁更新 |
-| **离线模式** | 克隆到 `references/_deps/` | 网络受限、稳定依赖 |
-
-#### 3.3 执行安装
-
-**j-skills 模式**：
-```bash
-git clone --depth 1 https://github.com/<owner>/<repo>.git /tmp/<repo-name>
-cd /tmp/<repo-name>/<skill-path>
-j-skills link
-j-skills install <skill-name> -g
-```
-
-**离线模式**：
-```bash
-mkdir -p references/_deps
-git clone --depth 1 https://github.com/<owner>/<repo>.git references/_deps/<repo-name>
-```
-
-#### 3.4 记录依赖
-
-创建或更新 `skill-deps.json`：
-
-```json
-{
-  "$schema": "./skill-deps.schema.json",
-  "dependencies": {
-    "<dep-name>": {
-      "source": "github:<owner>/<repo>",
-      "path": "<skill-path>",
-      "ref": "<ref>",
-      "commit": "<commit-hash>",
-      "installMode": "<offline|j-skills>",
-      "installedAt": "<ISO-8601-timestamp>",
-      "localPath": "references/_deps/<repo-name>/<skill-path>"
-    }
-  }
-}
-```
-
-> ✅ **Checkpoint** — 验证依赖安装成功
-
-> 📖 详细文档：`references/dependency-management.md`
-
-### Phase 4: 集成与验证
+### Phase 5: 集成与验证
 
 **目标**：将 skill 集成到目标环境并验证可用性
 
-#### 方案 A：使用 j-skills（推荐）
-
-```bash
-cd <skills-workspace>/<skill-name>
-j-skills link
-j-skills install <skill-name> -g --all-env
-j-skills link --list
-j-skills list -g
-```
-
-#### 方案 B：手动安装
-
-1. 复制或软链接 `<skill-name>/SKILL.md` 到目标 skills 目录
-2. 重启会话，通过触发词验证
+**方案 A**（推荐）：`j-skills link` → `j-skills install <name> -g`
+**方案 B**（手动）：复制/软链接 SKILL.md 到目标 skills 目录
 
 > ✅ **Checkpoint** — 确认 skill 安装成功并可触发
 
-### Phase 5: 可选优化（create-skills）
+### Phase 6: 可选优化
 
-**目标**：使用 create-skills 进行第二轮优化
+> 🔄 需要优化 → `j-skills run create-skills` / 跳过
 
-> 🔄 **需要用户选择**：需要优化 / 跳过
+---
 
-```bash
-cd <skills-workspace>/<skill-name>
-j-skills run create-skills
-```
-
-## 高级特性索引
-
-以下高级模式按需查阅，详见对应参考文档：
-
-| 特性 | 参考文档 | 适用场景 |
-|------|----------|----------|
-| XML 辅助编排 | `references/gsd-xml-tags.md` | 复杂 workflow 的结构化对齐 |
-| Hooks 与强制顺序 | `references/hooks-patterns.md` | 项目级 hook、skill 内 checkpoint |
-| 脚本解耦与外置进度 | `references/scripting-workflow-techniques.md` | 长流程、多状态任务 |
-| 跨会话 Workflow | `references/cross-session-workflow-skill-design.md` | 分阶段执行、中断恢复 |
-| YOLO / Interactive 模式 | `references/yolo-mode-patterns.md` | workflow 运行模式显式化 |
-| Approve 检查点设计 | `references/approve-patterns.md` | 验证型/决策型/行动型确认 |
-| 外部 Skill 依赖管理 | `references/dependency-management.md` | 离线/j-skills 两种模式 |
-
-## 参考文档完整索引
+## 参考文档索引
 
 | 文件 | 用途 |
 |------|------|
-| `references/dependency-management.md` | 外部 skill 依赖管理规范 |
+| `references/skill-templates.md` | **Skill 模板库**：门禁/YOLO 模板 + Resume/LLM 扩展块 |
+| `references/llm-check-guide.md` | **LLM 验证指南**：静默测试步骤、错误映射、修复建议模板 |
+| `references/dependency-management.md` | 外部 skill 依赖管理详细步骤 |
 | `references/gsd-xml-tags.md` | GSD workflow XML 词汇表 |
 | `references/hooks-patterns.md` | Hook 与 checkpoint 模式 |
 | `references/scripting-workflow-techniques.md` | 脚本解耦、外置进度 |
@@ -339,57 +233,36 @@ j-skills run create-skills
 | `references/CHANGELOG.md` | 规则修订记录 |
 | `skill-deps.schema.json` | 依赖清单 JSON Schema |
 
-## 最佳实践
-
-1. **统一管理** — 所有自定义 skills 放在同一工作区目录
-2. **命名规范** — 小写字母+连字符，如 `my-skill`
-3. **描述清晰** — description 准确说明触发条件，双引号包裹
-4. **GSD XML 结构** — 使用 `<role>`/`<gsd:workflow>` 标签定义 skill 结构
-5. **脚本解耦** — 多步骤任务用 `scripts/` + 外置状态文件
-6. **跨会话协议** — 阶段型任务使用 `next_action` + `Next Up` + `resume-signal`
-7. **子 Agent 样式** — 创建子 Agent 时包含 `background` 的 `color` 属性
-
-## 常见问题
-
-**Q: 修改 skill 后不生效？**
-A: 先跑下方 Check List，再查看 `references/trouble-shooting.md`。
-
-**Q: 如何删除 skill？**
-A: 先卸载 `j-skills uninstall <name> -g`，再取消链接 `j-skills link --unlink <name>`。
-
-**Q: 没有 j-skills 还能用吗？**
-A: 可以。手动创建/复制/软链接到目标 skills 目录即可。
-
-**Q: 提示 `missing YAML frontmatter delimited by ---` 怎么办？**
-A: 说明 `SKILL.md` 顶部缺少或损坏 frontmatter。按 `references/trouble-shooting.md` 的第 4 节补齐 `---` 包裹的 `name` 和 `description` 即可。
-
 ## Check List
 
 1. `SKILL.md` 顶部包含完整 frontmatter（`---` 包裹）：`name` + `description`
 2. `description` 使用双引号包裹，不以 `TRIGGER:` 开头
 3. `name` 使用小写字母+连字符
-4. 若使用 `j-skills`：`j-skills link --list` / `j-skills list -g` 能看到目标 skill
-5. 若不使用 `j-skills`：skill 已正确复制或软链接到目标 skills 目录
-6. 变更后已重启会话，并用触发词完成一次验证
+4. YOLO 模式的 skill 包含 `<yolo:config>` 块和安全门定义
+5. Resume 模式的 skill 包含状态文件和 Next Up 契约
+6. LLM 依赖的 skill 包含静默预检查和友好错误处理
+7. `j-skills link --list` / `j-skills list -g` 能看到目标 skill
+8. 变更后已重启会话并用触发词验证
+9. `SKILL.md` 行数 ≤ 500，超出部分抽离到 `references/`
+9. `SKILL.md` 行数 ≤ 500，超出部分抽离到 `references/`
 
 ---
 
-## ⚠️ 用户交互点总结
+## 用户交互点总结
 
-| 阶段 | 标记 | 用户操作 |
-|------|------|----------|
-| Phase 1 | 🛑 | 确认工作区目录 |
-| Phase 2 | 📝 | 输入 skill 名称和功能描述 |
-| Phase 2 | 🛑 | 确认生成的 SKILL.md 内容 |
-| Phase 3 | 🔄 | 选择是否添加外部依赖 |
-| Phase 3 | 📝 | 输入 GitHub 仓库地址和 skill 路径 |
-| Phase 3 | 🔄 | 选择 j-skills 或离线模式 |
-| Phase 3 | ✅ | 确认依赖安装成功 |
-| Phase 4 | ✅ | 确认安装成功 |
-| Phase 5 | 🔄 | 选择是否进行优化 |
+| 阶段 | 标记 | 用户操作 | YOLO 行为 |
+|------|------|----------|-----------|
+| Phase 0 | 📝🔄 | 回答模式问卷并确认配置 | — |
+| Phase 1 | 🛑 | 确认工作区目录 | 自动检测，仅异常时暂停 |
+| Phase 2 | 🛑 | LLM 验证（如需要） | 验证失败仍暂停 |
+| Phase 3 | 📝 | 输入 skill 名称和功能描述 | — |
+| Phase 3 | 🛑 | 确认 SKILL.md 内容 | 自动继续 |
+| Phase 4 | 🔄 | 添加外部依赖 | 自动跳过（如无依赖） |
+| Phase 5 | ✅ | 确认安装成功 | 自动验证 |
+| Phase 6 | 🔄 | 选择是否优化 | 自动跳过 |
 
-**LLM 执行提示**：
-- 🛑 → **必须等待用户确认**，不能自动跳过
+**标记说明**：
+- 🛑 → **必须等待确认**（门禁）/ **仅 HARD_GATE 阻塞**（YOLO）
 - 📝 → **需要用户输入**，使用 AskUserQuestion
-- ✅ → **需要验证结果**，确认后才继续
-- 🔄 → **需要用户选择**，提供选项
+- ✅ → **需要验证结果**
+- 🔄 → **需要用户选择**

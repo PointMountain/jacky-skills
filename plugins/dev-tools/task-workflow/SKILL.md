@@ -3,396 +3,125 @@ name: task-workflow
 description: "任务工作流编排工具。整合 task-memory、superpowers、task-harness 形成完整的任务执行流程。触发于 /task-workflow 或\"工作流编排\"、\"任务流程\"等关键词。"
 ---
 
-<critical>
-**强制约束 - 违反任何一条即为严重错误**
+# Task Workflow - 任务工作流编排
 
-1. **禁止跳过阶段**：必须按 INIT -> LISTEN -> BRAINSTORM -> HARNESS -> PLAN -> EXECUTE -> VERIFY -> REVIEW 顺序执行。只有用户明确指定 `quick`（跳过 BRAINSTORM）或 `yolo`（跳过所有门控）时才可跳过，且必须用户在命令中显式指定。
+将复杂任务拆分为可门控的阶段流程：INIT → BRAINSTORM → HARNESS → PLAN → EXECUTE → REVIEW。
 
-2. **禁止自行授权模式切换**：AI 不得自行判断使用 quick/yolo 模式。模式由用户命令决定：`/task-workflow` = 标准，`/task-workflow quick` = 快速，`/task-workflow yolo` = 全自动。
-
-3. **每个阶段必须使用 AskUserQuestion 获得用户确认**：完成一个阶段后，必须暂停并询问用户是否 approve，不能自行进入下一阶段（yolo 模式除外）。
-
-4. **禁止直接实现代码**：在进入 EXECUTE 阶段前，不得编写任何实现代码。阅读代码、分析代码是允许的。
-
-5. **必须调用依赖 skill**：LISTEN 阶段必须调用 task-memory，HARNESS 阶段必须调用 task-harness。如果不可用，必须暂停并提示用户安装。
-
-6. **禁止先写实现再补测试**：EXECUTE 阶段必须先写失败测试（Red），确认失败后再写实现代码（Green）。每个任务的执行顺序为：Red（写测试 → 运行确认失败）→ Green（写最小实现 → 测试通过）→ 记录偏差。
-</critical>
-
-<role>
-你是 Task Workflow 编排器。你的职责是协调多个工具完成复杂任务：
-
-1. **task-memory** - 全程监听，记录初始意图与执行偏差
-2. **superpowers** - 提供创意发散、计划编写、计划执行能力
-3. **task-harness** - 定义可验证的验收边界
-</role>
-
-<purpose>
-将复杂任务拆分为可门控的阶段流程，串联记忆、规划、执行与验证，确保结果可追踪且可验收。
-</purpose>
-
-<trigger>
-```text
-/task-workflow
-工作流编排
-任务流程
-多阶段任务执行
-需要 task-memory + task-harness 联动
-```
-</trigger>
-
-<gsd:workflow>
-  <gsd:meta>
-    <owner>task-workflow</owner>
-    <mode>stage-orchestration</mode>
-  </gsd:meta>
-  <gsd:goal>以阶段门控方式完成任务闭环：从初始化到复盘，全程有记录、有验收、有回放。</gsd:goal>
-  <gsd:phase id="1" name="init-listen">初始化工作流状态并启动 task-memory 建立跨会话记忆。</gsd:phase>
-  <gsd:phase id="2" name="design-plan">完成 brainstorming 与 harness 边界定义，再生成可执行计划。</gsd:phase>
-  <gsd:phase id="3" name="execute-verify-review">执行实现并循环验证，测试通过后进入 review 沉淀复盘。</gsd:phase>
-</gsd:workflow>
-
-<dependencies>
-本 skill 依赖以下两个 skill，执行前确保它们已可用：
-
-| Skill | 用途 | 触发命令 |
-|-------|------|----------|
-| **task-memory** | 对话监听与偏差记录 | `/task-memory` |
-| **task-harness** | 验收边界定义 | `/task-harness` |
-
-<required_reading>
-在开始工作流前，确认用户已安装依赖 skill：
-```bash
-j-skills list -g | grep -E "task-memory|task-harness"
-```
-如未安装，提示用户执行：
-```bash
-j-skills install task-memory -g
-j-skills install task-harness -g
-```
-</required_reading>
-</dependencies>
-
----
-
-<workflow_overview>
-
-```
-INIT -> LISTEN -> BRAINSTORM -> HARNESS -> PLAN -> EXECUTE <-> VERIFY -> REVIEW
-  |        |         |          |        |        |      |        |
-  |        |         |          |        |        |      |        +-- 复盘总结
-  |        |         |          |        |        |      +-- 测试通过后进入
-  |        |         |          |        |        +-- 执行任务（TDD 驱动）
-  |        |         |          |        +-- 生成执行计划
-  |        |         |          +-- 定义验收边界 + 测试用例
-  |        |         +-- 创意发散（superpowers）
-  |        +-- 启动 task-memory 监听
-  +-- 初始化工作流
-```
-
-| 阶段 | 工具 | 产物 | 核心目标 |
-|------|------|------|----------|
-| INIT | - | `.harness/tasks/{task-slug}/workflow.json` | 初始化目录与状态 |
-| LISTEN | task-memory | `.harness/tasks/{task-slug}/listen/intent.md` | 记录初始意图 |
-| BRAINSTORM | superpowers:brainstorming | `.harness/tasks/{task-slug}/brainstorm/` | 创意发散 |
-| HARNESS | task-harness | `.harness/tasks/{task-slug}/harness/` | 定义验收边界 + 测试用例 |
-| PLAN | superpowers:writing-plans | `.harness/tasks/{task-slug}/plan/PLAN.md` | 生成执行计划 |
-| EXECUTE | superpowers:executing-plans | 源码文件 | 实现功能 |
-| **VERIFY** | 测试框架 | 测试报告 | **测试通过才进入下一阶段** |
-| REVIEW | task-memory | `.harness/tasks/{task-slug}/listen/review.md` | 复盘总结 |
-
-</workflow_overview>
-
----
-
-<commands>
+## 模式
 
 | 命令 | 说明 |
 |------|------|
-| `/task-workflow <任务描述>` | 启动完整工作流（需用户确认） |
-| `/task-workflow quick <任务描述>` | 快速模式（跳过 BRAINSTORM） |
-| `/task-workflow yolo <任务描述>` | **YOLO 模式**（全自动，无阶段确认，失败会中止） |
+| `/task-workflow <描述>` | 标准模式 |
+| `/task-workflow quick <描述>` | 跳过 BRAINSTORM |
+| `/task-workflow yolo <描述>` | 全自动，无门控确认，失败中止 |
 | `/task-workflow status` | 查看当前状态 |
-| `/task-workflow next` | 进入下一阶段 |
-| `/task-workflow goto <阶段>` | 跳转到指定阶段 |
-| `/task-workflow record <描述>` | 手动记录偏差 |
 | `/task-workflow end` | 结束工作流，生成复盘 |
 
-</commands>
+## 复杂度评估（INIT 阶段自动判定）
 
----
+| 复杂度 | 条件 | 推荐模式 | 门控策略 |
+|--------|------|----------|----------|
+| 简单 | 影响文件 ≤ 3，无跨模块依赖 | quick | 自动通过 BRAINSTORM/HARNESS，仅 PLAN 确认 |
+| 中等 | 影响文件 4-8，有模块间依赖 | standard | HARNESS + PLAN 需确认 |
+| 复杂 | 影响文件 > 8，跨系统/架构级变更 | standard | BRAINSTORM + HARNESS + PLAN 需确认 |
 
-<process>
+> 用户可覆盖推荐模式。yolo 模式跳过所有门控。
 
-<step name="init" priority="first">
+## 工作流阶段
 
-**目标**：初始化工作流目录和状态
-
-**动作**：
-1. 生成 `task-slug`（基于任务名称规范化）
-2. 创建 `.harness/tasks/{task-slug}/` 目录结构
-3. 生成 `workflow.json` 记录状态
-4. 确认依赖 skill 已安装
-5. **检索已有实现**：使用 Grep/Glob 扫描项目中与任务相关的代码（关键词、文件路径模式），将检索结果写入 `.harness/tasks/{task-slug}/listen/search.md`，供后续阶段参考避免重复劳动
-6. **判断任务复杂度**：基于以下维度评估并记录到 workflow.json：
-   - **简单**（影响文件 ≤ 3，无跨模块依赖）→ 推荐 `quick` 模式
-   - **中等**（影响文件 4-8，有模块间依赖）→ 推荐 `standard` 模式
-   - **复杂**（影响文件 > 8，跨系统/架构级变更）→ 推荐 `standard` + 强调 BRAINSTORM 阶段深度探索
-   - 向用户展示复杂度评估，用户可覆盖推荐模式
-7. 更新 `.harness/current.json`（指向当前活跃任务）
-8. 更新 `workflow.json`：currentStage = "INIT", stageTimeline.INIT = { enteredAt: now }, updatedAt = now，complexity = { level, affectedFileCount, recommendation }
-
-```bash
-mkdir -p .harness/tasks/{task-slug}/{listen,brainstorm,harness,plan,execute,review}
+```
+INIT → BRAINSTORM → HARNESS → PLAN → EXECUTE → REVIEW
+        (quick跳过)                      (含验证)
 ```
 
-**产物**：`.harness/tasks/{task-slug}/workflow.json` + `.harness/current.json`
+### INIT
 
-**门控确认**：不需要（自动进入 LISTEN）
+1. 生成 task-slug，创建 `.harness/tasks/{slug}/` 目录
+2. 检索已有实现（Grep/Glob 扫描相关代码）
+3. 评估任务复杂度，向用户展示推荐模式
+4. 如 task-memory 可用，启动监听记录初始意图
+5. 写入 `workflow.json`
 
-</step>
+**自适应门控**：简单任务自动进入 PLAN；中等/复杂任务进入 BRAINSTORM（或 HARNESS，如果 quick 模式）。
 
-<step name="listen">
+### BRAINSTORM（quick 模式跳过）
 
-**目标**：启动 task-memory，记录初始意图
+调用 superpowers:brainstorming 进行创意发散，生成方案对比，记录最终决策。
 
-**动作**：调用 `/task-memory start "{{任务名}}"`
+**门控**：中等任务自动通过；复杂任务需用户确认。
 
-- 检查是否有历史记录（恢复场景）
-- 记录本次会话的初始 Prompt
-- 建立任务跟踪
-- 更新 `workflow.json`：currentStage = "LISTEN", stageTimeline.INIT.exitedAt = now, stageTimeline.LISTEN = { enteredAt: now }, updatedAt = now
-- 更新 `.harness/current.json`：currentStage = "LISTEN", updatedAt = now
+### HARNESS
 
-**产物**：`.harness/tasks/{task-slug}/listen/intent.md`
+基于 brainstorm 结果（或 INIT 检索结果，如果是 quick 模式），定义验收边界和测试用例。
 
-**门控确认**（必须）：
-使用 AskUserQuestion 询问用户：
-- 问题："初始意图已记录，是否继续进入 BRAINSTORM 阶段？"
-- 选项：approve 继续 / 调整任务描述
+> 如果 task-harness 可用，调用 `/task-harness` 辅助生成。Harness 模板见 `references/storage-structure.md`。
 
-**异常处理**：如果 task-memory 不可用，暂停并提示用户安装：`j-skills install task-memory -g`
+**门控**：中等/复杂任务需用户确认验收标准。
 
-</step>
+### PLAN
 
-<step name="brainstorm">
+基于 HARNESS 验收标准 + INIT 检索的已有实现，生成 PLAN.md。必须包含：
 
-**目标**：使用 superpowers:brainstorming 进行创意发散
+- **受影响文件清单**（create/modify/delete）
+- **任务依赖关系**
+- **风险与回归点**
+- **失败模式**（每个关键任务的回退方案）
 
-**动作**：
-1. 调用 `/brainstorming`
-2. 引导用户描述需求细节
-3. 生成方案对比，记录最终决策
-4. 更新 `workflow.json`：currentStage = "BRAINSTORM", stageTimeline.LISTEN.exitedAt = now, stageTimeline.BRAINSTORM = { enteredAt: now }, updatedAt = now
-5. 更新 `.harness/current.json`：currentStage = "BRAINSTORM", updatedAt = now
+**门控**：所有复杂度都需要用户确认执行计划。
 
-**产物**：
-- `.harness/tasks/{task-slug}/brainstorm/mindmap.md`
-- `.harness/tasks/{task-slug}/brainstorm/options.md`
-- `.harness/tasks/{task-slug}/brainstorm/decision.md`
+### EXECUTE（含验证）
 
-**门控确认**（必须）：
-使用 AskUserQuestion 询问用户：
-- 问题："需求是否已澄清完成？"
-- 选项：
-  - approve：需求已澄清，进入 HARNESS
-  - continue：继续探索更多细节
-  - adjust：重新定义需求后再次 brainstorm
+逐个执行 PLAN.md 中的任务，严格按 **TDD 红→绿** 顺序：
 
-**跳过条件**：用户命令为 `/task-workflow quick` 时跳过此阶段
+1. **Red**：写失败测试，运行确认失败
+2. **Green**：写最小实现代码，测试通过
+3. 记录执行偏差（如有 task-memory）
 
-</step>
+验证失败时循环修复（最多 5 次），超过上限暂停询问用户。
 
-<step name="harness">
+> 详细 TDD 验证协议见 `references/tdd-protocol.md`
 
-**目标**：使用 task-harness 定义可验证的验收边界
+**门控**：yolo 模式自动通过；其他模式完成后确认。
 
-**动作**：
-1. 调用 `/task-harness "{{基于 brainstorm 结果的任务描述}}"`
-2. 通过问答明确验收边界
-3. 生成 Harness 定义 + 验证脚本
-4. 更新 `workflow.json`：currentStage = "HARNESS", stageTimeline.BRAINSTORM.exitedAt = now, stageTimeline.HARNESS = { enteredAt: now }, updatedAt = now
-5. 更新 `.harness/current.json`：currentStage = "HARNESS", updatedAt = now
+### REVIEW
 
-**产物**：
-- `.harness/tasks/{task-slug}/harness/harness.md`
-- `.harness/tasks/{task-slug}/harness/verify.sh`
-
-**验收标准要求**：必须可检测、明确无歧义、覆盖核心功能、最小化只验证必要条件。
-
-**失败模式要求**：Harness 必须包含 `<failure_modes>` 部分，为每个 MUST 条件定义：
-- 预期失败场景（什么情况下会不通过）
-- 检测方式（如何发现失败）
-- 恢复策略（失败后的处理方式）
-
-> Harness 模板和反模式见 references/storage-structure.md
-
-**门控确认**（必须）：
-使用 AskUserQuestion 询问用户：
-- 问题："验收标准是否确认？"
-- 选项：
-  - approve：验收标准确认，进入 PLAN
-  - adjust：修改不合理的验收条件
-  - add：补充遗漏的验收条件
-
-**异常处理**：如果 task-harness 不可用，暂停并提示用户安装：`j-skills install task-harness -g`
-
-</step>
-
-<step name="plan">
-
-**目标**：使用 superpowers:writing-plans 生成执行计划
-
-**动作**：
-1. 基于 Harness 验收标准 + INIT 阶段的 search.md（已有实现参考）
-2. 调用 `/writing-plans`
-3. 生成 PLAN.md，必须包含以下**蓝图四要素**：
-   - **受影响文件清单**：标注每个文件的变更类型（create/modify/delete）
-   - **代码依赖关系**：任务间的依赖标注（哪些任务必须先完成）
-   - **风险与回归点**：可能破坏的现有功能 + 需要回归验证的场景
-   - **失败模式**：每个关键任务的回退方案（if X fails, then Y）
-4. 更新 `workflow.json`：currentStage = "PLAN", stageTimeline.HARNESS.exitedAt = now, stageTimeline.PLAN = { enteredAt: now }, updatedAt = now
-5. 更新 `.harness/current.json`：currentStage = "PLAN", updatedAt = now
-
-**产物**：`.harness/tasks/{task-slug}/plan/PLAN.md`
-
-> Plan 模板见 references/storage-structure.md
-
-**成功标准**：
-- 所有 MUST 条件都有对应任务
-- 每个任务都有 verify 定义
-- 任务顺序符合依赖关系
-
-**门控确认**（必须）：
-使用 AskUserQuestion 询问用户：
-- 问题："执行计划是否确认？"
-- 选项：
-  - approve：计划确认，开始执行
-  - adjust：调整任务顺序或内容
-  - add：补充遗漏的任务
-
-</step>
-
-<step name="execute">
-
-**目标**：使用 superpowers:executing-plans 执行，编写实现代码
-
-**动作**：
-1. 读取 HARNESS 提取 MUST 条件
-2. 逐个执行 PLAN.md 中的任务（严格按 Red-Green 顺序）：
-   - **Red**：先写失败测试（基于 HARNESS MUST 条件），运行确认测试失败
-   - **Green**：实现最小代码使测试通过
-   - 记录执行偏差到 task-memory
-3. 每次用户输入后记录到 task-memory
-4. 更新 `workflow.json`：currentStage = "EXECUTE", stageTimeline.PLAN.exitedAt = now, stageTimeline.EXECUTE = { enteredAt: now }, updatedAt = now
-5. 更新 `.harness/current.json`：currentStage = "EXECUTE", updatedAt = now
-
-**产物**：源码文件 + 测试文件
-
-**门控确认**（必须）：
-使用 AskUserQuestion 询问用户：
-- 问题："任务代码已编写完成，是否进入 VERIFY？"
-- 选项：
-  - approve：确认完成，进入 VERIFY
-  - adjust：调整实现
-  - add：补充遗漏任务
-
-</step>
-
-<step name="verify">
-
-**目标**：基于 HARNESS 运行所有验证脚本，确保 MUST 条件全部通过
-
-**动作**：
-1. 读取所有 HARNESS 的 MUST 条件
-2. 运行 `verify.sh` 验证脚本
-3. 失败则循环修复（最多 5 次，复用 tdd-protocol.md 的逻辑）
-4. 超过重试上限则暂停询问用户
-5. 更新 `workflow.json`：currentStage = "VERIFY", stageTimeline.EXECUTE.exitedAt = now, stageTimeline.VERIFY = { enteredAt: now }, updatedAt = now
-6. 更新 `.harness/current.json`：currentStage = "VERIFY", updatedAt = now
-
-> 详细的 TDD 验证协议、Verify Loop 流程图、失败分析模板见 references/tdd-protocol.md
-
-**产物**：测试报告
-
-**门控确认**（必须）：
-使用 AskUserQuestion 询问用户：
-- 问题："所有 HARNESS MUST 条件是否全部通过？"
-- 选项：
-  - approve：全部通过，进入 REVIEW
-  - report：查看详细测试报告
-  - fix：返回修复问题
-
-**异常处理**：重试 5 次后暂停，使用 AskUserQuestion 询问用户：
-- 选项：
-  - 重新设计 HARNESS
-  - 重新制定 PLAN
-  - 手动介入修复
-
-</step>
-
-<step name="review">
-
-**目标**：保存最终状态，生成复盘（入口来自 VERIFY 通过）
-
-**动作**：
-1. 调用 `/task-memory save "任务完成"` 保存最终进展
-2. 汇总 VERIFY 阶段的测试报告
-3. 调用 `/task-memory end` 结束任务
-4. 更新 `workflow.json`：currentStage = "COMPLETED", status = "completed", stageTimeline.VERIFY.exitedAt = now, stageTimeline.REVIEW = { enteredAt: now, exitedAt: now }, updatedAt = now
-5. 更新 `.harness/current.json`：currentStage = "COMPLETED", updatedAt = now
-
-**产物**：`.harness/tasks/{task-slug}/listen/review.md`
-
-**门控确认**：不需要（自动完成）
+保存最终状态，生成复盘报告。自动完成，无需确认。
 
 ```
 任务记录已保存到: .harness/tasks/{task-slug}/
-下次可使用 /task-memory recall 恢复上下文
 ```
 
-</step>
+## 恢复机制
 
-<step name="resume" trigger="current.json exists and status != completed">
+检测到 `.harness/current.json` 且 status ≠ completed 时，展示断点摘要并询问恢复策略（continue / restart-stage / abort）。
 
-**目标**：从断点恢复中断的工作流
+## 存储结构
 
-**触发条件**：检测到 `.harness/current.json` 存在且 status 不是 completed
+```
+.harness/
+├── current.json                    # 当前活跃任务指针
+└── tasks/{slug}/
+    ├── workflow.json               # 工作流状态
+    ├── PLAN.md                     # 执行计划
+    └── *.test.*                    # 测试文件
+```
 
-**动作**：
-1. 读取 `.harness/current.json` 获取活跃任务 slug
-2. 读取 `.harness/tasks/{task-slug}/workflow.json` 获取完整状态
-3. 定位断点：分析 stageTimeline 找到最后一个有 enteredAt 但无 exitedAt 的阶段
-4. 展示恢复摘要：
-   - 任务名称与当前阶段
-   - 已完成阶段列表
-   - 断点阶段的进入时间
-   - 是否存在偏差记录
-5. 使用 AskUserQuestion 询问用户恢复策略：
-   - **continue**：从断点阶段继续（保留已有产物）
-   - **restart-stage**：重新执行当前阶段（清除该阶段产物）
-   - **abort**：放弃当前任务，从当前阶段退出
-6. 根据用户选择执行恢复操作，更新 `workflow.json` 和 `current.json`
+## 推荐 Skill（非强制）
 
-**产物**：无新产物，恢复已有工作流状态
+| Skill | 用途 | 何时有用 |
+|-------|------|----------|
+| task-memory | 对话监听与偏差记录 | 复杂任务需要跨会话记忆 |
+| task-harness | 验收边界定义 | 需要严格的验收标准 |
 
-**门控确认**：恢复策略确认（上述 AskUserQuestion）
+不可用时静默降级，不阻塞流程。
 
-</step>
+## References
 
-</process>
-
----
-
-<references>
-
-本 skill 的详细参考文档位于 `references/` 目录：
+详细参考文档位于 `references/` 目录：
 
 | 文件 | 内容 |
 |------|------|
-| `references/tdd-protocol.md` | TDD 哲学、Verify Loop 流程图、失败分析模板、TDD 最佳实践 |
-| `references/stage-transitions.md` | 阶段跳转规则、门控协议、quick/yolo 模式说明 |
-| `references/storage-structure.md` | 目录结构、task-slug 规则、工具集成、模板 |
-| `references/examples.md` | 完整示例、各阶段详细说明 |
-
-</references>
+| `references/tdd-protocol.md` | TDD 哲学、Verify Loop 流程图、失败分析模板 |
+| `references/stage-transitions.md` | 阶段跳转规则、门控协议 |
+| `references/storage-structure.md` | 目录结构、task-slug 规则、模板 |
+| `references/examples.md` | 完整示例 |

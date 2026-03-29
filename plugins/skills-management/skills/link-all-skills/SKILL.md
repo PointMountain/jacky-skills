@@ -22,7 +22,7 @@ description: "将当前项目下所有 skills 链接到全局注册表并安装�
 
 </trigger>
 <gsd:workflow xmlns:gsd="urn:gsd:workflow">
-  <gsd:meta>scope=current-project; command_set=find,j-skills link,j-skills install --all-env</gsd:meta>
+  <gsd:meta>scope=current-project; command_set=find,j-skills link,j-skills install --all-env,j-skills link --doctor</gsd:meta>
   <gsd:goal>确保仓库内每个 `SKILL.md` 都被正确链接并分发到目标环境。</gsd:goal>
   <gsd:phase>扫描并收集所有 skill 目录，过滤无效路径。</gsd:phase>
   <gsd:phase>按 skill 执行 unlink+link，随后执行全环境全局安装。</gsd:phase>
@@ -32,6 +32,7 @@ description: "将当前项目下所有 skills 链接到全局注册表并安装�
 # 批量链接并安装 Skills
 
 将当前项目目录下所有包含 `SKILL.md` 的子目录链接到全局注册表，**并自动安装到所有支持的环境**。
+流程默认非交互执行，适合初始化和批量维护。
 
 ## 使用场景
 
@@ -44,8 +45,8 @@ description: "将当前项目下所有 skills 链接到全局注册表并安装�
 ### 1. 扫描 Skills
 
 ```bash
-# 查找所有包含 SKILL.md 的目录
-find . -maxdepth 2 -name "SKILL.md" -type f | xargs -I {} dirname {}
+# 查找所有包含 SKILL.md 的目录（安全处理空格路径）
+find "$PROJECT_DIR" -type f -name "SKILL.md" -print0 | xargs -0 -I {} dirname "{}"
 ```
 
 ### 2. 执行链接
@@ -54,10 +55,10 @@ find . -maxdepth 2 -name "SKILL.md" -type f | xargs -I {} dirname {}
 
 ```bash
 # 先 unlink（避免交互式确认阻塞）
-j-skills link --unlink <skill-name> 2>/dev/null
+j-skills link --unlink <skill-name> --force
 
 # 再 link（使用 -y 跳过确认）
-j-skills link <skill-name> -y
+j-skills link <skill-dir> -y --json
 ```
 
 ### 3. 自动安装到所有环境
@@ -66,7 +67,7 @@ j-skills link <skill-name> -y
 
 ```bash
 # 安装到所有支持的环境（claude-code, cursor, opencode, codex）
-j-skills install <skill-name> -g --all-env
+j-skills install <skill-name> -g --all-env --yes --json
 ```
 
 **说明**：
@@ -78,10 +79,13 @@ j-skills install <skill-name> -g --all-env
 
 ```bash
 # 查看已链接的 skills
-j-skills link --list
+j-skills link --list --json
 
 # 查看已安装的 skills
-j-skills list -g
+j-skills list -g --json
+
+# 检查断链
+j-skills link --doctor --json
 ```
 
 ## 一键脚本
@@ -89,7 +93,10 @@ j-skills list -g
 项目内包含 `link-all.sh` 脚本，可一键完成所有操作：
 
 ```bash
-./link-all.sh
+./link-all.sh [项目路径]
+
+# 仅预览将执行的动作（不落地）
+./link-all.sh --dry-run
 ```
 
 ## 注意事项
@@ -97,4 +104,5 @@ j-skills list -g
 - 链接是软链接，修改源文件立即生效
 - 如果 skill 已链接到其他位置，会被覆盖指向当前项目
 - 自动安装到所有支持的环境：Claude Code、Cursor、OpenCode、Codex
-- 需要 `j-skills` 已全局安装 (`npm install -g j-skills`)
+- 脚本会优先使用本机 `j-skills`，若不存在则回退 `npx @wangjs-jacky/j-skills`
+- 需要具备 Node.js 环境（用于 `npx` 回退模式）
