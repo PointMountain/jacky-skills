@@ -50,9 +50,13 @@ mp3 转 srt
   <!-- ==================== Phase 1: 环境检查 ==================== -->
   <gsd:phase name="precheck" order="1">
     <gsd:step>并行检查 Python3、mlx-whisper、ffmpeg 是否已安装</gsd:step>
+    <gsd:step>检查引擎配置状态：
+      - 本地引擎：验证 MLX-Whisper 模型是否可用（尝试加载默认模型）
+      - 豆包引擎：检查 API 凭证是否存在（~/.audio2subtitle/config.json 或环境变量）
+    </gsd:step>
     <gsd:step>确认输入音频/视频文件路径和格式（注意文件名中的特殊字符如 #）</gsd:step>
     <gsd:step>获取文件时长信息，如 >30min 则提醒用户</gsd:step>
-    <gsd:checkpoint>环境依赖就绪，音频文件可访问</gsd:checkpoint>
+    <gsd:checkpoint>环境依赖就绪，引擎配置验证通过，音频文件可访问</gsd:checkpoint>
   </gsd:phase>
 
   <!-- ==================== Phase 2: 参数配置（3 步顺序交互） ==================== -->
@@ -327,3 +331,16 @@ python3 scripts/transcribe.py audio.mp3 -l zh
 | 30 分钟 | large-v3-turbo | ~30 秒 | ~60x |
 | 60 分钟 | large-v3-turbo | ~60 秒 | ~60x |
 | 10 分钟 | large-v3 | ~20 秒 | ~30x |
+
+<reference>
+  <ref id="audio-to-subtitle-doc" path="SKILL.md" required="false">
+    完整的 audio-to-subtitle 使用文档，包含环境要求、支持格式、转录引擎说明和使用方式。
+  </ref>
+  <ref id="mlx-whisper" url="https://github.com/ml-explore/mlx-examples/tree/main/whisper" required="false">
+    MLX-Whisper 官方文档 - Apple Silicon 优化的 Whisper 实现。
+  </ref>
+  <ref id="doubao-asr" url="https://www.volcengine.com/docs/6561" required="false">
+    火山引擎豆包语音识别 API 文档。
+  </ref>
+</reference>
+

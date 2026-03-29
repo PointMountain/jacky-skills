@@ -1,7 +1,7 @@
 {
   "name": "monitoring",
-  "version": "1.0.0",
-  "description": "Claude Code Monitor - 监控工具调用、性能分析、Skills 调试",
+  "version": "2.0.0",
+  "description": "Claude Code 监控工具集 - macOS 原生悬浮窗通知",
   "author": {
     "name": "Jacky Wang",
     "email": "wangjs.jacky@gmail.com",
@@ -13,11 +13,11 @@
   "keywords": [
     "claude-code",
     "monitor",
-    "debugging",
-    "profiling",
-    "hooks"
+    "floating-window",
+    "macos",
+    "notification"
   ],
   "skills": [
-    "./skills/claude-monitor/"
+    "./claude-monitor/"
   ]
 }

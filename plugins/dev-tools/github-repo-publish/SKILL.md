@@ -29,7 +29,7 @@ release extension
   <gsd:goal>在可审计前提下完成从本地代码到 GitHub 仓库与可选 Release 的全流程发布。</gsd:goal>
   <gsd:phase id="1" name="preflight">检查远程状态、gh 登录、项目类型与版本条件，确定执行模式。</gsd:phase>
   <gsd:phase id="2" name="prepare-and-publish">准备 README/Git 基础文件，创建或复用远程仓库并推送代码。</gsd:phase>
-  <gsd:phase id="3" name="post-publish">设置 About 信息，按项目类型执行 VSCode Release 或 npm 发布提示，并完成验证。</gsd:phase>
+  <gsd:phase id="3" name="post-publish">设置 About 信息，按项目类型执行 Tauri Release（只上传 dmg）、VSCode Release 或 npm 发布提示，并完成验证。</gsd:phase>
 </gsd:workflow>
 
 # GitHub 仓库发布
@@ -75,6 +75,9 @@ release extension
 
 3. **检测项目类型**
    ```bash
+   # Tauri 桌面应用
+   [ -f "src-tauri/tauri.conf.json" ] && echo "tauri-app"
+
    # VSCode 插件
    grep -q '"engines".*"vscode"' package.json && echo "vscode-extension"
 
@@ -193,6 +196,37 @@ git push origin $(git branch --show-current)
 
 **目标**：处理项目特定的发布流程
 
+#### Tauri 桌面应用 → Release（只上传 DMG）
+
+> **重要：Tauri 构建产物包含 `.dmg` 和 `.zip`，Release 只上传 `.dmg`，不上传 `.zip`。**
+
+1. **确认构建产物**
+   ```bash
+   # 检查版本号
+   VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version" 2>/dev/null || node -p "require('./package.json').version")
+
+   # 查找 dmg 文件
+   find src-tauri/target/release/bundle -name "*.dmg" -type f
+   ```
+
+2. **创建 tag 并推送**
+   ```bash
+   git tag "v$VERSION" && git push origin "v$VERSION"
+   ```
+
+3. **创建 Release（只上传 .dmg）**
+   ```bash
+   # 精确指定 dmg 文件路径，不使用通配符匹配 zip
+   DMG_PATH=$(find src-tauri/target/release/bundle -name "*.dmg" -not -name "rw.*" -type f | head -1)
+
+   gh release create "v$VERSION" --title "v$VERSION" --notes "Release v$VERSION" "$DMG_PATH"
+   ```
+
+   > **注意**：
+   > - 使用 `-not -name "rw.*"` 排除 macOS 临时文件
+   > - **禁止上传 `.zip` 文件**，Tauri 构建产出的 zip 只是 dmg 的冗余副本
+   > - 如果找到多个 dmg（如多架构），全部上传：`find ... -name "*.dmg" -not -name "rw.*"`
+
 #### VSCode 插件 → Release
 
 ```bash
@@ -222,7 +256,8 @@ echo "  npm publish                  # regular packages"
 - [ ] 远程仓库可访问：`gh repo view`
 - [ ] README 正确显示
 - [ ] About 信息（中文描述 + Topics）
-- [ ] VSCode 插件：Release 包含 .vsix
+- [ ] Tauri 应用：Release 只包含 `.dmg`（无 `.zip`）
+- [ ] VSCode 插件：Release 包含 `.vsix`
 
 ## 快速参考
 
@@ -230,7 +265,8 @@ echo "  npm publish                  # regular packages"
 |------|------|
 | 创建仓库 | `gh repo create $NAME --public --source=. --push` |
 | 设置描述 | `gh repo edit --description "$中文描述"` |
-| 创建 Release | `gh release create $TAG --title "$TITLE" "*.vsix"` |
+| Tauri Release | `gh release create $TAG --title "$TITLE" "$DMG_PATH"` |
+| VSCode Release | `gh release create $TAG --title "$TITLE" "*.vsix"` |
 | 推送更新 | `git push origin <branch>` |
 
 ## 错误处理
@@ -251,6 +287,7 @@ echo "  npm publish                  # regular packages"
 - ❌ 合并中英文 README
 - ❌ 提交 .vsix 到仓库
 - ❌ 远程已存在时报错退出
+- ❌ Tauri Release 上传 `.zip` 文件（只上传 `.dmg`）
 
 ## Next Up
 

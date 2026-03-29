@@ -51,16 +51,24 @@ DEFAULT_CONFIG = {
     },
 }
 
-# 豆包 ASR resource_id 列表（按优先级排列）
-DOUBAO_RESOURCE_IDS = [
-    "volc.bigasr.auc_turbo",       # 大模型录音文件极速版（4.5 元/小时）
-    "volc.bigasr.auc",              # 录音文件识别
-    "volc.bigasr.sauc.duration",    # 按时长计费
-    "volc.bigasr.sauc.offline",     # 闲时版
-]
+
+def normalize_path(path: str) -> str:
+    """规范化文件路径，处理特殊字符
+
+    subprocess.run 列表形式会自动处理特殊字符，无需手动加引号。
+    此函数主要用于将相对路径转换为绝对路径。
+
+    Args:
+        path: 输入路径
+
+    Returns:
+        规范化后的绝对路径
+    """
+    return os.path.abspath(os.path.expanduser(path))
+
 
 # 豆包 ASR 标准版 resource_id（submit + query 轮询模式）
-DOUBAO_STANDARD_RESOURCE_IDS = [
+DOUBAO_RESOURCE_IDS = [
     "volc.seedasr.auc",      # 豆包录音文件识别模型2.0（已验证可用）
 ]
 
@@ -128,6 +136,7 @@ def check_ffmpeg() -> bool:
 
 def preprocess_audio(input_path: str, output_path: str) -> None:
     """使用 ffmpeg 将音频/视频转为 WAV 16kHz 单声道"""
+    input_path = normalize_path(input_path)
     cmd = [
         "ffmpeg", "-y", "-i", input_path,
         "-ar", "16000",
@@ -325,7 +334,7 @@ def _try_doubao_standard(
     query_url = "https://openspeech.bytedance.com/api/v3/auc/bigmodel/query"
 
     # 按优先级尝试标准版 resource_id
-    for rid in DOUBAO_STANDARD_RESOURCE_IDS:
+    for rid in DOUBAO_RESOURCE_IDS:
         request_id = str(uuid.uuid4())
         headers = {
             "X-Api-App-Key": app_id,
@@ -454,11 +463,11 @@ def transcribe_doubao(
     language: Optional[str] = None,
 ) -> TranscriptionResult:
     """
-    使用豆包 ASR API 转录（大模型录音文件极速版）
+    使用豆包 ASR API 转录（标准版 submit + query 轮询模式）
 
-    API 文档: https://www.volcengine.com/docs/6561/1631584
-    - 一次 HTTP POST 直接返回结果，无需轮询
-    - 支持最长 2 小时、100MB 的音频
+    API 文档: https://www.volcengine.com/docs/6561/1354868
+    - 提交任务（base64 直传） → 轮询查询结果
+    - 支持最长 2 小时音频
     - 返回带时间戳的 utterances，适合生成字幕
     """
     app_id, access_token = check_doubao_config(cfg)
@@ -481,166 +490,48 @@ def transcribe_doubao(
         print("❌ requests 未安装，请运行: pip install requests")
         sys.exit(1)
 
-    print("🔊 引擎: 豆包 ASR（大模型录音文件极速版）")
+    print("🔊 引擎: 豆包 ASR（标准版）")
 
-    # 文件大小检查（极速版限制 100MB）
-    file_size = os.path.getsize(audio_path)
-    file_size_mb = file_size / 1024 / 1024
-    print(f"📦 文件大小: {file_size_mb:.1f}MB")
-
-    if file_size_mb > 100:
-        print("❌ 文件超过 100MB 限制，请使用本地引擎或切分后重试")
-        sys.exit(1)
-
-    # 转换音频为 MP3 格式（豆包支持 WAV/MP3/OGG OPUS）
+    # 转换音频为支持格式
     file_ext = Path(audio_path).suffix.lstrip(".").lower()
     supported_exts = {"wav", "mp3", "ogg", "opus"}
 
     if file_ext not in supported_exts:
-        print("🔄 转换音频为 MP3 格式（豆包 API 要求）...")
-        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
-            tmp_mp3 = tmp.name
-        cmd = ["ffmpeg", "-y", "-i", audio_path, "-ar", "16000", "-ac", "1", tmp_mp3]
+        print("🔄 转换音频为 WAV 格式...")
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp_wav = tmp.name
+        input_path = normalize_path(audio_path)
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-ar", "16000", "-ac", "1", tmp_wav]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(f"ffmpeg 转换失败: {result.stderr}")
-        upload_path = tmp_mp3
-        file_ext = "mp3"
+        upload_path = tmp_wav
+        file_ext = "wav"
     else:
-        tmp_mp3 = None
+        tmp_wav = None
         upload_path = audio_path
 
     try:
-        # Base64 编码音频（只需做一次）
+        # Base64 编码音频
         with open(upload_path, "rb") as f:
             audio_data = base64.b64encode(f.read()).decode("utf-8")
 
-        # 构建 resource_id 尝试列表：上次成功的优先
-        saved_resource_id = cfg.get("doubao", {}).get("resource_id", "")
-        if saved_resource_id and saved_resource_id in DOUBAO_RESOURCE_IDS:
-            resource_ids = [saved_resource_id] + [
-                rid for rid in DOUBAO_RESOURCE_IDS if rid != saved_resource_id
-            ]
-        else:
-            resource_ids = list(DOUBAO_RESOURCE_IDS)
+        # 直接调用标准版 API
+        result = _try_doubao_standard(app_id, access_token, audio_data, file_ext, language, cfg)
+        if result:
+            return result
 
-        url = "https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash"
-
-        # 多 resource_id 自动探测
-        print(f"⏳ 上传音频并转录（探测可用 resource_id）...")
-        diagnosis_results = []  # [(resource_id, status_code, message)]
-        last_resp = None
-
-        for rid in resource_ids:
-            headers = {
-                "X-Api-App-Key": app_id,
-                "X-Api-Access-Key": access_token,
-                "X-Api-Resource-Id": rid,
-                "X-Api-Request-Id": str(uuid.uuid4()),
-                "X-Api-Sequence": "-1",
-            }
-
-            body = {
-                "user": {"uid": app_id},
-                "audio": {"data": audio_data},
-                "request": {
-                    "model_name": "bigmodel",
-                    "enable_itn": True,
-                    "enable_punc": True,
-                    "enable_ddc": True,
-                    "enable_speaker_info": False,
-                },
-            }
-
-            start_time = time.time()
-            resp = requests.post(url, json=body, headers=headers, timeout=300)
-            elapsed = time.time() - start_time
-
-            status_code = resp.headers.get("X-Api-Status-Code", "")
-            message = resp.headers.get("X-Api-Message", "")
-
-            print(f"📡 尝试 {rid} → {status_code} ({elapsed:.1f}s)")
-
-            # 认证失败（凭证无效），所有 resource_id 都会失败，直接退出探测
-            if status_code in ("45000001", "55000031"):
-                diagnosis_results.append((rid, status_code, message))
-                print(f"❌ 认证失败: {message}")
-                print("   请检查 APP ID 和 Access Token 是否正确")
-                # 清除无效配置
-                cfg["doubao"] = {"app_id": "", "access_token": ""}
-                save_config(cfg)
-                report = _build_diagnosis_report(diagnosis_results)
-                print(report)
-                raise DoubaoApiError(
-                    f"豆包 API 认证失败（{status_code}: {message}）。"
-                    "请检查 APP ID 和 Access Token 是否正确。\n"
-                    "可通过 python3 scripts/transcribe.py --setup-doubao 重新配置。",
-                    diagnosis=diagnosis_results,
-                )
-
-            # 成功
-            if status_code == "20000000":
-                print(f"✅ resource_id 探测成功: {rid}")
-                # 保存成功的 resource_id 到配置
-                if cfg.get("doubao", {}).get("resource_id") != rid:
-                    cfg["doubao"]["resource_id"] = rid
-                    save_config(cfg)
-                    print(f"💾 已保存 resource_id: {rid}")
-                last_resp = resp
-                break
-
-            # 其他错误（not granted / not allowed 等），继续尝试
-            diagnosis_results.append((rid, status_code, message))
-        else:
-            # 极速版所有 resource_id 都失败，尝试标准版 API（submit + query）
-            report = _build_diagnosis_report(diagnosis_results)
-            print(report)
-            print("")
-            print("🔄 极速版 API 不可用，尝试标准版 API（submit + query 轮询模式）...")
-            standard_result = _try_doubao_standard(
-                app_id, access_token, audio_data, file_ext, language, cfg
-            )
-            if standard_result:
-                return standard_result
-
-            # 标准版也失败，抛出错误
-            raise DoubaoApiError(
-                "豆包 API 极速版和标准版均不可用。"
-                "请检查火山引擎账号的语音识别服务开通情况。\n"
-                "开通服务后重新运行即可，或可手动选择回退到本地引擎。",
-                diagnosis=diagnosis_results,
-            )
-
-        data = last_resp.json()
-
-        # 解析结果
-        result_data = data.get("result", {})
-        utterances = result_data.get("utterances", [])
-        full_text = result_data.get("text", "").strip()
-        duration_ms = data.get("audio_info", {}).get("duration", 0)
-
-        segments = []
-        for utt in utterances:
-            segments.append(Segment(
-                start=utt.get("start_time", 0) / 1000.0,
-                end=utt.get("end_time", 0) / 1000.0,
-                text=utt.get("text", "").strip(),
-            ))
-
-        detected_lang = language or "zh"
-
-        print(f"✅ 转录完成: {len(segments)} 个段落, 时长: {duration_ms/1000:.1f}s")
-
-        return TranscriptionResult(
-            segments=segments,
-            language=detected_lang,
-            duration=duration_ms / 1000.0,
-            text=full_text,
+        # 标准版失败，抛出错误
+        raise DoubaoApiError(
+            "豆包 API 标准版不可用。"
+            "请检查火山引擎账号的语音识别服务开通情况。\n"
+            "开通服务后重新运行即可，或可手动选择回退到本地引擎。",
+            diagnosis=[],
         )
 
     finally:
-        if tmp_mp3 and os.path.exists(tmp_mp3):
-            os.unlink(tmp_mp3)
+        if tmp_wav and os.path.exists(tmp_wav):
+            os.unlink(tmp_wav)
 
 
 # ============================================================
@@ -897,6 +788,8 @@ def process_single(
 
     if cfg is None:
         cfg = load_config()
+
+    input_path = normalize_path(input_path)
 
     if not os.path.exists(input_path):
         print(f"❌ 文件不存在: {input_path}")
