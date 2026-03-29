@@ -72,6 +72,15 @@ j-skills link --list
 # 取消链接
 j-skills link --unlink <skill-name>
 
+# 强制清理无效链接（包括 registry 残留）
+j-skills link --unlink <skill-name> --force
+
+# 诊断并修复断链
+j-skills link --doctor
+
+# JSON 诊断输出
+j-skills link --doctor --json
+
 # JSON 输出（LLM 友好）
 j-skills link --list --json
 ```
