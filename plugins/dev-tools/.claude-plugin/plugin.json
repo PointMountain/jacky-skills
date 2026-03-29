@@ -1,6 +1,6 @@
 {
   "name": "dev-tools",
-  "version": "1.15.0",
+  "version": "1.16.0",
   "description": "开发工具集 - GitHub 发布、跨会话开发、Skills 创建、依赖管理等",
   "author": {
     "name": "Jacky Wang",
@@ -19,19 +19,28 @@
     "dependency-management"
   ],
   "skills": [
-    "./github-repo-publish/",
-    "./gsd-creator-skills/",
-    "./long-running-agent/",
-    "./skill-researcher/",
-    "./repo-study/",
-    "./vscode-extension-dev/",
+    "./agent-pipeline/",
+    "./agent-pipeline-generate/",
+    "./agent-pipeline-plan/",
+    "./agent-pipeline-score/",
     "./doc-to-tutorial/",
+    "./efficiency-audit/",
     "./feature-tracker/",
     "./gh-workflow-generator/",
-    "./skill-optimizer/",
+    "./github-profile-coolify/",
+    "./github-repo-publish/",
+    "./gsd-creator-skills/",
     "./harness-benchmark/",
+    "./long-running-agent/",
+    "./repo-study/",
+    "./skill-optimizer/",
+    "./skill-researcher/",
     "./task-harness/",
     "./task-memory/",
-    "./task-workflow/"
+    "./task-workflow/",
+    "./tw-generator/",
+    "./tw-planner/",
+    "./tw-scorer/",
+    "./vscode-extension-dev/"
   ]
 }
