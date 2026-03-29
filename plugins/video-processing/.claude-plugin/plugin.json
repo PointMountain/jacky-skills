@@ -1,6 +1,6 @@
 {
   "name": "video-processing",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "视频处理工具集 - B站字幕提取、视频下载、格式转换等",
   "author": {
     "name": "Jacky Wang",
@@ -23,6 +23,7 @@
     "./skills/bilibili-batch/",
     "./skills/video-to-text/",
     "./skills/m3u8-dl/",
-    "./skills/fix-neat-video/"
+    "./skills/fix-neat-video/",
+    "./skills/audio-to-subtitle/"
   ]
 }
