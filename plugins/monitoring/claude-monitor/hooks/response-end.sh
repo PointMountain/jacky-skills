@@ -25,8 +25,11 @@ curl --noproxy "*" -s -X PATCH "$DAEMON_URL/api/sessions/$SESSION_PID" \
 
 # 显示任务完成弹窗
 if is_scenario_enabled "sessionEnd"; then
-  DURATION=$(get_scenario_duration "sessionEnd" 3)
-  ~/.claude-monitor/claude-float-window completed "$PROJECT_NAME" "任务完成" "$TERMINAL" "$DURATION" &
+  FLOAT_BIN=$(get_binary_path)
+  if [[ -n "$FLOAT_BIN" ]]; then
+    DURATION=$(get_scenario_duration "sessionEnd" 3)
+    "$FLOAT_BIN" completed "$PROJECT_NAME" "任务完成" "$TERMINAL" "$DURATION" &
+  fi
 fi
 
 exit 0

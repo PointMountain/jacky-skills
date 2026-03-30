@@ -1,6 +1,6 @@
 {
   "name": "monitoring",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Claude Code 监控工具集 - macOS 原生悬浮窗通知",
   "author": {
     "name": "Jacky Wang",

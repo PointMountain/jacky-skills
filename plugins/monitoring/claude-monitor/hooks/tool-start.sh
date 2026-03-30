@@ -67,7 +67,10 @@ if [ -n "$TOOL" ]; then
         MESSAGE="执行: $TOOL"
       fi
 
-      ~/.claude-monitor/claude-float-window "$FLOAT_STATUS" "$PROJECT_NAME" "$MESSAGE" "$TERMINAL" "$DURATION" &
+      FLOAT_BIN=$(get_binary_path)
+      if [[ -n "$FLOAT_BIN" ]]; then
+        "$FLOAT_BIN" "$FLOAT_STATUS" "$PROJECT_NAME" "$MESSAGE" "$TERMINAL" "$DURATION" &
+      fi
     fi
   fi
 fi

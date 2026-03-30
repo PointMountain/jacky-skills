@@ -58,14 +58,20 @@ if [ -n "$TOOL_CALL_ID" ]; then
   if [ "$SESSION_STATUS" = "tool_done" ]; then
     # 所有工具完成，显示工具完成弹窗（但不显示任务完成）
     if is_scenario_enabled "executing"; then
-      DURATION=1  # 短暂显示
-      ~/.claude-monitor/claude-float-window tool_done "$PROJECT_NAME" "✓ $TOOL 完成" "$TERMINAL" "$DURATION" &
+      FLOAT_BIN=$(get_binary_path)
+      if [[ -n "$FLOAT_BIN" ]]; then
+        DURATION=1  # 短暂显示
+        "$FLOAT_BIN" tool_done "$PROJECT_NAME" "✓ $TOOL 完成" "$TERMINAL" "$DURATION" &
+      fi
     fi
   elif [ "$SESSION_STATUS" = "error" ]; then
     # 出错
     if is_scenario_enabled "executing"; then
-      DURATION=2
-      ~/.claude-monitor/claude-float-window error "$PROJECT_NAME" "✗ $TOOL 失败" "$TERMINAL" "$DURATION" &
+      FLOAT_BIN=$(get_binary_path)
+      if [[ -n "$FLOAT_BIN" ]]; then
+        DURATION=2
+        "$FLOAT_BIN" error "$PROJECT_NAME" "✗ $TOOL 失败" "$TERMINAL" "$DURATION" &
+      fi
     fi
   fi
 fi

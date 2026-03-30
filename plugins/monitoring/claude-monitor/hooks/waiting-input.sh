@@ -17,8 +17,11 @@ curl --noproxy "*" -s -X PATCH "$DAEMON_URL/api/sessions/$SESSION_PID" \
 
 # 检查是否启用悬浮窗
 if is_scenario_enabled "waitingInput"; then
-  DURATION=$(get_scenario_duration "waitingInput" 0)
-  ~/.claude-monitor/claude-float-window waiting_input "$PROJECT_NAME" "等待用户输入" "$TERMINAL" "$DURATION" &
+  FLOAT_BIN=$(get_binary_path)
+  if [[ -n "$FLOAT_BIN" ]]; then
+    DURATION=$(get_scenario_duration "waitingInput" 0)
+    "$FLOAT_BIN" waiting_input "$PROJECT_NAME" "等待用户输入" "$TERMINAL" "$DURATION" &
+  fi
 fi
 
 exit 0

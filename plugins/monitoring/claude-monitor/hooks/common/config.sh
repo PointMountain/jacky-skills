@@ -2,7 +2,14 @@
 # hooks/common/config.sh
 # 配置读取工具函数
 
+# 确保配置目录存在
+mkdir -p "$HOME/.claude-monitor" 2>/dev/null
+
 CONFIG_FILE="$HOME/.claude-monitor/config.json"
+
+# 引入二进制管理
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/ensure-binary.sh"
 
 # 读取配置值 (支持嵌套路径，如 "floatingWindow.scenarios.thinking.enabled")
 get_config() {
@@ -62,4 +69,15 @@ is_tool_in_filter() {
 
   # 检查工具是否在列表中
   echo "$tools" | jq -e "index(\"$tool\")" >/dev/null 2>&1
+}
+
+# 检查依赖是否就绪（jq 等）
+# 返回值: 0=依赖就绪, 1=缺少关键依赖
+ensure_dependencies() {
+  if ! command -v jq &> /dev/null; then
+    echo "[claude-monitor] jq 未安装，部分功能可能受限。建议安装: brew install jq" >&2
+    # jq 缺失不阻塞，降级处理
+    return 0
+  fi
+  return 0
 }

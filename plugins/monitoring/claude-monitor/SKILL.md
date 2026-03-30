@@ -29,46 +29,46 @@ description: "Claude Code 原生悬浮窗通知 - 在 macOS 状态栏显示 Clau
 
 ## 安装
 
-### 方式一：使用安装命令（推荐）
+### 自动安装（推荐）
+
+首次启动 Claude Code 会话时，`session-start` hook 会自动检测并编译悬浮窗二进制。无需手动操作。
+
+> 如果自动编译失败（如缺少 `swiftc`），悬浮窗功能会被静默跳过，不影响 Claude Code 正常使用。1 小时后会自动重试。
+
+### 手动安装
+
+如果自动编译未成功，可以手动执行：
+
+1. **使用安装命令**：
 
 ```
 /monitor-setup
 ```
 
-自动完成编译和配置。
-
-### 方式二：手动安装
-
-1. **编译 Swift 悬浮窗**：
+2. **或手动编译**：
 
 ```bash
-cd ~/.claude-monitor  # 或 skill 目录下的 swift-notify/
 bash swift-notify/build.sh
 ```
 
-2. **确认二进制存在**：
+## 系统依赖
+
+| 依赖 | 用途 | 是否必须 |
+|------|------|----------|
+| macOS 12.0+ | 悬浮窗运行环境 | 是 |
+| Xcode Command Line Tools | 提供 `swiftc` 编译器 | 编译时需要 |
+| `jq` | 解析 JSON 配置 | 否（缺失时降级） |
+
+安装 Xcode CLT：
 
 ```bash
-ls ~/.claude-monitor/claude-float-window
+xcode-select --install
 ```
 
-3. **创建默认配置**（可选）：
+安装 jq（可选）：
 
 ```bash
-mkdir -p ~/.claude-monitor
-cat > ~/.claude-monitor/config.json << 'EOF'
-{
-  "floatingWindow": {
-    "enabled": true,
-    "scenarios": {
-      "thinking": { "enabled": true, "duration": 3 },
-      "executing": { "enabled": true, "duration": 2 },
-      "waitingInput": { "enabled": true, "duration": 0 },
-      "sessionEnd": { "enabled": true, "duration": 3 }
-    }
-  }
-}
-EOF
+brew install jq
 ```
 
 ## 验证
@@ -83,7 +83,7 @@ EOF
 
 ## 配置
 
-配置文件：`~/.claude-monitor/config.json`
+配置文件：`~/.claude-monitor/config.json`（首次使用自动创建默认配置）
 
 | 配置项 | 说明 | 默认值 |
 |--------|------|--------|
@@ -97,11 +97,12 @@ EOF
 | `scenarios.sessionEnd.enabled` | 会话结束弹窗 | `true` |
 | `scenarios.sessionEnd.duration` | 结束弹窗显示秒数 | `3` |
 
-## 依赖
+## 工作原理
 
-- macOS 12.0+
-- `jq`（用于解析 JSON 配置）
-- Swift 工具链（编译悬浮窗时需要，Xcode Command Line Tools）
+1. 每次会话启动时，`session-start.sh` 自动检测 `~/.claude-monitor/claude-float-window` 是否存在
+2. 如果不存在，自动调用 `swift-notify/build.sh` 编译
+3. 编译失败会创建 `/tmp/claude-monitor/setup_failed` 标记，避免每次 hook 重试（1 小时后自动清除）
+4. 所有 hook 调用悬浮窗前会通过 `get_binary_path()` 检查二进制是否就绪
 
 ## 触发场景
 

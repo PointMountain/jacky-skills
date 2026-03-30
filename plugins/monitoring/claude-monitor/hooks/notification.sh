@@ -56,13 +56,16 @@ if is_scenario_enabled "waitingInput"; then
   pkill -9 -f "claude-float-window.*notification" 2>/dev/null || true
 
   # 显示悬浮窗
-  if [ "$DURATION" -eq 0 ]; then
-    # 持续显示直到用户关闭
-    ~/.claude-monitor/claude-float-window waiting_input "$PROJECT_NAME" "$TITLE" "$TERMINAL" 0 &
-  else
-    ~/.claude-monitor/claude-float-window waiting_input "$PROJECT_NAME" "$TITLE" "$TERMINAL" "$DURATION" &
+  FLOAT_BIN=$(get_binary_path)
+  if [[ -n "$FLOAT_BIN" ]]; then
+    if [ "$DURATION" -eq 0 ]; then
+      # 持续显示直到用户关闭
+      "$FLOAT_BIN" waiting_input "$PROJECT_NAME" "$TITLE" "$TERMINAL" 0 &
+    else
+      "$FLOAT_BIN" waiting_input "$PROJECT_NAME" "$TITLE" "$TERMINAL" "$DURATION" &
+    fi
+    disown 2>/dev/null || true
   fi
-  disown 2>/dev/null || true
 fi
 
 exit 0

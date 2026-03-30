@@ -16,8 +16,11 @@ curl --noproxy "*" -s -X DELETE "$DAEMON_URL/api/sessions/$SESSION_PID" > /dev/n
 
 # 检查是否启用悬浮窗
 if is_scenario_enabled "sessionEnd"; then
-  DURATION=$(get_scenario_duration "sessionEnd" 3)
-  ~/.claude-monitor/claude-float-window done "$PROJECT_NAME" "会话已结束" "$TERMINAL" "$DURATION" &
+  FLOAT_BIN=$(get_binary_path)
+  if [[ -n "$FLOAT_BIN" ]]; then
+    DURATION=$(get_scenario_duration "sessionEnd" 3)
+    "$FLOAT_BIN" done "$PROJECT_NAME" "会话已结束" "$TERMINAL" "$DURATION" &
+  fi
 fi
 
 exit 0

@@ -39,10 +39,13 @@ if [ -n "$PROMPT" ]; then
 
   # 检查是否启用悬浮窗
   if is_scenario_enabled "thinking"; then
-    DURATION=$(get_scenario_duration "thinking" 3)
-    TRUNCATED_PROMPT=$(echo "$PROMPT" | cut -c1-30)
-    [ ${#PROMPT} -gt 30 ] && TRUNCATED_PROMPT="${TRUNCATED_PROMPT}..."
-    ~/.claude-monitor/claude-float-window thinking "$PROJECT_NAME" "$TRUNCATED_PROMPT" "$TERMINAL" "$DURATION" &
+    FLOAT_BIN=$(get_binary_path)
+    if [[ -n "$FLOAT_BIN" ]]; then
+      DURATION=$(get_scenario_duration "thinking" 3)
+      TRUNCATED_PROMPT=$(echo "$PROMPT" | cut -c1-30)
+      [ ${#PROMPT} -gt 30 ] && TRUNCATED_PROMPT="${TRUNCATED_PROMPT}..."
+      "$FLOAT_BIN" thinking "$PROJECT_NAME" "$TRUNCATED_PROMPT" "$TERMINAL" "$DURATION" &
+    fi
   fi
 fi
 
