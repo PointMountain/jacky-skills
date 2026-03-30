@@ -1,6 +1,6 @@
 {
   "name": "dev-tools",
-  "version": "1.16.1",
+  "version": "1.17.0",
   "description": "开发工具集 - GitHub 发布、跨会话开发、Skills 创建、依赖管理等",
   "author": {
     "name": "Jacky Wang",
@@ -20,6 +20,7 @@
   ],
   "skills": [
     "./agent-pipeline/",
+    "./distiller/",
     "./agent-pipeline-generate/",
     "./agent-pipeline-plan/",
     "./agent-pipeline-score/",
