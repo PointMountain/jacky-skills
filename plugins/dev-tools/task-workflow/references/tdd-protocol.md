@@ -2,8 +2,6 @@
 
 > 本文件包含 TDD 哲学、Verify Loop 流程、失败分析模板和最佳实践。
 
-**阶段归属**：本协议主要服务于 **VERIFY 阶段**。EXECUTE 阶段只负责编写代码和测试用例，所有验证循环、重试逻辑和失败分析均属于 VERIFY 阶段的职责。
-
 ## TDD 核心理念：红灯-绿灯-重构
 
 **测试先行原则**：
@@ -15,6 +13,29 @@
 - HARNESS 定义了"什么是对的"
 - 测试用例来源于 HARNESS 的 MUST 条件
 - 只有测试通过才算任务完成
+- **PLAN 中每个任务通过 `harness_ref` 关联到具体的 BDD 测试**
+
+---
+
+## TDD 与 BDD 的关联
+
+```
+HARNESS (MUST 条件)
+    ↓ 1:1 映射
+BDD Case (步骤描述: Given/When/Then)
+    ↓ 1:1 映射
+测试脚本 (可执行 Vitest 代码)
+    ↓ 被引用
+PLAN 任务 (harness_ref 字段)
+    ↓ 被验证
+EXECUTE (红→绿循环)
+```
+
+**关键约定**：
+- 每个 MUST 条件 → 至少一个 BDD case
+- 每个 BDD case → 对应一个测试文件
+- PLAN 中每个 task → `harness_ref` 引用对应的 BDD case 编号
+- EXECUTE 中每个 task → 先运行对应的 BDD 测试确认红灯，再实现代码到绿灯
 
 ---
 
@@ -32,7 +53,15 @@
                                    │
                                    ▼
                           ┌─────────────────┐
-                          │ 编写测试用例      │
+                          │ 读取 PLAN        │
+                          │ 获取 harness_ref │
+                          └────────┬────────┘
+                                   │
+                                   ▼
+                          ┌─────────────────┐
+                          │ 编写 BDD 测试    │
+                          │ (基于 harness_ref│
+                          │  关联的 case)    │
                           └────────┬────────┘
                                    │
                                    ▼
@@ -42,7 +71,8 @@
                                    │
                                    ▼
                     ┌──────────────────────────┐
-                    │ 运行测试                   │◄─────────────────┐
+                    │ 运行 BDD 测试              │◄─────────────────┐
+                    │ npx vitest run <test>     │                  │
                     └──────────┬───────────────┘                  │
                                │                                  │
                   ┌────────────┴────────────┐                    │
@@ -72,7 +102,7 @@
                  │             └────────────────────────────────┘
                  │
                  ▼
-          进入下一任务 / REVIEW
+          记录偏差 → 进入下一任务 / REVIEW
 ```
 
 ---
@@ -83,12 +113,12 @@
 FOR each task in PLAN:
 
   1. 准备阶段
-     - 读取 HARNESS: .harness/harness/{task-slug}/harness.md
-     - 提取 MUST 条件作为测试用例
-     - 确定测试框架（从 HARNESS 中读取）
+     - 读取 PLAN 中的 harness_ref
+     - 确认对应的 BDD case 和测试文件已存在
+     - 确认测试框架配置（vitest.config.ts）
 
   2. 红灯阶段（Red）
-     - 编写测试用例（覆盖所有 MUST 条件）
+     - 基于 BDD case 编写测试用例（覆盖所有 MUST 条件）
      - 运行测试 -> 确认失败
      - 记录期望行为
 
@@ -100,11 +130,11 @@ FOR each task in PLAN:
   4. 循环验证（Loop）
      retry_count = 0
      WHILE (测试未通过 AND retry_count < 5):
-        a. 运行测试: bash .harness/harness/{task-slug}/verify.sh
+        a. 运行测试: npx vitest run <对应测试文件>
         b. IF 失败:
            - 分析失败原因（见下方模板）
            - 修复代码（最小修改）
-           - 记录到 task-memory
+           - 记录偏差到 execute/deviations.md
            - retry_count++
         c. IF 通过:
            - BREAK
@@ -120,8 +150,26 @@ FOR each task in PLAN:
 
   6. 完成标记
      - Task 完成
-     - 记录到 task-memory
+     - 更新 workflow.json 中对应的 harnessTests 状态
      - 进入下一个 task
+```
+
+---
+
+## 测试运行命令
+
+```bash
+# 运行单个 BDD 测试
+npx vitest run tests/bdd/{page}/T-{prefix}{N}.test.ts
+
+# 运行页面下所有 BDD 测试
+npx vitest run tests/bdd/{page}/
+
+# 运行所有测试
+npx vitest run
+
+# 带覆盖率
+npx vitest run --coverage
 ```
 
 ---
@@ -133,13 +181,15 @@ FOR each task in PLAN:
 
 ### 基本信息
 - **Task ID**: T2
+- **BDD Case**: T-GH3（{{case 标题}}）
+- **测试文件**: tests/bdd/hot/T-GH3.test.ts
 - **重试次数**: 2/5
 - **失败时间**: {{时间戳}}
 
 ### 失败的测试用例
 ```bash
 # 运行命令
-bash .harness/harness/{{task-slug}}/verify.sh
+npx vitest run tests/bdd/hot/T-GH3.test.ts
 
 # 失败输出
 FAIL: should increment count when + clicked
@@ -170,9 +220,12 @@ FAIL: should increment count when + clicked
 - [ ] MUST: 最大值不超过 100 -> 失败
 - [ ] SHOULD: 显示当前计数 -> 未测试
 
+### 偏差记录
+- 记录到 execute/deviations.md (DEV-{{N}})
+
 ### 重测计划
 1. 修复代码（见上方 diff）
-2. 运行测试: `bash .harness/harness/{{task-slug}}/verify.sh`
+2. 运行测试: `npx vitest run tests/bdd/hot/T-GH3.test.ts`
 3. 预期结果：所有 MUST 条件通过
 ```
 
@@ -214,9 +267,17 @@ FAIL: should increment count when + clicked
 
 | HARNESS 条件类型 | 测试策略 |
 |-----------------|---------|
-| MUST 条件 | 必须有对应测试用例，失败则任务失败 |
+| MUST 条件 | 必须有对应 BDD case + 测试脚本，失败则任务失败 |
 | SHOULD 条件 | 建议有测试用例，失败可接受 |
-| 验证命令 | 作为测试脚本的一部分 |
+| EDGE 条件 | 边缘场景测试（空数据、异常输入等），提升健壮性 |
+
+### 测试类型选择
+
+| 任务类型 | 测试位置 | 验证方式 |
+|----------|----------|----------|
+| UI 组件/页面交互 | `tests/bdd/` | render + findByTestId + DOM 结构验证 |
+| 数据一致性/配置对齐 | `tests/integration/` | 直接断言对比 |
+| 纯函数/工具 | `tests/unit/` | 输入输出断言 |
 
 ---
 
@@ -241,4 +302,4 @@ FAIL: should increment count when + clicked
 | 代码执行失败 | 用户的补充说明 |
 | 用户补充需求 | 是范围蔓延还是原始需求不完整 |
 | 里程碑完成 | 保存当前进展 |
-| 测试失败 | 记录失败原因和修复策略 |
+| 测试失败 | 记录失败原因和修复策略到 deviations.md |

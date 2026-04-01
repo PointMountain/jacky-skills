@@ -24,7 +24,7 @@
     │ AskUserQuestion 门控确认          │
     │ 问题: 是否 approve?              │
     │ 选项: approve / 其他             │
-    └──────────────┬───────────────────┘
+    └────────────┬───────────────────┘
                    │
          ┌─────────┴─────────┐
          │                     │
@@ -51,15 +51,21 @@
 
 ## 各阶段门控要求
 
-| 阶段 | 门控类型 | 门控条件 | resume-signal |
+| 阶段 | 门控类型 | 产物要求 | resume-signal |
 |------|----------|----------|---------------|
-| LISTEN | - | init.md 已创建 | 自动进入 |
-| BRAINSTORM | `checkpoint:decision` | decision.md 已创建 + 需求澄清确认 | `approve \| continue \| adjust` |
-| HARNESS | `checkpoint:decision` | harness.md 已创建 + 验收标准确认 | `approve \| adjust \| add` |
-| PLAN | `checkpoint:decision` | PLAN.md 已创建 + 计划确认 | `approve \| adjust \| add` |
-| EXECUTE | `checkpoint:decision` | 所有任务代码已编写 | `approve \| adjust \| add` |
-| VERIFY | `checkpoint:human-verify` | 所有 HARNESS MUST 条件通过 + verify.sh 执行成功 | `approve \| report \| fix` |
-| REVIEW | - | 复盘报告已生成 | 自动完成 |
+| INIT | - | workflow.json 已创建 | 自动进入 |
+| BRAINSTORM | `checkpoint:decision` | decision.md 已创建 | `approve \| continue \| adjust` |
+| HARNESS | `checkpoint:decision` | harness.md 已创建 + BDD case + 测试脚本已生成 | `approve \| adjust \| add` |
+| PLAN | `checkpoint:decision` | PLAN.md 已创建（含 harness_ref） | `approve \| adjust \| add` |
+| EXECUTE | `checkpoint:decision` | 所有任务代码已编写 + 偏差已记录 | `approve \| adjust \| add` |
+| REVIEW | - | review.md 复盘报告已生成 | 自动完成 |
+
+**HARNESS 阶段产出验证清单**：
+- [ ] `harness.md` 包含 MUST/SHOULD 条件
+- [ ] 每个 MUST 条件有对应的 BDD case 文件
+- [ ] 每个 BDD case 有对应的测试脚本
+- [ ] 测试脚本可运行（红灯状态）
+- [ ] 如果项目缺少 `@wangjs-jacky/tdd-kit`，已在 HARNESS 阶段安装
 
 ---
 
@@ -108,14 +114,12 @@
 
 | 从 | 到 | 允许 | 条件 | 门控确认 |
 |----|----|----|------|----------|
-| INIT | LISTEN | 是 | workflow.json 已创建 | 不需要 |
-| LISTEN | BRAINSTORM | 是 | init.md 已创建 | 不需要（自动进入） |
-| LISTEN | HARNESS | 是 | quick 模式 + init.md 已创建 | 不需要（自动进入） |
-| BRAINSTORM | HARNESS | 是 | decision.md 已创建 + 需求澄清确认 | **必须** |
-| HARNESS | PLAN | 是 | harness.md 已创建 + 验收标准确认 | **必须** |
-| PLAN | EXECUTE | 是 | PLAN.md 已创建 + 计划确认 | **必须** |
-| EXECUTE | VERIFY | 是 | 所有任务代码已编写 | 不需要（自动进入） |
-| VERIFY | REVIEW | 是 | 所有 HARNESS MUST 条件通过 + 用户 approve | **必须** |
+| INIT | BRAINSTORM | 是 | workflow.json 已创建 | 不需要 |
+| INIT | HARNESS | 是 | quick 模式 + workflow.json 已创建 | 不需要 |
+| BRAINSTORM | HARNESS | 是 | decision.md 已创建 | **必须** |
+| HARNESS | PLAN | 是 | harness.md + BDD case + 测试脚本已创建 | **必须** |
+| PLAN | EXECUTE | 是 | PLAN.md 已创建（含 harness_ref） | **必须** |
+| EXECUTE | REVIEW | 是 | 所有任务完成 + 偏差已记录 | 不需要（自动进入） |
 | 任意 | 之前的阶段 | 是 | 支持回退修改 | 不需要 |
 
 ---
@@ -136,12 +140,10 @@
 `/task-workflow quick <任务描述>` 跳过 BRAINSTORM 阶段：
 
 ```
-INIT -> LISTEN -> HARNESS -> PLAN -> EXECUTE <-> VERIFY -> REVIEW
-              ^
-              跳过
+INIT -> HARNESS -> PLAN -> EXECUTE -> REVIEW
+        ^
+     BRAINSTORM 跳过，HARNESS 必须执行
 ```
-
-**注意**：quick 模式仅跳过 BRAINSTORM，**不能跳过 VERIFY**。
 
 **适用场景**：
 - 任务目标非常明确
@@ -157,34 +159,47 @@ INIT -> LISTEN -> HARNESS -> PLAN -> EXECUTE <-> VERIFY -> REVIEW
 
 ## YOLO 模式
 
-`/task-workflow yolo <任务描述>` **全自动执行（无需阶段确认）**
+`/task-workflow yolo <任务描述>` **全自动执行（无需门控确认），但所有阶段必须执行**
 
 ```
-INIT -> LISTEN -> BRAINSTORM -> HARNESS -> PLAN -> EXECUTE <-> VERIFY -> REVIEW
-                                        ^         ^      ^
-                                     AI 决策   AI 决策  AI 自动修复
+INIT -> BRAINSTORM -> HARNESS -> PLAN -> EXECUTE -> REVIEW
+                          ↑
+                     必须执行（仅跳过确认）
 ```
+
+### YOLO 模式语义澄清
+
+> **核心区分**：yolo 跳过的是"门控确认"（用户审批），不是"阶段执行"。
+
+| 阶段 | 是否执行 | 是否需确认 | 说明 |
+|------|----------|------------|------|
+| INIT | 是 | 否 | 正常执行 |
+| BRAINSTORM | 是 | 否 | AI 自动选择最佳方案 |
+| HARNESS | **是（强制）** | 否 | AI 自动生成 BDD case + 测试脚本 |
+| PLAN | 是 | 否 | AI 自动生成计划（含 harness_ref） |
+| EXECUTE | 是 | 否 | AI 自动实现 + 自动修复循环 |
+| REVIEW | 是 | 否 | AI 自动生成复盘报告 |
 
 ### AI 自动决策
 
 | 阶段 | AI 决策内容 |
 |------|------------|
 | BRAINSTORM | 自动选择最佳方案 |
-| HARNESS | 自动选择测试框架 + 生成用例 |
-| PLAN | 自动生成执行计划 |
-| EXECUTE | 自动实现 + 自动修复循环 |
+| HARNESS | 自动检测框架 + 生成 BDD case + 测试脚本 |
+| PLAN | 自动生成执行计划（每个 task 含 harness_ref） |
+| EXECUTE | 自动实现 + 记录偏差 + 自动修复循环 |
 
 ### 模式对比
 
-| 模式 | 用户确认点 | 适用场景 |
-|------|-----------|----------|
-| 标准 | 每个阶段 | 复杂任务、首次任务 |
-| quick | 跳过 BRAINSTORM | 目标明确 |
-| **yolo** | **无阶段确认（失败会中止）** | 简单任务、演示、信任 AI |
+| 模式 | BRAINSTORM | HARNESS 执行 | 门控确认 | 适用场景 |
+|------|-----------|-------------|----------|----------|
+| 标准 | 执行 | 执行 | 每阶段确认 | 复杂任务、首次任务 |
+| quick | **跳过** | 执行 | HARNESS + PLAN 确认 | 目标明确 |
+| yolo | 执行 | **执行（强制）** | 全部自动 | 简单任务、演示 |
 
 **YOLO 模式 auto_advance 行为**：
 - `checkpoint:decision` -> 自动选择第一个选项
-- `checkpoint:human-verify` -> 自动批准
+- 产物文件照常生成（harness.md、BDD case、测试脚本、deviations.md、review.md）
 
 ---
 
@@ -192,8 +207,7 @@ INIT -> LISTEN -> BRAINSTORM -> HARNESS -> PLAN -> EXECUTE <-> VERIFY -> REVIEW
 
 | 回退到 | 保留产物 | 需重做产物 |
 |--------|----------|------------|
-| BRAINSTORM | workflow.json, memory/ | harness/, plan/, execute 后产物 |
-| HARNESS | workflow.json, memory/, planning/ | harness/, plan/, execute 后产物 |
-| PLAN | workflow.json, memory/, planning/, harness/ | plan/, execute 后产物 |
-| EXECUTE | 全部 | verify 后产物 |
-| VERIFY | 全部 | - |
+| BRAINSTORM | workflow.json | harness/, plan/, execute/, review/ |
+| HARNESS | workflow.json, brainstorm/ | plan/, execute/, review/ |
+| PLAN | workflow.json, brainstorm/, harness/ | execute/, review/ |
+| EXECUTE | 全部 | review/ |

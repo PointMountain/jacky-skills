@@ -10,21 +10,27 @@
 └── tasks/
     └── {task-slug}/                     # 每个任务独立目录
         ├── workflow.json                # 工作流状态（含 stageTimeline）
-        ├── listen/                      # LISTEN 阶段产物
-        │   ├── search.md               # INIT 阶段检索的已有实现
-        │   ├── intent.md                # 初始意图
-        │   ├── deviation-*.md           # 偏差记录
-        │   └── review.md               # 复盘报告
-        ├── brainstorm/                  # BRAINSTORM 阶段产物
+        ├── brainstorm/                  # BRAINSTORM 阶段产物（quick 模式跳过）
         │   ├── mindmap.md               # 设计脑图
         │   ├── options.md               # 方案对比
         │   └── decision.md              # 最终决策
-        ├── harness/                     # HARNESS 阶段产物
-        │   ├── harness.md               # 验收标准
-        │   └── verify.sh                # 验证脚本
+        ├── harness/                     # HARNESS 阶段产物（必须存在）
+        │   └── harness.md               # 验收标准
         ├── plan/                        # PLAN 阶段产物
-        │   └── PLAN.md                  # 任务列表
-        └── execute/                     # EXECUTE 阶段产物（代码引用）
+        │   └── PLAN.md                  # 任务列表（含 harness_ref）
+        ├── execute/                     # EXECUTE 阶段产物
+        │   └── deviations.md            # 执行偏差记录
+        └── review/                      # REVIEW 阶段产物
+            └── review.md                # 复盘报告
+
+tests/                                   # 测试文件放在项目 tests/ 目录下
+├── bdd/
+│   ├── cases/{page}/                    # BDD 步骤描述
+│   │   └── T-{prefix}{N}.js
+│   └── {page}/                          # BDD 测试脚本
+│       └── T-{prefix}{N}.test.ts
+├── integration/                         # 集成测试
+└── unit/                                # 单元测试
 ```
 
 ### workflow.json 模板
@@ -36,6 +42,11 @@
   "taskSlug": "<task-slug>",
   "status": "in_progress",
   "currentStage": "INIT",
+  "complexity": {
+    "level": "medium",
+    "affectedFileCount": 6,
+    "recommendation": "standard"
+  },
   "createdAt": "2026-03-22T10:00:00Z",
   "updatedAt": "2026-03-22T10:00:00Z",
   "stageTimeline": {
@@ -45,6 +56,14 @@
     }
   },
   "deviations": 0,
+  "harnessTests": [
+    {
+      "testCaseId": "T-GH1",
+      "mustCondition": "{{对应的 MUST 条件}}",
+      "testFile": "tests/bdd/hot/T-GH1.test.ts",
+      "caseFile": "tests/bdd/cases/hot/T-GH1.js"
+    }
+  ],
   "dependencies": ["task-memory", "task-harness"]
 }
 ```
@@ -91,7 +110,7 @@ TASK_SLUG="$(printf '%s' "$TASK_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-
 
 | task-memory 命令 | 阶段 | 用途 |
 |------------------|------|------|
-| `start` | LISTEN | 记录初始意图 |
+| `start` | INIT | 记录初始意图 |
 | `record` | EXECUTE | 记录偏差 |
 | `end` | REVIEW | 生成复盘 |
 
@@ -99,17 +118,30 @@ TASK_SLUG="$(printf '%s' "$TASK_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-
 
 | task-harness 命令 | 阶段 | 用途 |
 |-------------------|------|------|
-| `/task-harness` | HARNESS | 定义验收边界 |
+| `/task-harness` | HARNESS | 定义验收边界 + 生成 BDD 测试 |
+
+**集成流程**：
+
+```
+1. task-workflow HARNESS 阶段 → 调用 /task-harness
+2. task-harness → 检测项目测试结构
+3. task-harness → 生成 BDD case + 测试脚本（写入 tests/）
+4. task-harness → 生成验收标准（写入 .harness/harness.md）
+5. task-workflow → 读取测试用例列表，写入 workflow.json 的 harnessTests
+6. PLAN 阶段 → 每个 task 关联 harness_ref
+7. EXECUTE 阶段 → 按 harness_ref 运行 TDD 红绿循环
+```
 
 ---
 
 ## 最佳实践
 
-1. **不要跳过 LISTEN** - 初始意图是偏差检测的基础
-2. **不要跳过 HARNESS** - 没有明确边界就无法验证完成
-3. **及时记录偏差** - 发现偏差立即记录，避免遗忘
-4. **认真做 REVIEW** - 复盘是改进的关键
+1. **不要跳过 HARNESS** - 没有明确边界就无法验证完成，yolo 模式也必须执行
+2. **PLAN 必须关联 HARNESS** - 每个任务通过 harness_ref 追溯到 MUST 条件
+3. **及时记录偏差** - 发现偏差立即记录到 `execute/deviations.md`
+4. **认真做 REVIEW** - 生成正式复盘报告到 `review/review.md`
 5. **保存 workflow.json** - 便于中断后恢复，stageTimeline 提供完整阶段追溯
+6. **测试放在 tests/ 目录** - 测试文件放在项目的 tests/ 目录下，不是 .harness/
 
 ---
 
@@ -117,10 +149,13 @@ TASK_SLUG="$(printf '%s' "$TASK_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-
 
 | 反模式 | 问题 | 正确做法 |
 |--------|------|----------|
-| 跳过 BRAINSTORM | 思考不足导致返工 | 至少做简短的方案探索 |
+| 跳过 HARNESS | 没有验收标准，无法验证 | HARNESS 必须执行，yolo 仅跳过确认 |
 | 模糊的 Harness | 无法验证完成 | 使用可量化的标准 |
-| 不记录偏差 | 无法复盘改进 | 发现偏差立即记录 |
-| 不做 REVIEW | 无法沉淀经验 | 认真分析偏差根因 |
+| 测试放在 src/ 下 | Vitest 不认 tests/ 目录，task-harness 管理不到 | 测试放在 tests/bdd/ 下 |
+| 不记录偏差 | 无法复盘改进 | 发现偏差立即记录到 deviations.md |
+| PLAN 缺少 harness_ref | 任务与验收标准断裂 | 每个任务关联 BDD 编号和测试文件 |
+| 不做 REVIEW | 无法沉淀经验 | 生成正式复盘报告 |
+| 缺少 tdd-kit 依赖 | 无法使用 expectElement 断言 | HARNESS 阶段主动安装 |
 
 ---
 
@@ -138,6 +173,16 @@ TASK_SLUG="$(printf '%s' "$TASK_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-
 ### 应该 (SHOULD)
 - [ ] {{可验证条件 3}}
 
+### 边缘场景 (EDGE)
+- [ ] {{空数据/异常输入等边界条件}}
+
+## BDD 测试映射
+
+| MUST 条件 | BDD Case | 测试文件 |
+|-----------|----------|----------|
+| {{条件 1}} | T-{{prefix}}{{N}} | tests/bdd/{{page}}/T-{{prefix}}{{N}}.test.ts |
+| {{条件 2}} | T-{{prefix}}{{N+1}} | tests/bdd/{{page}}/T-{{prefix}}{{N+1}}.test.ts |
+
 ## 失败模式
 
 | MUST 条件 | 失败场景 | 检测方式 | 恢复策略 |
@@ -147,7 +192,7 @@ TASK_SLUG="$(printf '%s' "$TASK_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-
 
 ## 验证命令
 ```bash
-# 执行验证的命令
+npx vitest run tests/bdd/{{page}}/
 ```
 ```
 
@@ -159,6 +204,9 @@ TASK_SLUG="$(printf '%s' "$TASK_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-
 
 错误: "性能要好"          -> 模糊
 正确: "首屏加载 < 2s"     -> 可量化
+
+错误: 测试放在 src/       -> Vitest 配置不覆盖
+正确: 测试放在 tests/     -> 遵循项目测试目录约定
 ```
 
 ---
@@ -191,7 +239,23 @@ TASK_SLUG="$(printf '%s' "$TASK_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-
   <files>{{涉及的文件}}</files>
   <action>{{具体行动}}</action>
   <verify>{{验证命令}}</verify>
-  <harness_ref>{{对应的 Harness 条件}}</harness_ref>
+  <harness_ref>
+    - MUST: {{对应的 MUST 条件}}
+    - BDD: T-{{prefix}}{{N}}（{{BDD case 标题}}）
+    - Test: tests/bdd/{{page}}/T-{{prefix}}{{N}}.test.ts
+  </harness_ref>
+</task>
+
+<task type="auto" id="T2">
+  <name>{{任务名称}}</name>
+  <files>{{涉及的文件}}</files>
+  <action>{{具体行动}}</action>
+  <verify>{{验证命令}}</verify>
+  <harness_ref>
+    - MUST: {{对应的 MUST 条件}}
+    - BDD: T-{{prefix}}{{N+1}}
+    - Test: tests/bdd/{{page}}/T-{{prefix}}{{N+1}}.test.ts
+  </harness_ref>
 </task>
 
 <task type="checkpoint" id="C1" gate="blocking">
@@ -200,4 +264,66 @@ TASK_SLUG="$(printf '%s' "$TASK_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-
   <resume-signal>{{继续信号}}</resume-signal>
 </task>
 </plan>
+```
+
+---
+
+## 偏差记录模板
+
+偏差记录写入 `.harness/tasks/{slug}/execute/deviations.md`。
+
+```markdown
+## 偏差记录
+
+### DEV-001: {{偏差标题}}
+- **发生时间**: {{时间戳}}
+- **关联任务**: T{{N}}
+- **偏差类型**: 设计偏差 / 实现偏差 / 环境偏差
+- **描述**: {{偏差描述}}
+- **根因**: {{根因分析}}
+- **影响范围**: {{影响哪些文件/模块}}
+- **处理方式**: {{如何解决}}
+- **harness_ref**: 对应的 MUST 条件是否受影响
+```
+
+---
+
+## 复盘报告模板
+
+复盘报告写入 `.harness/tasks/{slug}/review/review.md`。
+
+```markdown
+# 复盘报告：{{任务名称}}
+
+## 基本信息
+- **任务 ID**: {{taskId}}
+- **模式**: standard / quick / yolo
+- **复杂度**: simple / medium / complex
+- **开始时间**: {{createdAt}}
+- **结束时间**: {{completedAt}}
+
+## 完成情况
+
+### MUST 条件覆盖率
+| MUST 条件 | 状态 | 对应 BDD | 对应测试 |
+|-----------|------|----------|----------|
+| {{条件}} | PASS/FAIL | T-{{prefix}}{{N}} | tests/bdd/... |
+
+### 测试执行结果
+- 总测试数: {{total}}
+- 通过: {{passed}}
+- 失败: {{failed}}
+- 跳过: {{skipped}}
+
+## 偏差分析
+| 编号 | 偏差描述 | 根因 | 处理方式 |
+|------|----------|------|----------|
+| DEV-001 | {{描述}} | {{根因}} | {{处理}} |
+
+## 改进建议
+1. {{建议 1}}
+2. {{建议 2}}
+
+## 经验沉淀
+- {{可复用的经验/模式}}
 ```

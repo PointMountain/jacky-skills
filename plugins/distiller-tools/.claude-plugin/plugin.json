@@ -1,0 +1,23 @@
+{
+  "name": "distiller-tools",
+  "version": "1.0.0",
+  "description": "资源蒸馏工具集 — distiller 引擎 + 蒸馏产物知识库（每个产物是可复用的 Skill）",
+  "author": {
+    "name": "Jacky Wang",
+    "email": "wangjs.jacky@gmail.com",
+    "url": "https://github.com/wangjs-jacky"
+  },
+  "homepage": "https://github.com/wangjs-jacky/jacky-skills/tree/main/plugins/distiller-tools",
+  "repository": "https://github.com/wangjs-jacky/jacky-skills",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "distiller",
+    "knowledge-base",
+    "code-extraction"
+  ],
+  "skills": [
+    "./distiller/",
+    "./distilled/chrome-ext-ai-script/"
+  ]
+}
