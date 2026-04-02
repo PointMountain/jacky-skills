@@ -1,0 +1,23 @@
+{
+  "name": "ticktick-manager",
+  "version": "1.0.0",
+  "description": "TickTick（滴答清单）日程管理 - 任务读取/写入、项目管理、日程复盘补全",
+  "author": {
+    "name": "Jacky Wang",
+    "email": "wangjs.jacky@gmail.com",
+    "url": "https://github.com/wangjs-jacky"
+  },
+  "homepage": "https://github.com/wangjs-jacky/jacky-skills/tree/main/plugins/ticktick-manager",
+  "repository": "https://github.com/wangjs-jacky/jacky-skills",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "ticktick",
+    "dida365",
+    "task-management",
+    "schedule-review"
+  ],
+  "skills": [
+    "./skills/ticktick-manager/"
+  ]
+}
