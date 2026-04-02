@@ -21,14 +21,14 @@ TickTick（滴答清单）日程管理 Skill，提供完整的任务读取、写
     <constraints>
       <constraint>Phase 0 必须首先执行，检测 MCP 工具可用性</constraint>
       <constraint>MCP 未配置时，必须提供安装引导，不得直接报错退出</constraint>
-      <constraint>自动配置时，必须询问用户凭据，不得硬编码</constraint>
+      <constraint>自动配置时，使用 Streamable HTTP 远程连接方式（OAuth 授权），无需本地安装</constraint>
       <constraint>配置文件修改前，必须备份原文件</constraint>
       <constraint>禁止硬编码 projectId，必须通过 list_projects 动态获取</constraint>
       <constraint>禁止串行调用 API，必须并行调用（已完成/未完成/项目列表）</constraint>
       <constraint>用户说"更新/修改"时，直接查找现有任务，不要问"是要修改还是要创建"</constraint>
-      <constraint>日程复盘必须使用 Agent 模式，保护主会话上下文</constraint>
+      <constraint>日程复盘由主会话直接执行，3步完成：①并行获取数据 ②AskUserQuestion展示空白时段 ③批量创建任务</constraint>
       <constraint>历史任务（时间已过）必须自动标记为完成</constraint>
-      <constraint>时间必须转换为上海时区（UTC+8）</constraint>
+      <constraint>时区规则：API 返回 +0000 偏移 + timeZone=Asia/Shanghai 时，时间值即上海本地时间，无需 +8 转换</constraint>
     </constraints>
   </gsd:meta>
 
@@ -36,8 +36,8 @@ TickTick（滴答清单）日程管理 Skill，提供完整的任务读取、写
 
   <gsd:phase name="前置检测" order="0">
     <gsd:step>检测 dida365 MCP 工具是否可用</gsd:step>
-    <gsd:step>如果不可用，读取用户 MCP 配置</gsd:step>
-    <gsd:step>提供安装引导和配置示例</gsd:step>
+    <gsd:step>如果不可用，提供 Streamable HTTP 远程连接引导</gsd:step>
+    <gsd:step>提供多客户端配置参考</gsd:step>
   </gsd:phase>
 
   <gsd:phase name="任务读取" order="1">
@@ -60,11 +60,10 @@ TickTick（滴答清单）日程管理 Skill，提供完整的任务读取、写
   </gsd:phase>
 
   <gsd:phase name="日程复盘" order="4">
-    <gsd:step>使用 Agent 模式执行复杂分析</gsd:step>
-    <gsd:step>获取今日 + 历史 7 天任务数据</gsd:step>
-    <gsd:step>生成时间轴并识别空白时段</gsd:step>
-    <gsd:step>智能推断并交互式询问</gsd:step>
-    <gsd:step>批量创建任务</gsd:step>
+    <gsd:step>并行获取今日任务（已完成+未完成）+ 历史7天数据 + 项目列表</gsd:step>
+    <gsd:step>生成时间轴，识别 ≥30min 空白时段，智能推断推荐活动</gsd:step>
+    <gsd:step>使用 AskUserQuestion 展示所有空白时段选项</gsd:step>
+    <gsd:step>根据用户选择调用 batch_add_tasks 批量创建</gsd:step>
   </gsd:phase>
 </gsd:workflow>
 
@@ -164,7 +163,7 @@ try {
 
 **如果检测到 MCP 未配置，执行以下步骤**：
 
-**Step 1: 读取用户 MCP 配置**
+**Step 1: 检测当前环境**
 
 ```bash
 # 读取 Claude Code MCP 配置文件
@@ -177,9 +176,9 @@ Read ~/.claude/settings.json
 **Step 2: 分析当前配置**
 
 检查以下内容：
-- ✅ `enabledMcpjsonServers` 中是否包含 `dida365`
-- ✅ MCP 服务器配置文件是否存在
-- ✅ dida365 MCP 服务器是否已安装
+- ✅ MCP 配置中是否包含 `dida365`
+- ✅ 是否使用了 Streamable HTTP 远程连接（`url` 字段）
+- ⚠️ 如果仍使用旧的 `command`/`args`/`env` 本地模式，建议迁移到远程连接
 
 **Step 3: 提供安装引导**
 
@@ -190,89 +189,114 @@ Read ~/.claude/settings.json
 
 dida365 MCP 服务是 TickTick 任务管理的必需依赖。
 
-📦 安装方式：
+📦 配置方式：
 
-选项 1：自动配置（推荐）
-  - 我将帮你下载并配置 dida365 MCP 服务器
-  - 需要你提供 TickTick 账号信息
+选项 1：一键远程连接（推荐）
+  - 使用 Streamable HTTP 远程协议，无需本地安装
+  - 支持 OAuth 自动授权，无需手动输入账号密码
 
-选项 2：手动配置
-  - 我将生成配置文件示例
-  - 你需要手动安装和配置
+选项 2：手动配置（多客户端参考）
+  - 提供 Claude Code / Cursor / VS Code / Claude Desktop / ChatGPT 配置示例
+  - 适合在不同客户端中使用
 
-选项 3：查看配置文档
-  - 展示详细的配置步骤
+选项 3：查看官方配置文档
+  - 展示官方文档链接
   - 适合高级用户
 
-请选择安装方式：
+请选择配置方式：
 ```
 
 **Step 4: 根据用户选择执行**
 
-**选项 1：自动配置**
+**选项 1：一键远程连接（推荐）**
 
-1. 下载 dida365 MCP 服务器：
+dida365 MCP 已支持 Streamable HTTP 远程传输协议，无需本地安装任何依赖。
+
+1. 执行配置命令：
    ```bash
-   npm install -g @wangjs-jacky/dida365-mcp-server
-   # 或
-   npx @wangjs-jacky/dida365-mcp-server
+   claude mcp add --transport http dida365 https://mcp.dida365.com
    ```
 
-2. 生成 MCP 配置：
-   ```json
-   {
-     "mcpServers": {
-       "dida365": {
-         "command": "npx",
-         "args": ["-y", "@wangjs-jacky/dida365-mcp-server"],
-         "env": {
-           "DIDA365_USERNAME": "你的用户名",
-           "DIDA365_PASSWORD": "你的密码"
-         }
-       }
-     }
-   }
+2. 完成 OAuth 授权：
+   - 配置完成后，在 Claude Code 会话中运行 `/mcp`
+   - 按照提示完成 OAuth 授权流程（浏览器会自动打开授权页面）
+   - 授权成功后即可使用
+
+3. 如需使用 Bearer Token（代替 OAuth）：
+   ```bash
+   claude mcp add --transport http dida365 https://mcp.dida365.com --header "Authorization: Bearer YOUR_TOKEN_HERE"
    ```
 
-3. 询问用户凭据：
-   ```
-   请提供 TickTick 账号信息：
-   - 用户名/邮箱：
-   - 密码：
-   ```
-
-4. 写入配置文件：
-   - 读取现有 `~/.claude/mcp.json`
-   - 合并新配置
-   - 写回文件
-
-5. 提示用户重启：
+4. 提示用户重启：
    ```
    ✅ 配置完成！
 
    请重启 Claude Code 以加载新的 MCP 服务器：
    1. 退出 Claude Code
    2. 重新启动
-   3. 运行 /mcp 验证连接
+   3. 运行 /mcp，按照提示完成 OAuth 授权
    4. 再次使用 ticktick-manager skill
    ```
 
-**选项 2：手动配置**
+**选项 2：手动配置（多客户端参考）**
 
-展示配置示例：
+展示不同客户端的配置方式：
 
 ```markdown
-## 📝 手动配置步骤
+## 📝 多客户端手动配置
 
-### 1. 安装 MCP 服务器
+### Claude Code（终端命令）
 
 \`\`\`bash
-npm install -g @wangjs-jacky/dida365-mcp-server
+claude mcp add --transport http dida365 https://mcp.dida365.com
 \`\`\`
 
-### 2. 创建或编辑 MCP 配置文件
+### Cursor
 
-文件路径：\`~/.claude/mcp.json\`
+编辑 \`.cursor/mcp.json\`：
+
+\`\`\`json
+{
+  "mcpServers": {
+    "dida365": {
+      "url": "https://mcp.dida365.com"
+    }
+  }
+}
+\`\`\`
+
+### VS Code
+
+编辑 \`.vscode/mcp.json\`：
+
+\`\`\`json
+{
+  "servers": {
+    "dida365": {
+      "type": "http",
+      "url": "https://mcp.dida365.com"
+    }
+  }
+}
+\`\`\`
+
+### Claude Desktop
+
+进入 Customize > Connectors > Add Connector，填写 URL：
+https://mcp.dida365.com
+
+### ChatGPT
+
+设置 > 应用 > 高级设置 > 开发人员模式 > 创建应用，填写 URL：
+https://mcp.dida365.com
+
+### 备选方案（本地安装，不推荐）
+
+如果无法使用远程连接，可以使用旧的本地安装方式：
+
+\`\`\`bash
+npx @wangjs-jacky/dida365-mcp-server
+\`\`\`
 
 \`\`\`json
 {
@@ -288,97 +312,65 @@ npm install -g @wangjs-jacky/dida365-mcp-server
   }
 }
 \`\`\`
-
-### 3. 在 settings.json 中启用
-
-文件路径：\`~/.claude/settings.json\`
-
-\`\`\`json
-{
-  "enabledMcpjsonServers": [
-    "dida365"
-  ]
-}
-\`\`\`
-
-### 4. 重启 Claude Code
-
-退出并重新启动 Claude Code
-
-### 5. 验证连接
-
-\`\`\`bash
-/mcp
-\`\`\`
-
-应该看到 dida365 服务器状态为 ✅
 ```
 
-**选项 3：查看配置文档**
+**选项 3：查看官方配置文档**
 
-展示详细的配置文档链接和说明：
+展示官方配置文档链接和说明：
 
 ```markdown
-## 📚 配置文档
+## 📚 官方配置文档
 
-### 官方文档
-- MCP 协议文档：https://modelcontextprotocol.io
-- TickTick API 文档：https://ticktick.com/api
+### dida365 MCP 官方
+- MCP 服务器地址：https://mcp.dida365.com
+- 协议：Streamable HTTP（远程传输）
 
-### dida365 MCP 服务器
-- GitHub：https://github.com/wangjs-jacky/dida365-mcp-server
-- npm：https://www.npmjs.com/package/@wangjs-jacky/dida365-mcp-server
+### 相关文档
+- MCP 协议规范：https://modelcontextprotocol.io
+- TickTick API 文档：https://developer.ticktick.com
 
 ### 常见问题
 
-**Q: 为什么需要账号密码？**
-A: dida365 MCP 服务器需要登录 TickTick 才能获取任务数据
+**Q: OAuth 授权流程是什么？**
+A: 配置完成后运行 /mcp，浏览器会自动打开滴答清单授权页面，登录确认即可
 
-**Q: 密码是否安全？**
-A: 密码存储在本地配置文件中，不会上传到云端
+**Q: 支持 Bearer Token 吗？**
+A: 支持。可在配置时通过 --header 参数添加 Authorization: Bearer YOUR_TOKEN
 
-**Q: 支持哪些认证方式？**
-A: 目前支持用户名+密码，未来会支持 OAuth
+**Q: 远程连接和本地安装有什么区别？**
+A: 远程连接无需本地安装任何依赖，通过 OAuth 授权更安全便捷，推荐使用
 ```
 
 #### 0.3 配置文件示例
 
-**完整的 mcp.json 示例**：
+**Claude Code mcp.json 示例**（Streamable HTTP 远程连接）：
 
 ```json
 {
   "mcpServers": {
     "dida365": {
-      "command": "npx",
-      "args": ["-y", "@wangjs-jacky/dida365-mcp-server"],
-      "env": {
-        "DIDA365_USERNAME": "your_username",
-        "DIDA365_PASSWORD": "your_password",
-        "DIDA365_BASE_URL": "https://api.ticktick.com"
-      }
-    },
-    "feishu2md": {
-      "command": "npx",
-      "args": ["-y", "@wangjs-jacky/feishu2md"],
-      "env": {
-        "FEISHU_APP_ID": "your_app_id",
-        "FEISHU_APP_SECRET": "your_app_secret"
+      "url": "https://mcp.dida365.com"
+    }
+  }
+}
+```
+
+**使用 Bearer Token 的 mcp.json 示例**：
+
+```json
+{
+  "mcpServers": {
+    "dida365": {
+      "url": "https://mcp.dida365.com",
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN_HERE"
       }
     }
   }
 }
 ```
 
-**settings.json 启用示例**：
-
-```json
-{
-  "enabledMcpjsonServers": [
-    "dida365",
-    "feishu2md"
-  ]
-}
-```
+> 💡 **提示**：推荐使用 `claude mcp add --transport http dida365 https://mcp.dida365.com` 命令自动配置，OAuth 授权后无需手动管理 Token。
 
 > 🛑 **Checkpoint**：MCP 配置完成后，提示用户重启 Claude Code 并验证连接
 
@@ -515,19 +507,28 @@ A: 目前支持用户名+密码，未来会支持 OAuth
 
 **功能**：分析今天没有填写任务的时间段，逐个询问用户在做什么，然后批量记录到滴答清单。
 
-**⚠️ 重要**：此阶段必须使用 Agent 模式执行，保护主会话上下文
+**执行方式**：主会话直接执行，3 步完成（不使用 Agent）
 
-**执行方式**：
+#### Step 1: 并行获取数据
 
-使用 Agent 工具在独立上下文中执行日程复盘分析。Agent 将负责：
-1. 获取今日 + 历史 7 天任务数据
-2. 生成 06:00-22:00 时间轴
-3. 识别 ≥30 分钟的空白时段
-4. 基于相邻任务/历史习惯/时段特征智能推断
-5. 使用 AskUserQuestion 交互式询问用户
-6. 批量创建任务
+**同时调用 4 个 MCP 工具**：
+- `mcp__dida365__list_projects` — 获取清单映射
+- `mcp__dida365__list_undone_tasks_by_date` — 今日未完成任务
+- `mcp__dida365__list_completed_tasks_by_date` — 今日已完成任务
+- `mcp__dida365__list_completed_tasks_by_date` — 过去 7 天已完成（用于习惯推断）
 
-**智能推断规则（简化版）**：
+**时区规则**（重要）：
+> API 返回时间格式为 `"2026-04-02T02:15:00+0000"` 且 `timeZone: "Asia/Shanghai"`。
+> **时间值即上海本地时间**，无需 +8 转换。`02:15` 就是凌晨 2:15。
+
+#### Step 2: 分析时间轴 + 展示选项
+
+1. 合并今日已完成 + 未完成任务，按开始时间排序
+2. 生成 06:00-22:00 时间轴，识别 ≥30 分钟空白时段
+3. 基于智能推断规则生成推荐活动
+4. **直接用 AskUserQuestion 展示所有空白时段和选项**（不要问"是否需要补全"）
+
+**智能推断规则**：
 
 | 时间段 | 推断优先级 |
 |--------|-----------|
@@ -536,265 +537,34 @@ A: 目前支持用户名+密码，未来会支持 OAuth
 | 17:00-19:00 | 相邻任务 > 习惯 > 默认（下班通勤） |
 | 19:00-22:00 | 习惯 > 默认（晚餐/娱乐） |
 
-**推断源权重**：
-- 相邻任务: 0.4
-- 历史习惯: 0.4
-- 时段特征: 0.2
+**推断源权重**：相邻任务 0.4 / 历史习惯 0.4 / 时段特征 0.2
 
-**Agent 指令模板**：
+**推荐理由格式**：`← 推荐（工作日早晨 + 09:00有工作任务）`
 
-```javascript
-Agent({
-  subagent_type: "general-purpose",
-  description: "日程复盘分析",
-  prompt: `
-你是一个日程复盘专家。请分析今天的空白时段并补全。
+#### Step 3: 批量创建任务
 
-## 任务
-1. 获取今日任务数据（已完成 + 未完成）
-2. 获取过去 7 天历史数据（用于习惯推断）
-3. 生成 06:00-22:00 时间轴
-4. 识别 ≥30 分钟的空白时段
-5. 基于相邻任务/历史习惯/时段特征智能推断
-6. 使用 AskUserQuestion 交互式询问用户
-7. 批量创建任务
+根据用户选择，调用 `mcp__dida365__batch_add_tasks` 一次性创建。
 
-## MCP 工具
-- mcp__dida365__list_completed_tasks_by_date
-- mcp__dida365__list_undone_tasks_by_date
-- mcp__dida365__list_projects
-- mcp__dida365__batch_add_tasks
+**清单分配规则**（同 Phase 2.1）：
+| 活动关键词 | 分配清单 |
+|-----------|---------|
+| 睡觉、休息 | 休息（紫） |
+| 午休、午睡、午饭、午餐、早饭、晚餐、吃饭 | 午休（黄） |
+| 游戏、娱乐、看电影、刷剧 | 娱乐（红） |
+| 其他 | Inbox |
 
-## 智能推断规则
-| 时间段 | 推断优先级 |
-|--------|-----------|
-| 06:00-09:00 | 相邻任务 > 习惯 > 默认（通勤/早餐） |
-| 11:30-14:00 | 习惯 > 默认（午餐/午休） |
-| 17:00-19:00 | 相邻任务 > 习惯 > 默认（下班通勤） |
-| 19:00-22:00 | 习惯 > 默认（晚餐/娱乐） |
-
-**推断源权重**：
-- 相邻任务: 0.4
-- 历史习惯: 0.4
-- 时段特征: 0.2
-
-## 交互方式
-1. 直接展示所有空白时段和选项，不要问"是否需要补全"
-2. 推荐理由简化格式：`← 推荐（工作日早晨 + 09:00有工作任务）`
-3. 用户输入格式：`11 21 31`（时段1选活动1，时段2选活动1，时段3选活动1）
-
-## 输出格式
-\`\`\`
-📊 今日日程复盘
-
-发现 N 个空白时段：
-
-1️⃣ 07:00-09:00（2小时）
-   可能的活动：
-   - 1. 🚗 通勤/上班路上 ← 推荐（工作日早晨 + 09:00有工作任务）
-   - 2. 🍳 吃早餐
-   - 3. 😴 睡觉/休息
-   - 4. 📱 刷手机/娱乐
-   - 5. ✏️ 其他
-
-请输入时段编号 + 活动编号（如 "11 21 31"）：
-
-📝 汇总：
-1️⃣ 07:00-09:00 → 通勤/上班路上
-2️⃣ 12:00-14:00 → 午餐/午休
-
-✅ 已创建 N 个任务
-\`\`\`
-
-## 注意事项
-- projectId 必须通过 list_projects 动态获取，禁止硬编码
-- 历史任务（时间已过）必须自动标记为完成
-- 时间必须转换为上海时区（UTC+8）
-`
-})
-```
-
-**优势**：
-- ✅ 保护主会话上下文，避免 token 超限
-- ✅ 独立环境执行复杂分析
-- ✅ 可以读取大量历史数据而不影响主会话
-
-#### 4.1 获取任务数据
-
-**步骤**：
-1. 并行调用（获取今日 + 历史数据）：
-   - `mcp__dida365__list_completed_tasks_by_date` - 今日已完成任务
-   - `mcp__dida365__list_undone_tasks_by_date` - 今日未完成任务
-   - `mcp__dida365__list_completed_tasks_by_date` - 过去 7 天已完成任务（用于习惯推断）
-2. 合并今日结果，按时间排序
-3. 提取每个任务的开始时间和结束时间
-4. 缓存历史任务数据供智能推断使用
-
-**参数设置**：
-```json
-{
-  // 今日任务
-  "today": {
-    "startDate": "2026-04-01T00:00:00Z",  // 今天 00:00
-    "endDate": "2026-04-01T23:59:59Z"     // 今天 23:59
-  },
-  // 历史数据（用于习惯推断）
-  "history": {
-    "startDate": "2026-03-25T00:00:00Z",  // 7天前
-    "endDate": "2026-03-31T23:59:59Z"     // 昨天
-  }
-}
-```
-
-#### 4.2 生成时间轴
-
-**时间范围**：06:00 - 22:00（可配置）
-
-**步骤**：
-1. 创建时间轴数组，粒度为 15 分钟
-2. 标记有任务的时间段
-3. 识别连续的空白时段
-
-**空白时段过滤规则**：
-- 只关注 ≥30 分钟的空档
-- 可选：跳过已过去但未记录的时段
-
-#### 4.3 识别空白时段
-
-**示例输出**：
-```
-📊 今日时间轴分析（06:00 - 22:00）
-
-✅ 已记录时段：
-  09:00-10:00  晨会
-  10:00-12:00  开发功能 A
-  14:00-15:30  代码审查
-  15:30-17:00  开发功能 B
-
-⚠️ 发现 3 个空白时段：
-  1. 07:00-09:00 (2小时)
-  2. 12:00-14:00 (2小时)
-  3. 17:00-19:00 (2小时)
-```
-
-#### 4.4 智能推断与交互式询问
-
-**⚠️ 核心原则**：不要问"是否需要补全"，直接列出选项让用户选择
-
-**❌ 错误方式**（不要这样做）：
-```
-"发现 3 个空白时段，是否需要补全？(Y/n)"
-```
-
-**✅ 正确方式**（直接列出选项）：
-```
-⚠️ 发现 3 个空白时段：
-
-1️⃣ 07:00-09:00（2小时）
-   可能的活动：
-   - 1. 🚗 通勤/上班路上 ← 推荐（工作日早晨 + 09:00有工作任务）
-   - 2. 🍳 吃早餐
-   - 3. 😴 睡觉/休息
-   - 4. 📱 刷手机/娱乐
-   - 5. ✏️ 其他
-
-请输入时段编号 + 活动编号（如 "11 21 31"）：
-```
-
-**交互方式**：
-1. **直接展示所有空白时段和选项**
-   - 不要问"是否需要补全"
-   - 不要逐个询问，一次性展示所有选项
-
-2. **推荐理由简化**：
-   - ❌ 冗长：`💡 推荐理由：工作日早晨时段，且 09:00 有工作任务`
-   - ✅ 简洁：`← 推荐（工作日早晨 + 09:00有工作任务）`
-
-3. **用户输入格式**：
-   - 单个时段：`11`（时段1选活动1）
-   - 多个时段：`11 21 32`（用空格分隔）
-   - 跳过某个时段：不输入该时段的编号
-
-#### 4.5 收集答案
-
-**数据结构**：
-```json
-[
-  {
-    "timeSlot": "07:00-09:00",
-    "duration": "2小时",
-    "answer": "通勤/上班路上"
-  },
-  {
-    "timeSlot": "12:00-14:00",
-    "duration": "2小时",
-    "answer": "午餐/午休"
-  }
-]
-```
-
-#### 4.6 批量创建任务
-
-**使用 `mcp__dida365__batch_add_tasks`**：
-
-**步骤**：
-1. 根据答案构建任务列表
-2. 智能匹配清单（参考 Phase 2.1 的智能清单分配规则）
-3. 调用批量创建 API
-
-**任务构建示例**：
-```json
-{
-  "tasks": [
-    {
-      "title": "通勤/上班路上",
-      "startDate": "2026-04-01T07:00:00+08:00",
-      "dueDate": "2026-04-01T09:00:00+08:00",
-      "isAllDay": false,
-      "projectId": "{休息清单的projectId}"
-    },
-    {
-      "title": "午餐/午休",
-      "startDate": "2026-04-01T12:00:00+08:00",
-      "dueDate": "2026-04-01T14:00:00+08:00",
-      "isAllDay": false,
-      "projectId": "{午休清单的projectId}"
-    }
-  ]
-}
-```
-
-> ⚠️ **注意**：projectId 必须通过 `mcp__dida365__list_projects` 动态获取，禁止硬编码
+**历史任务处理**：时间已过的任务，创建后立即调用 `complete_task` 标记完成。
 
 **输出格式**：
 ```
-📊 今日日程复盘
+📝 汇总：
+1️⃣ 07:00-09:00 → 通勤/上班路上 ✅
+2️⃣ 12:00-14:00 → 午餐/午休 ✅
 
-发现 3 个空白时段：
-
-1️⃣ 07:00-09:00 (2小时)
-   → 你说：通勤/上班路上
-   ✅ 已记录
-
-📝 正在同步到滴答清单...
-✅ 已创建 3 个任务
+已创建 2 个任务
 ```
 
-> 🛑 **Checkpoint**：所有询问结束后，展示汇总并确认是否创建任务
-
-#### 4.7 配置选项
-
-**可配置参数**：
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| **时间范围** | 06:00-22:00 | 分析的时间段 |
-| **最小空档** | 30 分钟 | 小于此值的空白时段忽略 |
-| **跳过过去** | true | 是否跳过已过去但未记录的时段 |
-| **批量创建** | true | 是否使用批量 API（推荐） |
-
-**配置方式**：
-- 通过 `AskUserQuestion` 在复盘开始时询问
-- 或使用默认配置直接开始
+> 🛑 **Checkpoint**：批量创建前展示汇总确认
 
 ## MCP 工具清单
 
@@ -830,18 +600,12 @@ Agent({
 
 ### 时区处理
 
-**关键**：API 返回的时间字符串包含时区偏移量（如 `+0000`），需要正确解析
-
-**时间格式示例**：
-```
-API 返回: "2026-04-01T06:30:00+0000" (UTC 时间 06:30)
-转换为上海时间: 06:30 + 8小时 = 14:30
-```
+**关键**：API 返回 `"2026-04-01T06:30:00+0000"` + `timeZone: "Asia/Shanghai"` 时，**时间值即上海本地时间**，无需 +8 转换。
 
 **转换规则**：
-1. 解析 API 返回的完整时间字符串（含时区偏移）
-2. 如果偏移是 `+0000`（UTC），则加 8 小时得到上海时间
-3. 如果偏移已经是 `+08:00`，则无需转换
+1. 检查 `timeZone` 字段是否为 `Asia/Shanghai`
+2. 如果是 → 时间值直接使用（`06:30` 就是上海时间 06:30）
+3. 如果 `timeZone` 缺失或为其他值 → 按 `+0000` 偏移 +8 转换
 
 **输出格式**：
 ```
@@ -1030,6 +794,76 @@ Claude：
 | 时间显示错误 | 时区未转换 | UTC + 8 = 上海时间 |
 | 找不到清单 | projectId 过期 | 调用 list_projects 刷新映射 |
 
+## 多客户端配置参考
+
+dida365 MCP 服务支持 Streamable HTTP 远程传输协议，可在多种 AI 客户端中使用。
+
+### 客户端配置速查表
+
+| 客户端 | 配置方式 | 配置文件/位置 |
+|--------|---------|--------------|
+| **Claude Code** | 终端命令 | `claude mcp add --transport http` |
+| **Cursor** | JSON 配置 | `.cursor/mcp.json` |
+| **VS Code** | JSON 配置 | `.vscode/mcp.json` |
+| **Claude Desktop** | UI 配置 | Customize > Connectors |
+| **ChatGPT** | UI 配置 | 设置 > 开发人员模式 |
+
+### Claude Code
+
+```bash
+# 推荐：OAuth 授权（自动管理 Token）
+claude mcp add --transport http dida365 https://mcp.dida365.com
+
+# 或使用 Bearer Token
+claude mcp add --transport http dida365 https://mcp.dida365.com --header "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+配置完成后运行 `/mcp`，按照提示完成 OAuth 授权。
+
+### Cursor
+
+编辑 `.cursor/mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "dida365": {
+      "url": "https://mcp.dida365.com"
+    }
+  }
+}
+```
+
+### VS Code
+
+编辑 `.vscode/mcp.json`：
+
+```json
+{
+  "servers": {
+    "dida365": {
+      "type": "http",
+      "url": "https://mcp.dida365.com"
+    }
+  }
+}
+```
+
+### Claude Desktop
+
+1. 打开 Claude Desktop
+2. 进入 **Customize > Connectors > Add Connector**
+3. 填写 URL：`https://mcp.dida365.com`
+4. 保存并按照提示完成授权
+
+### ChatGPT
+
+1. 打开 ChatGPT
+2. 进入 **设置 > 应用 > 高级设置 > 开发人员模式**
+3. 点击 **创建应用**
+4. 填写 URL：`https://mcp.dida365.com`
+5. 保存并按照提示完成授权
+
 ## Check List
 
 - [ ] MCP 连接正常（`/mcp` 验证）
@@ -1039,8 +873,9 @@ Claude：
 - [ ] 创建任务：判断是否为历史任务，自动标记完成
 - [ ] 修改操作前已确认
 - [ ] 动态获取 projectId 映射（禁止硬编码）
-- [ ] 日程复盘：获取今日 + 历史 7 天任务数据
+- [ ] 日程复盘：主会话直接执行（不使用 Agent）
+- [ ] 日程复盘：并行获取 4 类数据（今日已完成+未完成+历史7天+项目列表）
+- [ ] 日程复盘：时区规则正确（timeZone=Asia/Shanghai 时直接使用时间值）
 - [ ] 日程复盘：基于相邻任务/历史习惯/时段特征智能推断
-- [ ] 日程复盘：逐个询问空白时段，提供智能推荐
-- [ ] 日程复盘：收集所有答案后批量创建
-- [ ] 日程复盘：使用 `batch_add_tasks` 而非循环调用
+- [ ] 日程复盘：AskUserQuestion 直接展示所有空白时段选项
+- [ ] 日程复盘：使用 `batch_add_tasks` 批量创建
