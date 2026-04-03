@@ -1,6 +1,6 @@
 {
   "name": "dev-tools",
-  "version": "1.19.0",
+  "version": "1.20.0",
   "description": "开发工具集 - GitHub 发布、跨会话开发、Skills 创建、依赖管理等",
   "author": {
     "name": "Jacky Wang",
@@ -23,7 +23,6 @@
 "./agent-pipeline-generate/",
     "./agent-pipeline-plan/",
     "./agent-pipeline-score/",
-    "./doc-to-tutorial/",
     "./efficiency-audit/",
     "./feature-tracker/",
     "./gh-workflow-generator/",
@@ -32,7 +31,6 @@
     "./gsd-creator-skills/",
     "./harness-benchmark/",
     "./long-running-agent/",
-    "./repo-study/",
     "./skill-optimizer/",
     "./skill-researcher/",
     "./task-harness/",
