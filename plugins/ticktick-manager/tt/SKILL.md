@@ -1,16 +1,18 @@
 ---
-name: ticktick-manager
-description: "TickTick（滴答清单）日程管理 Skill。通过 tt CLI 查看今日/昨日任务、创建/修改任务、管理项目清单、日程复盘补全。触发词：日程、待办、ticktick、tt、计划、任务、滴答清单、一天结束、日程复盘、时间都去哪了、今天干了什么、补全日程、完善行程、回顾今天。"
+name: tt
+description: "TickTick 日程管理。触发词：/tt、日程、待办、计划、任务、滴答清单、日程复盘、时间都去哪了、今天干了什么、补全日程、回顾今天。"
 ---
 
-# ticktick-manager
+# tt
 
 TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的任务读取、写入和项目管理功能。
 
+> **IMPORTANT**: 在执行任何任务操作前，必须先读取 `references/humanization.md` 并遵循其中的人性化关怀规则。这是一份强制加载的参考资料。
+
 <gsd:workflow>
   <gsd:meta>
-    <name>ticktick-manager</name>
-    <trigger>日程、待办、ticktick、tt、计划、任务、滴答清单、一天结束、日程复盘、时间都去哪了、今天干了什么、补全日程、完善行程、回顾今天</trigger>
+    <name>tt</name>
+    <trigger>/tt、日程、待办、计划、任务、滴答清单、日程复盘、时间都去哪了、今天干了什么、补全日程、回顾今天</trigger>
     <requires>tt CLI (npm install -g @wangjs-jacky/tt-cli), Bash, AskUserQuestion</requires>
     <checkpoints>
       <checkpoint order="0">CLI 可用性检测完成后，提示用户安装或登录</checkpoint>
@@ -26,7 +28,8 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
       <constraint>用户说"更新/修改"时，直接查找现有任务，不要问"是要修改还是要创建"</constraint>
       <constraint>日程复盘由主会话直接执行，3步完成：①并行获取数据 ②AskUserQuestion展示空白时段 ③批量创建任务</constraint>
       <constraint>历史任务（时间已过）必须自动标记为完成</constraint>
-      <constraint>时区规则：API 返回的时间为 UTC（+0000/Z 后缀），必须 +8 转换为上海本地时间</constraint>
+      <constraint>时区规则：API 返回的时间为 UTC（+0000/Z 后缀），必须 +8 转换为上海本地时间（CLI 已修复，直接使用 new Date() 解析即可）</constraint>
+      <constraint>非今日任务查询必须用 --start/--end 日期范围参数，禁止用 --query yesterday（不支持）</constraint>
     </constraints>
   </gsd:meta>
 
@@ -65,15 +68,20 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
   </gsd:phase>
 </gsd:workflow>
 
+## 🌙 人性化关怀
+
+> 详细规则见 `references/humanization.md`。核心原则：**自然、克制、优先关心人**。
+>
+> 关怀仅在三个节点输出：任务创建后、日程展示后、日程复盘结尾。每类关怀每会话最多 1 次。
+
 <commands>
 ```
-/ticktick         # 主命令，显示今日任务
-/tt               # 主命令别名
-/ticktick today   # 今日任务
-/ticktick tomorrow # 明日任务
-/ticktick add <任务> # 创建任务
-/ticktick done <任务ID> # 完成任务
-/ticktick review  # 日程复盘，补全空白时段
+/tt               # 主命令，显示今日任务
+/tt today         # 今日任务
+/tt tomorrow      # 明日任务
+/tt add <任务>     # 创建任务
+/tt done <任务ID>  # 完成任务
+/tt review        # 日程复盘，补全空白时段
 ```
 </commands>
 
@@ -81,9 +89,17 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
 
 所有操作通过 `tt` CLI 完成，替代 MCP 工具调用：
 
+### 任务查询
+
+**`--query` 支持的预设值**：`today`、`tomorrow`、`last24hour`、`next24hour`、`last7day`、`next7day`
+
+> ⚠️ **不支持 `yesterday`！** 查询非今日任务必须使用 `--start` 和 `--end` 参数。
+
 | 场景 | CLI 命令 |
 |------|---------|
 | 查看未完成今日任务 | `tt task undone --query today` |
+| 查看未完成昨日任务 | `tt task undone --start 2026-04-03 --end 2026-04-04` |
+| 查看未完成指定日期任务 | `tt task undone --start <startDate> --end <endDate>` |
 | 查看已完成今日任务 | `tt task completed --start <date> --end <date>` |
 | 搜索任务 | `tt task search <keyword>` |
 | 按ID查找任务 | `tt task find <taskId>` |
@@ -164,9 +180,21 @@ tt login
 ### Phase 1: 任务读取
 
 **并行调用**（Bash 并行）：
+
+**查询今日任务**：
 ```bash
 tt task undone --query today &
 tt task completed --start 2026-04-04 --end 2026-04-05 &
+tt project-list &
+wait
+```
+
+**查询指定日期任务**（如"昨天"、"前天"等，禁止用 `--query yesterday`）：
+```bash
+# --query 仅支持: today, tomorrow, last24hour, next24hour, last7day, next7day
+# 非 today/tomorrow 的查询必须用 --start/--end 日期范围
+tt task undone --start 2026-04-03 --end 2026-04-04 &
+tt task completed --start 2026-04-03 --end 2026-04-04 &
 tt project-list &
 wait
 ```
@@ -267,6 +295,7 @@ tt task-batch-done <projectId> --task-ids <ids> --force
 - [ ] tt CLI 已安装且已登录
 - [ ] 首次查询并行获取数据
 - [ ] 时间已从 UTC +8 转换为上海时区
+- [ ] 非今日查询使用 --start/--end 日期范围（禁止 --query yesterday/today 以外的值）
 - [ ] 表格包含清单名称列
 - [ ] projectId 已缓存，非首次不重复调 tt project-list
 - [ ] 创建任务：判断是否为历史任务，自动标记完成
@@ -277,3 +306,7 @@ tt task-batch-done <projectId> --task-ids <ids> --force
 - [ ] 日程复盘：基于相邻任务/历史习惯/时段特征智能推断
 - [ ] 日程复盘：AskUserQuestion 直接展示所有空白时段选项
 - [ ] 日程复盘：批量创建使用 tt task-batch-add
+- [ ] 人性化：深夜操作（23:00-06:00）输出休息提醒，每会话最多 1 次
+- [ ] 人性化：凌晨时段任务（00:00-06:00）关心睡眠状况
+- [ ] 人性化：过载/连续工作时善意建议，不说教不轰炸
+- [ ] 人性化：完成成就时真诚庆祝
