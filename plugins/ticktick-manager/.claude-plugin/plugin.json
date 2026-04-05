@@ -1,6 +1,6 @@
 {
   "name": "ticktick-manager",
-  "version": "1.1.3",
+  "version": "1.2.0",
   "description": "TickTick（滴答清单）日程管理 - 任务读取/写入、项目管理、日程复盘补全",
   "author": {
     "name": "Jacky Wang",
@@ -18,6 +18,8 @@
     "schedule-review"
   ],
   "skills": [
-    "./tt/"
+    "./tt/",
+    "./tt-defer/",
+    "./tt-worker/"
   ]
 }
