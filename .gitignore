@@ -10,3 +10,5 @@ plugins/language-skills/**/vocabulary.json
 .harness/tasks/
 .harness/workflow.json
 content/
+.hooks-test
+.omc
