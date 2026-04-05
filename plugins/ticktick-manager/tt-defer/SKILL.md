@@ -13,7 +13,7 @@ description: "将任务推送到滴答清单任务池，支持自然语言触发
   <gsd:meta>
     <name>tt-defer</name>
     <trigger>推到待办、丢到池子、明天再做、tt-defer、推任务、推迟任务、放到池子里、稍后执行</trigger>
-    <requires>tt CLI (npm install -g @wangjs-jacky/tt-cli), Bash, AskUserQuestion</requires>
+    <requires>tt CLI (npm install -g @wangjs-jacky/ticktick-cli), Bash, AskUserQuestion</requires>
     <checkpoints>
       <checkpoint order="0">tt CLI 可用且已登录</checkpoint>
       <checkpoint order="1">任务池清单已确认存在</checkpoint>

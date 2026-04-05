@@ -13,7 +13,7 @@ description: "读取滴答清单任务池中的任务并自动执行。触发词
   <gsd:meta>
     <name>tt-worker</name>
     <trigger>执行任务池、tt-worker、处理待办、跑任务池、自动执行、处理池子</trigger>
-    <requires>tt CLI (npm install -g @wangjs-jacky/tt-cli), Bash</requires>
+    <requires>tt CLI (npm install -g @wangjs-jacky/ticktick-cli), Bash</requires>
     <checkpoints>
       <checkpoint order="0">tt CLI 可用且已登录，任务池清单存在</checkpoint>
       <checkpoint order="1">任务列表读取完成，确认执行范围</checkpoint>

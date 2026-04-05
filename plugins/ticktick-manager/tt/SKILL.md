@@ -13,7 +13,7 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
   <gsd:meta>
     <name>tt</name>
     <trigger>/tt、日程、待办、计划、任务、滴答清单、日程复盘、时间都去哪了、今天干了什么、补全日程、回顾今天</trigger>
-    <requires>tt CLI (npm install -g @wangjs-jacky/tt-cli), Bash, AskUserQuestion</requires>
+    <requires>tt CLI (npm install -g @wangjs-jacky/ticktick-cli), Bash, AskUserQuestion</requires>
     <checkpoints>
       <checkpoint order="0">CLI 可用性检测完成后，提示用户安装或登录</checkpoint>
       <checkpoint order="1">首次查询后展示结果，等待用户下一步指令</checkpoint>
@@ -233,7 +233,7 @@ tt whoami
 
 **未安装时引导**：
 ```bash
-npm install -g @wangjs-jacky/tt-cli
+npm install -g @wangjs-jacky/ticktick-cli
 tt login
 ```
 
