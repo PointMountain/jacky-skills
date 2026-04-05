@@ -1,7 +1,7 @@
 {
   "name": "video-processing",
-  "version": "1.2.0",
-  "description": "视频处理工具集 - B站字幕提取、视频下载、格式转换等",
+  "version": "1.7.0",
+  "description": "音视频处理工具集 - 音视频转文字、内容提取、Obsidian 笔记生成",
   "author": {
     "name": "Jacky Wang",
     "email": "wangjs.jacky@gmail.com",
@@ -19,12 +19,10 @@
     "subtitle"
   ],
   "skills": [
-    "./skills/bilibili-to-obsidian/",
-    "./skills/bilibili-batch/",
-    "./skills/video-to-text/",
-    "./skills/m3u8-dl/",
-    "./skills/fix-neat-video/",
+    "./skills/audio-to-obsidian/",
+    "./skills/extract-url-media/",
     "./skills/audio-to-subtitle/",
-    "./skills/subtitle-to-audio/"
+    "./skills/write-obsidian-note/",
+    "./skills/bilibili-video-list/"
   ]
 }

@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["dependencies"],
+  "properties": {
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["source", "path", "commit", "installMode"],
+        "properties": {
+          "source": {
+            "type": "string",
+            "pattern": "^github:[^/]+/[^/]+$"
+          },
+          "path": { "type": "string" },
+          "ref": { "type": "string" },
+          "version": { "type": "string" },
+          "commit": { "type": "string" },
+          "installMode": {
+            "type": "string",
+            "enum": ["offline", "j-skills"]
+          },
+          "installedAt": { "type": "string", "format": "date-time" },
+          "localPath": { "type": "string" }
+        }
+      }
+    }
+  }
+}

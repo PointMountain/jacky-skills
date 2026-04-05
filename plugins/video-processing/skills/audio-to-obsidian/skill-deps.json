@@ -1,0 +1,20 @@
+{
+  "$schema": "./skill-deps.schema.json",
+  "dependencies": {
+    "extract-url-media": {
+      "source": "local",
+      "installMode": "offline",
+      "localPath": "../extract-url-media/"
+    },
+    "audio-to-subtitle": {
+      "source": "local",
+      "installMode": "offline",
+      "localPath": "../audio-to-subtitle/"
+    },
+    "write-obsidian-note": {
+      "source": "local",
+      "installMode": "offline",
+      "localPath": "../write-obsidian-note/"
+    }
+  }
+}
