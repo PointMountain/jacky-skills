@@ -33,6 +33,7 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
       <constraint>⚡ 效率要求：任务操作必须在 1 分钟内完成。优先使用 --json 获取结构化数据，避免文本解析和多次 CLI 调用</constraint>
       <constraint>批量更新任务时，必须用 --json 获取 task ID，然后用 tt task-batch-update --stdin 一次完成，禁止逐个更新</constraint>
       <constraint>获取 task ID 的优先路径：tt task undone --json → tt project-tasks <id> --json → tt task-search --json（按可用性降序）</constraint>
+      <constraint>标题与内容规则：标题必须简短（≤15字），具体细节写入 --content。禁止把所有信息塞在标题里。详见「标题与内容规则」小节</constraint>
     </constraints>
   </gsd:meta>
 
@@ -53,9 +54,10 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
 
   <gsd:phase name="任务写入" order="2">
     <gsd:step>解析用户输入，提取任务名称和时间</gsd:step>
+    <gsd:step>生成简洁标题 + 详细内容（见「标题与内容规则」）</gsd:step>
     <gsd:step>智能清单分配</gsd:step>
     <gsd:step>判断是否为历史任务</gsd:step>
-    <gsd:step>创建任务并处理完成状态</gsd:step>
+    <gsd:step>创建任务（必须包含 --content）并处理完成状态</gsd:step>
   </gsd:phase>
 
   <gsd:phase name="项目管理" order="3">
@@ -116,6 +118,9 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
 
 所有操作通过 `tt` CLI 完成，替代 MCP 工具调用：
 
+> **⚡ 效率提示**：批量操作（更新/删除/移动）需要 task ID 时，优先使用 `--json` 标志获取结构化数据，一步拿到 ID，无需文本解析。
+> 支持 `--json` 的命令：`task-undone`、`task-list`、`project-tasks`
+
 ### 任务查询
 
 **`--query` 支持的预设值**：`today`、`tomorrow`、`last24hour`、`next24hour`、`last7day`、`next7day`
@@ -132,19 +137,44 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
 | 搜索任务 | `tt task-search <keyword>` |
 | 搜索任务（结构化） | `tt task-search <keyword> --json` ⚡ |
 | 按ID查找任务 | `tt task-find <taskId>` |
-| 创建任务 | `tt task-add <title> -p <projectId> --start-date <date> --due-date <date>` |
+| 创建任务 | `tt task-add <title> -p <projectId> --content <text> --start-date <date> --due-date <date>` |
 | 批量创建任务 | `echo '[...]' | tt task-batch-add --stdin` |
 | 完成任务 | `tt task-done <projectId> <taskId>` |
 | 批量完成 | `tt task-batch-done <projectId> --task-ids <ids>` |
 | 更新任务 | `tt task-update <taskId> -p <projectId> [options]` |
 | 列出项目 | `tt project-list` |
 | 查看项目任务 | `tt project-tasks <projectId>` |
+| 查看项目任务（结构化） | `tt project-tasks <projectId> --json` ⚡ |
+| 筛选任务（结构化） | `tt task-list -p <projectId> --json` ⚡ |
 | 用户信息 | `tt user-pref` |
 | 登录 | `tt login` |
 | 登录状态 | `tt whoami` |
 | 切换区域 | `tt config --region cn\|global` |
 
 ## 核心规则
+
+### 标题与内容规则
+
+**创建任务时必须同时填写标题和内容，禁止只填标题。**
+
+**标题（title）**：简短概括，≤15 字，一眼能看出做了什么
+**内容（content）**：具体的细节描述，用 Markdown 列表形式
+
+| 场景 | 标题（title） | 内容（--content） |
+|------|--------------|-------------------|
+| 用户说"我刚发布了一个包 v1.1.1" | 发布 jacky-skills v1.1.1 | `- 修复了 skill 链接问题\n- 新增 xxx 功能\n- 更新了文档` |
+| 用户说"优化了 tt-cli 的性能" | tt-cli 性能优化 | `- 修复 --json 输出污染问题\n- 优化 spinner 渲染逻辑\n- 减少不必要的 API 调用` |
+| 用户说"研究了 PaperWM" | 研究 PaperWM | `- 了解 PaperWM 的窗口管理概念\n- 尝试安装和基础配置\n- 评估是否适合日常使用` |
+| 用户说"开了一下午会" | 团队周会 | `- 讨论了 Q2 计划\n- 同步了各模块进度\n- 确认了下周交付节点` |
+| 简单任务（如"吃午饭"） | 午饭 | 可留空，不加 --content |
+
+**内容生成规则**：
+1. 根据用户描述、对话上下文，总结 2-5 个要点
+2. 使用 Markdown 列表格式（`- 要点`）
+3. 每个要点简洁明了，不超过一行
+4. 如果用户只给了简单的任务名（如"午饭"、"休息"），可以不加 content
+
+**批量创建时**：JSON 数组中每个任务对象也必须包含 `content` 字段（除非是简单生活类任务）。
 
 ### 时区处理
 
@@ -253,24 +283,25 @@ wait
 
 **创建任务**：
 1. 解析用户输入 → 提取任务名 + 时间
-2. 缺少必填字段时用 `AskUserQuestion` 询问
-3. 智能清单分配
-4. 判断是否历史任务（dueDate < 当前时间）
+2. 生成简短标题（≤15字）+ 总结要点作为 content（见「标题与内容规则」）
+3. 缺少必填字段时用 `AskUserQuestion` 询问
+4. 智能清单分配
+5. 判断是否历史任务（dueDate < 当前时间）
 
 **历史任务**（时间已过）：
 ```bash
-tt task-add "任务名" -p <projectId> --start-date <start> --due-date <end>
+tt task-add "简短标题" -p <projectId> --content "- 要点1\n- 要点2" --start-date <start> --due-date <end>
 tt task-done <projectId> <taskId>
 ```
 
 **未来任务**（时间未到）：
 ```bash
-tt task-add "任务名" -p <projectId> --start-date <start> --due-date <end>
+tt task-add "简短标题" -p <projectId> --content "- 要点1\n- 要点2" --start-date <start> --due-date <end>
 ```
 
 **批量创建**（日程复盘等场景）：
 ```bash
-echo '[{"title":"...","projectId":"...","startDate":"...","dueDate":"..."}]' | tt task-batch-add --stdin
+echo '[{"title":"简短标题","content":"- 要点1\n- 要点2","projectId":"...","startDate":"...","dueDate":"..."}]' | tt task-batch-add --stdin
 ```
 
 **修改任务**：

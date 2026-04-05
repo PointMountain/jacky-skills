@@ -1,0 +1,29 @@
+{
+  "name": "knowledge-base",
+  "version": "1.0.0",
+  "description": "个人知识库 - 教程、经验总结、参考方案，只读查阅型（类似个人版 Context7）",
+  "author": {
+    "name": "Jacky Wang",
+    "email": "wangjs.jacky@gmail.com",
+    "url": "https://github.com/wangjs-jacky"
+  },
+  "homepage": "https://github.com/wangjs-jacky/jacky-skills/tree/main/plugins/knowledge-base",
+  "repository": "https://github.com/wangjs-jacky/jacky-skills",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "knowledge-base",
+    "tutorial",
+    "reference",
+    "personal-docs"
+  ],
+  "skills": [
+    "./skills/npm-publish/",
+    "./skills/vscode-extension-dev/",
+    "./skills/gh-workflow-generator/",
+    "./skills/github-profile-coolify/",
+    "./skills/harness-benchmark/",
+    "./skills/chrome-ext-ai-script/",
+    "./skills/web-to-tauri-migration-loop/"
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "name": "dev-tools",
-  "version": "1.21.0",
-  "description": "开发工具集 - GitHub 发布、跨会话开发、Skills 创建、依赖管理等",
+  "version": "2.0.0",
+  "description": "核心开发工具集 - 任务工作流、发布工具、效率审计",
   "author": {
     "name": "Jacky Wang",
     "email": "wangjs.jacky@gmail.com",
@@ -12,33 +12,16 @@
   "license": "MIT",
   "keywords": [
     "claude-code",
-    "github",
-    "development",
-    "skills",
-    "automation",
-    "dependency-management"
+    "task-workflow",
+    "publish",
+    "development"
   ],
   "skills": [
-    "./agent-pipeline/",
-"./agent-pipeline-generate/",
-    "./agent-pipeline-plan/",
-    "./agent-pipeline-score/",
-    "./efficiency-audit/",
-    "./feature-tracker/",
-    "./gh-workflow-generator/",
-    "./github-profile-coolify/",
-    "./github-repo-publish/",
-    "./gsd-creator-skills/",
-    "./harness-benchmark/",
-    "./long-running-agent/",
-    "./skill-optimizer/",
-    "./skill-researcher/",
-    "./task-harness/",
-    "./task-memory/",
     "./task-workflow/",
-    "./tw-generator/",
-    "./tw-planner/",
-    "./tw-scorer/",
-    "./vscode-extension-dev/"
+    "./task-memory/",
+    "./task-harness/",
+    "./feature-tracker/",
+    "./github-repo-publish/",
+    "./efficiency-audit/"
   ]
 }

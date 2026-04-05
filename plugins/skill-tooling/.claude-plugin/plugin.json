@@ -1,0 +1,25 @@
+{
+  "name": "skill-tooling",
+  "version": "1.0.0",
+  "description": "Skill 工具链 - Skill 创建、优化、调研的生命周期管理工具",
+  "author": {
+    "name": "Jacky Wang",
+    "email": "wangjs.jacky@gmail.com",
+    "url": "https://github.com/wangjs-jacky"
+  },
+  "homepage": "https://github.com/wangjs-jacky/jacky-skills/tree/main/plugins/skill-tooling",
+  "repository": "https://github.com/wangjs-jacky/jacky-skills",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "skills",
+    "create",
+    "optimize",
+    "research"
+  ],
+  "skills": [
+    "./skills/gsd-creator-skills/",
+    "./skills/skill-optimizer/",
+    "./skills/skill-researcher/"
+  ]
+}
