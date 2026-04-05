@@ -114,7 +114,7 @@ ERRORS=0
 if command -v ffmpeg &>/dev/null; then
     ok "ffmpeg ✓"
 else
-    fail "ffmpeg ✗"
+    echo -e "${RED}[FAIL]${NC} ffmpeg ✗"
     ERRORS=$((ERRORS + 1))
 fi
 
@@ -122,7 +122,7 @@ fi
 if command -v python3 &>/dev/null; then
     ok "python3 ✓"
 else
-    fail "python3 ✗"
+    echo -e "${RED}[FAIL]${NC} python3 ✗"
     ERRORS=$((ERRORS + 1))
 fi
 
@@ -130,7 +130,7 @@ fi
 if python3 -c "import mlx_whisper" 2>/dev/null; then
     ok "mlx-whisper ✓"
 else
-    fail "mlx-whisper ✗"
+    echo -e "${RED}[FAIL]${NC} mlx-whisper ✗"
     ERRORS=$((ERRORS + 1))
 fi
 

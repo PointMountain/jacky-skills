@@ -1,96 +1,47 @@
 # Video Processing Plugin
 
-This plugin provides video processing capabilities for the AI agents.
+音视频处理插件，聚焦于“媒体提取 → 转录 → 笔记落盘”的技能编排。
 
-## Features
-- **M3U8 Video Download**: Download videos from M3u8/HLS streams with AES-128 decryption support
-- **Bilibili to Obsidian**: Extract subtitles from Bilibili videos and save to Obsidian vault
-- **Bilibili Batch**: Batch process multiple Bilibili videos by creator or topic
-- **Fix Neat Video**: Fix video download issues with custom filename handling
-- **Video to Text**: Extract text content from videos using OCR
+## Included Skills
 
-## Skills
+当前 `plugin.json` 实际注册了以下 6 个 skills：
 
-### 1. m3u8-dl
-- Description: 使用 m3u8-dl 下载 M3U8/HLS 视频流
-- Triggers: when user needs to download video, provides m3u8 link, or mentions video download
-- allowed-tools: npx, fzf
-- metadata:
-  - internal: true (hides from normal discovery)
-- ---
-name: bilibili-to-obsidian
-description: 从 B 站视频提取字幕并整理到 Obsidian 仓库
-triggers:
-  - when user needs to extract subtitles from Bilibili video
-  - when user wants to save Bilibili video content to Obsidian
-  - when user mentions "B站", "Bilibili", or needs to organize Bilibili content
-allowed-tools: npx, fzf
-- metadata:
-  - internal: true
-- ---
-name: bilibili-batch
-description: 从 B 站 UP 主空间批量提取视频字幕到 Obsidian，支持按播放量/收藏数/发布时间排序
-triggers:
-  - when user needs to batch process Bilibili videos
-  - when user wants to extract multiple videos from an UP
-  - when user mentions "B站批量", "Bilibili 批量", or similar
-allowed-tools: npx, fzf
-- metadata:
-  - internal: true
-- ---
-name: fix-neat-video
-description: 修复视频下载问题，如文件名冲突、代理问题
-triggers:
-  - when video download fails
-  - when user encounters download errors with video tools
-  - when user mentions "video download not fix", "fix video", or similar
-allowed-tools: npx, fzf
-- metadata:
-  - internal: true
-- ---
-name: video-to-text
-description: 从视频平台提取文案的 CLI 工具
-triggers:
-  - when user needs to extract text from video
-  - when user mentions "video to text", "extract text from video"
-  - when user asks about video content extraction
-allowed-tools: npx, fzf
-- metadata:
-  - internal: true
-- ---
+1. `audio-to-obsidian`
+2. `extract-url-media`
+3. `audio-to-subtitle`
+4. `write-obsidian-note`
+5. `bilibili-video-list`
+6. `youtube-video-list`
+
+## Capability Summary
+
+| Skill | 主要能力 | 当前实现状态 |
+|---|---|---|
+| `audio-to-subtitle` | 本地/云端音视频转字幕（SRT/VTT/TXT/MD） | 含可执行脚本 |
+| `extract-url-media` | URL 媒体元信息与音频提取 | 含可执行脚本 |
+| `write-obsidian-note` | 统一格式写入 Obsidian 原文/归纳笔记 | 含可执行脚本 |
+| `audio-to-obsidian` | 端到端编排（提取 + 转录 + 写笔记） | 含可执行脚本 |
+| `bilibili-video-list` | B 站 UP 主视频列表采集（agent-browser） | 以 Skill 文档流程为主 |
+| `youtube-video-list` | YouTube 频道视频列表采集（Data API） | 含可执行脚本 |
 
 ## Installation
 
 ### From CLI (Recommended)
+
 ```bash
 npx skills add wangjs-jacky/video-processing
 ```
 
 ### From GitHub
-```bash
-git clone https://github.com/wangjs-jacky/video-processing.git ~/.agents/skills/
-```
-
-Then run these skills to your Claude Code environment:
 
 ```bash
-ls -la .claude/skills/
+git clone https://github.com/wangjs-jacky/jacky-skills.git
 ```
 
-### Manual Installation
-If you prefer to install manually:
+然后使用你当前的 skill 管理方式加载 `plugins/video-processing` 下的 skills。
 
-```bash
-# Install all skills to global Claude Code environment
-npx skills add wangjs-jacky/video-processing --all -g
+### Update
 
-```
-
-### Update Skills
 ```bash
 npx skills update
 ```
-
-### View on skills.sh
-Visit https://skills.sh to browse and discover new skills.
-

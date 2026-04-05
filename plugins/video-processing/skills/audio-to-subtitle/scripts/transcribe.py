@@ -97,6 +97,27 @@ def save_config(cfg: dict) -> None:
     print(f"✅ 配置已保存到 {CONFIG_FILE}")
 
 
+def mask_secret(value: str) -> str:
+    """对敏感信息做脱敏显示"""
+    if not value:
+        return value
+    if len(value) <= 6:
+        return "*" * len(value)
+    return f"{value[:3]}{'*' * (len(value) - 5)}{value[-2:]}"
+
+
+def redact_config(cfg: dict) -> dict:
+    """返回脱敏后的配置副本，用于安全展示"""
+    redacted = json.loads(json.dumps(cfg))
+    doubao = redacted.get("doubao", {})
+    if isinstance(doubao, dict):
+        if "app_id" in doubao:
+            doubao["app_id"] = mask_secret(str(doubao["app_id"]))
+        if "access_token" in doubao:
+            doubao["access_token"] = mask_secret(str(doubao["access_token"]))
+    return redacted
+
+
 # ============================================================
 # 数据结构
 # ============================================================
@@ -200,7 +221,21 @@ def transcribe_local(
     if language:
         transcribe_kwargs["language"] = language
 
-    result = mlx_whisper.transcribe(audio_path, **transcribe_kwargs)
+    try:
+        result = mlx_whisper.transcribe(audio_path, **transcribe_kwargs)
+    except Exception as e:
+        error_name = e.__class__.__name__
+        error_msg = str(e)
+        if (
+            "LocalEntryNotFoundError" in error_name
+            or "ConnectTimeout" in error_name
+            or "timed out" in error_msg.lower()
+        ):
+            raise RuntimeError(
+                "下载 MLX 模型失败（网络超时或离线）。请检查网络后重试，"
+                "或提前缓存模型。"
+            ) from e
+        raise RuntimeError(f"本地转录失败: {error_name}: {error_msg}") from e
 
     segments = []
     for seg in result.get("segments", []):
@@ -915,7 +950,7 @@ def main():
     # 查看配置
     if args.show_config:
         print(f"配置文件: {CONFIG_FILE}")
-        print(json.dumps(cfg, indent=2, ensure_ascii=False))
+        print(json.dumps(redact_config(cfg), indent=2, ensure_ascii=False))
         return
 
     # 配置豆包 API
@@ -927,7 +962,10 @@ def main():
         access_token = input("  Access Token: ").strip()
 
         if app_id and access_token:
-            cfg["doubao"] = {"app_id": app_id, "access_token": access_token}
+            if not isinstance(cfg.get("doubao"), dict):
+                cfg["doubao"] = {}
+            cfg["doubao"]["app_id"] = app_id
+            cfg["doubao"]["access_token"] = access_token
             save_config(cfg)
             print("\n✅ 豆包 API 凭证配置完成！")
         else:
@@ -954,7 +992,10 @@ def main():
     if args.yolo:
         # YOLO 模式不交互，默认走本地引擎
         engine = args.engine or "local"
-        print("🚀 YOLO 模式：跳过交互，默认使用本地引擎")
+        if engine == "doubao":
+            print("🚀 YOLO 模式：跳过交互，使用豆包引擎")
+        else:
+            print("🚀 YOLO 模式：跳过交互，使用本地引擎")
     else:
         if has_interactive_tty():
             fmt, model, engine, args.output, language = interactive_prepare_run(
@@ -1002,10 +1043,18 @@ def main():
         print(f"\n🎉 批量处理完成: {len(results)}/{len(files)} 成功")
 
     else:
-        process_single(
-            args.input, fmt, model, engine,
-            language, args.output, quantize, cfg,
-        )
+        try:
+            process_single(
+                args.input, fmt, model, engine,
+                language, args.output, quantize, cfg,
+            )
+        except DoubaoApiError as e:
+            print(f"❌ 豆包转录失败: {e}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"❌ 转录失败: {e}")
+            print("   请检查网络、依赖安装或输入文件后重试。")
+            sys.exit(1)
 
 
 if __name__ == "__main__":

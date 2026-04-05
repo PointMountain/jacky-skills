@@ -64,6 +64,27 @@ description: "生成统一格式的 Obsidian 笔记（原文 + 归纳），写�
 
 统一管理所有来源的 Obsidian 笔记模板，确保格式一致。
 
+## 可执行脚本
+
+```bash
+# 方式 1：通过契约 JSON 写入
+python3 scripts/write_note.py \
+  --input-json /path/to/payload.json \
+  --obsidian-repo "$OBSIDIAN_REPO"
+
+# 方式 2：通过参数直接写入
+python3 scripts/write_note.py \
+  --obsidian-repo "$OBSIDIAN_REPO" \
+  --title "标题" \
+  --author "作者" \
+  --url "https://example.com" \
+  --transcript-file /path/to/transcript.md
+
+# 覆盖已存在文件
+python3 scripts/write_note.py --input-json /path/to/payload.json \
+  --obsidian-repo "$OBSIDIAN_REPO" --overwrite
+```
+
 ## 输入输出契约
 
 ### 输入

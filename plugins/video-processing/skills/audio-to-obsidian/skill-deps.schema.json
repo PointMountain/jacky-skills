@@ -7,13 +7,11 @@
       "type": "object",
       "additionalProperties": {
         "type": "object",
-        "required": ["source", "path", "commit", "installMode"],
+        "required": ["source", "installMode"],
         "properties": {
-          "source": {
-            "type": "string",
-            "pattern": "^github:[^/]+/[^/]+$"
-          },
+          "source": { "type": "string" },
           "path": { "type": "string" },
+          "repo": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
           "ref": { "type": "string" },
           "version": { "type": "string" },
           "commit": { "type": "string" },
@@ -23,7 +21,30 @@
           },
           "installedAt": { "type": "string", "format": "date-time" },
           "localPath": { "type": "string" }
-        }
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "source": { "const": "local" }
+            },
+            "required": ["localPath"]
+          },
+          {
+            "properties": {
+              "source": {
+                "type": "string",
+                "pattern": "^github:[^/]+/[^/]+$"
+              }
+            },
+            "required": ["path"]
+          },
+          {
+            "properties": {
+              "source": { "const": "github" }
+            },
+            "required": ["repo", "path"]
+          }
+        ]
       }
     }
   }

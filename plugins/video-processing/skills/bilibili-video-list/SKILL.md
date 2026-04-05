@@ -1,14 +1,14 @@
 ---
 name: bilibili-video-list
-description: "使用无头浏览器获取 B 站 UP 主完整视频列表。支持按发布时间/播放量/收藏数排序，输出 JSON 文件。触发词：获取UP主视频列表、bilibili-video-list、B站视频列表、UP主所有视频。"
+description: "获取 B 站 UP 主完整视频列表。支持 API（Cookie）和浏览器双模式，输出 JSON。触发词：获取UP主视频列表、bilibili-video-list、B站视频列表、热门视频。"
 ---
 
 <role>
-你是 B 站 UP 主视频列表采集助手，使用 agent-browser 无头浏览器从 B 站空间页批量提取视频信息。
+你是 B 站 UP 主视频列表采集助手，支持 API 和浏览器两种模式获取视频列表。
 </role>
 
 <purpose>
-给定 UP 主的 UID 或空间 URL，通过浏览器自动化逐页提取所有视频的元数据（BV 号、标题、播放量、时长、发布日期），输出 JSON 文件和终端预览。
+给定 UP 主的 UID、空间 URL 或名字，获取视频元数据（BV 号、标题、播放量、时长、日期），输出 JSON 文件和终端预览。
 </purpose>
 
 <trigger>
@@ -27,168 +27,253 @@ description: "使用无头浏览器获取 B 站 UP 主完整视频列表。支�
   <gsd:meta>
     <name>bilibili-video-list</name>
     <owner>video-processing</owner>
-    <requires>agent-browser</requires>
+    <requires>python3 + requests | agent-browser</requires>
     <checkpoints>
-      <checkpoint order="1">agent-browser 可用</checkpoint>
+      <checkpoint order="1">Cookie 可用性检查完成，确定采集模式</checkpoint>
       <checkpoint order="2">UP 主 UID 解析完成</checkpoint>
-      <checkpoint order="3">浏览器打开空间页，视频卡片加载完成</checkpoint>
-      <checkpoint order="4">排序方式切换完成（非默认排序时）</checkpoint>
-      <checkpoint order="5">所有页面遍历完成，JSON 文件已保存</checkpoint>
+      <checkpoint order="3">视频数据采集完成，JSON 文件已保存</checkpoint>
     </checkpoints>
     <constraints>
-      <constraint>本 skill 为纯数据采集，不做字幕提取、视频下载或笔记写入</constraint>
-      <constraint>使用 agent-browser 无头浏览器，不需要登录/Cookie/WBI 签名</constraint>
-      <constraint>排序必须通过页面按钮切换，不支持 URL 参数排序</constraint>
-      <constraint>每页间隔 2-3 秒，模拟人类翻页行为</constraint>
+      <constraint>纯数据采集，不做字幕提取、视频下载或笔记写入</constraint>
+      <constraint>API 模式需要 SESSDATA Cookie（配置方式见 references/api-mode.md）</constraint>
+      <constraint>浏览器模式必须使用 --headed，无头模式会触发 -352 风控</constraint>
       <constraint>仅限个人学习与研究，严禁商业用途或二次分发</constraint>
     </constraints>
   </gsd:meta>
 
   <gsd:goal>获取 UP 主完整视频列表并保存为 JSON 文件。</gsd:goal>
 
-  <gsd:phase name="precheck" order="1">
-    <gsd:step>检查 agent-browser 是否已安装：`which agent-browser`</gsd:step>
-    <gsd:step>未安装则提示：`npm install -g agent-browser`</gsd:step>
-    <gsd:checkpoint>环境就绪</gsd:checkpoint>
+  <gsd:phase name="mode-select" order="1">
+    <gsd:step>检查 Cookie 是否可用（环境变量 BILIBILI_SESSDATA 或配置文件 ~/.config/bilibili-cookies.json）。</gsd:step>
+    <gsd:step>有 Cookie → API 模式（快速、精确、无风控风险）。</gsd:step>
+    <gsd:step>无 Cookie → 浏览器模式（需 agent-browser，有风控风险）。</gsd:step>
+    <gsd:checkpoint>采集模式确定</gsd:checkpoint>
   </gsd:phase>
 
   <gsd:phase name="parse" order="2">
-    <gsd:step>从用户输入中提取 UP 主 UID。</gsd:step>
-    <gsd:step>支持的输入格式：空间 URL（提取数字部分）/ 纯数字 UID。</gsd:step>
-    <gsd:step>确定排序方式（默认 pubdate）和数量限制（默认全部）。</gsd:step>
+    <gsd:step>从输入中提取 UID / URL / 名字，确定排序方式和数量限制。</gsd:step>
+    <gsd:step>排序参数：未指定→pubdate，"播放量"/"热门"→click，"收藏"→stow。</gsd:step>
     <gsd:checkpoint>UID + 参数解析完成</gsd:checkpoint>
   </gsd:phase>
 
-  <gsd:phase name="collect" order="3">
-    <gsd:step>使用 agent-browser 打开空间视频页。</gsd:step>
-    <gsd:step>处理登录弹窗（如有），点击关闭按钮。</gsd:step>
-    <gsd:step>切换排序方式（非默认排序时点击对应按钮）。</gsd:step>
-    <gsd:step>JS 提取当前页所有视频数据。</gsd:step>
-    <gsd:step>点击"下一页"，等待加载，重复提取。</gsd:step>
-    <gsd:step>直到没有"下一页"按钮或达到数量限制。</gsd:step>
-    <gsd:checkpoint>所有视频数据采集完成</gsd:checkpoint>
+  <gsd:phase name="api-collect" order="3" condition="API 模式">
+    <gsd:step>运行 python3 scripts/api-fetch.py（见 API 模式执行流程）。</gsd:step>
+    <gsd:checkpoint>数据采集完成</gsd:checkpoint>
+  </gsd:phase>
+
+  <gsd:phase name="browser-collect" order="3" condition="浏览器模式">
+    <gsd:step>用 --headed 模式打开空间页，等待 8 秒（SPA 渲染）。</gsd:step>
+    <gsd:step>关闭登录弹窗，验证视频卡片数量。</gsd:step>
+    <gsd:step>如遇 -352 风控，按 references/anti-detection.md 处理。</gsd:step>
+    <gsd:step>切换排序（非默认时点击 `.radio-filter__item` 按钮）。</gsd:step>
+    <gsd:step>提取视频数据（见 references/extract-scripts.md），翻页重复。</gsd:step>
+    <gsd:checkpoint>数据采集完成</gsd:checkpoint>
   </gsd:phase>
 
   <gsd:phase name="export" order="4">
-    <gsd:step>保存 JSON 文件到 ~/Downloads/bilibili-video-list/。</gsd:step>
-    <gsd:step>终端输出表格预览。</gsd:step>
-    <gsd:step>如用户需要进一步处理，建议使用 bilibili-to-obsidian 或 bilibili-batch。</gsd:step>
+    <gsd:step>JSON 已保存到 ~/Downloads/bilibili-video-list/，终端输出表格预览。</gsd:step>
+    <gsd:step>如需进一步处理，建议 bilibili-to-obsidian 或 bilibili-batch。</gsd:step>
   </gsd:phase>
 </gsd:workflow>
 
 # Bilibili Video List — B 站 UP 主视频列表采集
 
-> 使用 agent-browser 无头浏览器采集，不需要登录/Cookie/WBI 签名。
+> 支持双模式：API（Cookie，推荐）和浏览器（兜底）。API 模式速度快、数据精确、无风控风险。
 
-## 触发场景
+## 模式选择
 
-- 用户想获取某个 UP 主发布的所有视频列表
-- 用户想按播放量/收藏数排序查看 UP 主视频
-- 用户想导出 UP 主视频数据为 JSON
+### 检查 Cookie 可用性
 
-## 前置条件
+```bash
+# 检查环境变量
+echo $BILIBILI_SESSDATA
 
-| 工具 | 安装方式 | 说明 |
-|------|----------|------|
-| agent-browser | `npm install -g agent-browser` | 无头浏览器自动化 |
+# 检查配置文件
+cat ~/.config/bilibili-cookies.json 2>/dev/null
+```
+
+**决策逻辑**：
+
+| 条件 | 模式 | 优势 |
+|------|------|------|
+| Cookie 可用 | **API 模式** | 快速、精确、额外字段（评论/收藏/弹幕数） |
+| Cookie 不可用 | **浏览器模式** | 无需登录，但有风控风险 |
+
+> **推荐**：配置 Cookie 后使用 API 模式。获取方式见 [api-mode.md](references/api-mode.md)。
+
+---
 
 ## 输入解析
 
-从用户输入中提取 UID 和参数：
-
 | 输入格式 | 提取方式 | 示例 |
 |----------|----------|------|
-| `https://space.bilibili.com/1039025435` | 正则提取数字 | UID = `1039025435` |
-| `https://space.bilibili.com/1039025435/upload/video` | 正则提取数字 | UID = `1039025435` |
-| 纯数字 `1039025435` | 直接使用 | UID = `1039025435` |
+| 空间 URL | 正则提取数字 | `https://space.bilibili.com/1039025435` → UID `1039025435` |
+| 纯数字 | 直接使用 | `1039025435` |
+| UP 主名字 | API 搜索或浏览器搜索 | "摩的司机徐师傅" |
 
 ### 排序参数
-
-从用户意图推断排序方式：
 
 | 用户说法 | 排序方式 |
 |----------|----------|
 | "最新"/"按时间"/"默认" | `pubdate` |
-| "播放量"/"最多播放"/"热门" | `click` |
+| "播放量"/"热门"/"最多播放" | `click` |
 | "收藏"/"最多收藏" | `stow` |
-| 未指定 | `pubdate`（默认） |
+| 未指定 | `pubdate` |
 
 ### 数量限制
 
-- 未指定：获取全部视频
-- "前 N 个"/"Top N"：仅获取前 N 个
-- "第 N 页到第 M 页"：获取指定范围
+- 未指定：获取全部 | "前 N 个"：仅获取前 N 个 | "第 N 页到第 M 页"：指定范围
 
-## 执行流程
+---
 
-### Step 1: 打开空间页
+## API 模式执行流程（推荐）
+
+> 前提：已配置 SESSDATA Cookie。详见 [api-mode.md](references/api-mode.md)。
+
+脚本位置：`plugins/video-processing/skills/bilibili-video-list/scripts/api-fetch.py`
+
+### 直接运行
 
 ```bash
-agent-browser open "https://space.bilibili.com/${UID}/upload/video"
-agent-browser wait --load networkidle
-agent-browser wait 5000
+SCRIPT_PATH="plugins/video-processing/skills/bilibili-video-list/scripts/api-fetch.py"
+
+# 基础用法
+python3 "$SCRIPT_PATH" --mid ${UID} --order ${ORDER:-pubdate}
+
+# 按播放量排序
+python3 "$SCRIPT_PATH" --mid ${UID} --order click
+
+# 通过名字搜索
+python3 "$SCRIPT_PATH" --name "UP主名字" --order click
+
+# 限制数量
+python3 "$SCRIPT_PATH" --mid ${UID} --limit 50
+
+# 指定 Cookie（一次性）
+python3 "$SCRIPT_PATH" --mid ${UID} --sessdata "YOUR_SESSDATA"
+
+# 缓存相关
+python3 "$SCRIPT_PATH" --mid ${UID} --order pubdate         # 首次调用 → API，后续 24h 内读缓存
+python3 "$SCRIPT_PATH" --mid ${UID} --no-cache              # 强制刷新，忽略缓存
+python3 "$SCRIPT_PATH" --mid ${UID} --cache-ttl 3600        # 自定义缓存有效期 1 小时
 ```
 
-**关键**：必须等待足够长时间（5 秒），B 站空间页是 SPA，需要等待 JS 渲染完成。
+### 脚本特性
 
-### Step 2: 处理登录弹窗
+- **自动 WBI 签名**：内置混淆表，无需手动处理
+- **自动翻页**：每页 50 条，自动获取全部
+- **UID 解析**：支持纯数字、空间 URL、UP 主名字（自动搜索）
+- **多字段输出**：播放量（精确值）、评论数、收藏数、弹幕数、简介
+- **终端预览**：自动显示前 20 个视频的表格
+- **缓存机制**：默认缓存 24 小时，重复查询同一 UP 主直接读缓存，跳过 API 调用
 
-B 站可能弹出登录提示，需要关闭：
+### API 与浏览器模式数据对比
+
+| 字段 | API 模式 | 浏览器模式 |
+|------|----------|------------|
+| 播放量 | `16310000`（精确值） | `1631.0万`（近似值） |
+| 评论数 | 有 | 无 |
+| 收藏数 | 有 | 无 |
+| 弹幕数 | 有 | 无 |
+| 简介 | 有 | 无 |
+| BV 号 | 有 | 有 |
+| 时长 | 有 | 有 |
+| 日期 | 有 | 有 |
+
+---
+
+## 缓存机制
+
+API 模式自动缓存获取结果，避免重复请求。
+
+| 项目 | 说明 |
+|------|------|
+| 缓存路径 | `~/.cache/bilibili-video-list/{uid}.json` |
+| 缓存键 | UID + 排序方式 |
+| 默认 TTL | 24 小时（86400 秒） |
+| 旧版输出 | 同时写入 `~/Downloads/bilibili-video-list/`（向后兼容） |
+
+### 缓存命中条件
+
+所有条件同时满足时命中缓存：
+
+1. 缓存文件存在且可解析
+2. `cacheExpiresAt` 未过期
+3. 缓存中的 `order` 与请求的排序方式一致
+
+### 命中 vs 未命中
+
+| 场景 | 行为 |
+|------|------|
+| 缓存命中 | 跳过 API，直接读文件，`source` 字段标记为 `"cache"` |
+| 缓存过期 / 不存在 | 调用 API，更新缓存 |
+| 排序方式不同 | 缓存未命中，重新获取 |
+| `--no-cache` | 忽略缓存，始终调 API |
+
+### 清理缓存
+
+```bash
+# 清理全部缓存
+rm -rf ~/.cache/bilibili-video-list/
+
+# 清理单个 UP 主
+rm ~/.cache/bilibili-video-list/{UID}.json
+```
+
+---
+
+## 浏览器模式执行流程（兜底）
+
+> 无 Cookie 时的备选方案。必须用 --headed 模式。
+
+### Step 1: 打开空间页（必须 --headed）
+
+```bash
+agent-browser open --headed "https://space.bilibili.com/${UID}/upload/video"
+agent-browser wait --load networkidle && agent-browser wait 8000
+```
+
+> **为什么必须 --headed**：无头模式 `navigator.webdriver=true`，B 站检测后返回 -352 风控。详见 [anti-detection.md](references/anti-detection.md)。
+
+### Step 2: 关闭弹窗 + 验证加载
 
 ```bash
 agent-browser eval 'document.querySelector(".bili-mini-close-icon")?.click(); "done"'
-```
-
-如果弹窗不存在，这条命令也不会报错。关闭后等待 3 秒让页面内容加载。
-
-### Step 3: 验证页面加载
-
-```bash
-agent-browser eval 'document.querySelectorAll(".upload-video-card").length'
-```
-
-如果返回 0，说明页面未加载完成，再等待：
-
-```bash
 agent-browser wait 3000
+agent-browser eval 'JSON.stringify({
+  videoCount: document.querySelectorAll(".upload-video-card").length,
+  hasError: document.body?.innerText?.includes("-352")
+})'
 ```
 
-如果仍为 0，检查页面文本是否包含"空间主人还没投过视频"：
-- 是 → 提示用户该 UP 主没有视频
-- 否 → 可能是页面加载失败，提示检查网络
+- `videoCount > 0` → 继续采集
+- `hasError: true` → 风控拦截，见 [anti-detection.md](references/anti-detection.md)
+- `videoCount === 0 && !hasError` → 检查是否显示"还没投过视频"
 
-### Step 4: 获取 UP 主名称
+### Step 3: 获取 UP 主名称
 
 ```bash
 agent-browser eval 'document.querySelector("#h-name, .nickname")?.textContent?.trim() || "unknown"'
 ```
 
-### Step 5: 切换排序（非默认排序时）
+### Step 4: 切换排序（非默认时）
 
-排序按钮在 `.video-order-filter` 区域内：
-
-```bash
-agent-browser snapshot -i -C -s ".video-order-filter"
-```
-
-返回三个可点击元素：
-- `@e1` → "最新发布"（pubdate）
-- `@e2` → "最多播放"（click）
-- `@e3` → "最多收藏"（stow）
-
-点击对应排序按钮：
+排序按钮在 `.radio-filter__item` 中（不是 button，是 div）：
 
 ```bash
-# 按播放量排序
-agent-browser click @e2
-agent-browser wait 3000
+agent-browser eval --stdin <<'EVALEOF'
+const items = document.querySelectorAll('.radio-filter__item');
+items.forEach(item => {
+  if (item.textContent.trim().includes('最多播放')) item.click();  // 或 '最多收藏'
+});
+'done'
+EVALEOF
+agent-browser wait 4000
 ```
 
-**注意**：切换排序后页面会重新加载视频列表，必须等待 3 秒。
+### Step 5: 提取视频数据
 
-### Step 6: 提取当前页视频数据
-
-使用以下 JS 脚本提取：
+使用优化后的提取脚本（修复了时长/日期丢失问题）：
 
 ```bash
 agent-browser eval --stdin <<'EVALEOF'
@@ -199,168 +284,85 @@ JSON.stringify({
     const bvid = (href.match(/BV[\w]+/) || [''])[0] || '';
     const titleEl = card.querySelector('.bili-video-card__title a, .video-title');
     const title = titleEl ? titleEl.textContent.trim() : '';
-    const rawText = card.textContent;
-    const playMatch = rawText.match(/([\d.]+万?)/);
-    const dateMatch = rawText.match(/(\d{2}-\d{2})\s*$/);
-    const durationMatch = rawText.match(/(\d{1,2}:\d{2}(?::\d{2})?)\s*$/);
-    return {
-      bvid,
-      title,
-      play: playMatch ? playMatch[1] : '',
-      duration: durationMatch ? durationMatch[1] : '',
-      date: dateMatch ? dateMatch[1] : '',
-      isExclusive: rawText.includes('充电专属'),
-      url: 'https://www.bilibili.com/video/' + bvid
-    };
+    const rawText = card.innerText;
+    const playMatch = rawText.match(/([\d.]+万?)\n\d+\n/);
+    const play = playMatch ? playMatch[1] : '';
+    const durationMatch = rawText.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
+    const duration = durationMatch ? durationMatch[1] : '';
+    const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+    const date = lines[lines.length - 1] || '';
+    return { bvid, title, play, duration, date, url: 'https://www.bilibili.com/video/' + bvid };
   }),
   count: document.querySelectorAll('.upload-video-card').length
 })
 EVALEOF
 ```
 
-### Step 7: 翻页并继续提取
-
-查找并点击"下一页"按钮：
+### Step 6: 翻页
 
 ```bash
-agent-browser find text "下一页" click
+agent-browser eval --stdin <<'EVALEOF'
+const nextBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('下一页'));
+if (nextBtn) { nextBtn.click(); 'clicked'; } else { 'last_page'; }
+EVALEOF
 agent-browser wait 3000
 ```
 
-如果点击失败（没有下一页按钮），说明已是最后一页，结束遍历。
+返回 `last_page` 时停止翻页。
 
-**备选方式**：通过 snapshot 查找分页按钮：
-
-```bash
-agent-browser snapshot -i
-```
-
-在输出中查找包含"下一页"文本的 button 元素，使用对应 ref 点击。
-
-### Step 8: 循环提取所有页面
-
-重复 Step 6 和 Step 7，直到没有"下一页"按钮。
-
-将每页的视频数据追加到总列表中。
-
-**翻页间隔**：每翻一页等待 2-3 秒。
-
-### Step 9: 保存 JSON 文件
-
-创建输出目录：
+### Step 7: 保存 + 关闭
 
 ```bash
 mkdir -p ~/Downloads/bilibili-video-list
-```
-
-将汇总数据写入 JSON 文件：
-
-```json
-{
-  "uploader": "战国时代_姜汁汽水",
-  "uid": "1039025435",
-  "order": "pubdate",
-  "totalVideos": 176,
-  "fetchDate": "2026-04-05T12:00:00+08:00",
-  "videos": [
-    {
-      "bvid": "BV15cAYzkEb8",
-      "title": "地缘分析：美伊以冲突推演（26年2月至3月）",
-      "play": "127.2万",
-      "duration": "32:31",
-      "date": "02-28",
-      "isExclusive": false,
-      "url": "https://www.bilibili.com/video/BV15cAYzkEb8"
-    }
-  ]
-}
-```
-
-文件名：`~/Downloads/bilibili-video-list/{UP主名}_{排序方式}_{日期}.json`
-
-使用 Write 工具写入文件。
-
-### Step 10: 终端预览
-
-输出表格预览：
-
-```
-📊 战国时代_姜汁汽水 的视频列表（按发布时间排序）
-共 176 个视频
-
-#  | BV 号          | 标题                                | 播放量  | 时长   | 日期
----|----------------|-------------------------------------|---------|--------|------
-1  | BV1Gi95BYE2s  | 总体思路，关键时间，真假TACO...       | 14.4万  | 38:47  | 04-01
-2  | BV1ZyQdBnEop  | 金银分析，关注4月，eSLR...           | 12.1万  | 19:13  | 03-23
-...
-
-✅ JSON 已保存到: ~/Downloads/bilibili-video-list/战国时代_姜汁汽水_pubdate_2026-04-05.json
-```
-
-如果视频数量超过 20 个，只显示前 20 个 + "... 以及更多 N 个视频"。
-
-### Step 11: 关闭浏览器
-
-```bash
+# 用 Write 工具写入 JSON：~/Downloads/bilibili-video-list/{UP主名}_{排序}_{日期}.json
 agent-browser close
 ```
 
+---
+
+## Cookie 配置指南
+
+### 快速配置（推荐）
+
+引导用户完成 Cookie 配置：
+
+1. 打开浏览器登录 [bilibili.com](https://www.bilibili.com)
+2. 按 F12 → Application → Cookies → `https://www.bilibili.com`
+3. 复制 `SESSDATA` 的值
+4. 保存到配置文件：
+
+```bash
+mkdir -p ~/.config
+cat > ~/.config/bilibili-cookies.json << EOF
+{
+  "SESSDATA": "用户提供的 SESSDATA 值"
+}
+EOF
+chmod 600 ~/.config/bilibili-cookies.json
+```
+
+> 详细说明见 [api-mode.md](references/api-mode.md)。
+
+---
+
+## 输出文件
+
+- **路径**：`~/Downloads/bilibili-video-list/{UP主名}_{排序}_{日期}.json`
+- **格式**：见 [api-mode.md](references/api-mode.md) 中的 JSON 输出格式
+- **终端预览**：>20 个视频时只显示前 20 个
+
 ## 边界情况
 
-### 登录弹窗
-
-B 站未登录时可能弹出登录弹窗，自动点击 `.bili-mini-close` 关闭。
-
-### 页面未加载
-
-如果 `.upload-video-card` 数量为 0：
-1. 再等待 3 秒
-2. 检查页面文本是否包含"空间主人还没投过视频"
-3. 如果是，提示用户该 UP 主没有视频
-
-### 999+ 视频
-
-B 站显示"投稿 999+"时实际视频数可能更多。持续翻页直到没有"下一页"按钮。
-
-### 充电专属视频
-
-充电专属视频在空间页仍然可见，`isExclusive` 字段标记。后续 yt-dlp 提取字幕时可能需要登录。
-
-### 连接失败
-
-如果 `agent-browser open` 超时或失败：
-1. 检查网络连接
-2. 提示用户使用 `agent-browser-troubleshooting` skill 排查
-
-### 风控拦截（-352 错误）
-
-如果页面文本包含"错误码：-352"或"风控校验失败"：
-1. 说明短时间内访问过于频繁
-2. 建议用户等待 5-10 分钟后重试
-3. 或使用 `agent-browser --headed` 有头模式重试（模拟真实用户操作）
-
-## 技术参考
-
-### DOM 选择器速查
-
-| 元素 | 选择器 | 说明 |
-|------|--------|------|
-| 视频卡片 | `.upload-video-card` | 每页 40 个 |
-| 视频链接 | `a[href*="bilibili.com/video/"]` | 包含 BV 号 |
-| 标题 | `.bili-video-card__title a` | 视频标题 |
-| 排序区域 | `.video-order-filter` | 三个排序按钮 |
-| 分页按钮 | 底部 `button` "下一页" | 翻页 |
-| 登录弹窗关闭 | `.bili-mini-close-icon` | 关闭按钮 |
-| UP 主名称 | `#h-name` | 昵称元素 |
-
-### 关键注意事项
-
-1. **URL 参数排序不可用**：`?order=click` 会导致页面空白，必须通过页面按钮切换
-2. **等待时间**：空间页是 SPA，首次加载需 5 秒，排序切换需 3 秒，翻页需 3 秒
-3. **不需要代理**：直接访问 bilibili.com 即可
-4. **关闭浏览器**：采集完成后执行 `agent-browser close`
+| 情况 | 处理方式 |
+|------|----------|
+| Cookie 过期 | API 返回错误，提示重新获取 SESSDATA |
+| -352 风控（浏览器模式） | 必须用 --headed 模式，详见 [anti-detection.md](references/anti-detection.md) |
+| 登录弹窗（浏览器模式） | 自动点击 `.bili-mini-close-icon` 关闭 |
+| 视频数 999+ | API 模式自动翻页；浏览器模式持续翻页直到没有"下一页" |
+| UP 主名字搜索 | API 模式：自动搜索；浏览器模式：见 [uid-resolution.md](references/uid-resolution.md) |
+| 缓存文件损坏 | 忽略缓存，重新获取 |
+| 排序方式与缓存不一致 | 缓存未命中，重新获取 |
 
 ## 免责声明
 
-> [!warning] 法律风险提示
-> 本 Skill 仅用于个人学习和研究目的。因不当使用造成的法律后果由使用者自行承担。
+> [!warning] 本 Skill 仅用于个人学习和研究目的。因不当使用造成的法律后果由使用者自行承担。

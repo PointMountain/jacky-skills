@@ -71,6 +71,23 @@ description: "从 URL 提取媒体元信息和音频文件。封装 yt-dlp 的�
 
 从任意平台 URL 获取结构化元信息 + 音频文件的原子 Skill。
 
+## 可执行脚本
+
+```bash
+# 基础用法
+python3 scripts/extract.py "https://www.youtube.com/watch?v=xxxx"
+
+# 指定工作目录
+python3 scripts/extract.py "https://www.youtube.com/watch?v=xxxx" \
+  --video-pipeline-dir "~/Downloads/video-pipeline"
+
+# 跳过字幕提取
+python3 scripts/extract.py "https://www.youtube.com/watch?v=xxxx" --skip-subs
+
+# 强制刷新（忽略已有 meta/audio 缓存）
+python3 scripts/extract.py "https://www.youtube.com/watch?v=xxxx" --force-refresh
+```
+
 ## 输入输出契约
 
 ### 输入

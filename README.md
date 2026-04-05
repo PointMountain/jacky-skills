@@ -12,18 +12,23 @@
 
 本项目采用**多 Plugin 架构**，每个 Plugin 包含一组相关 Skills，可独立安装和启用。
 
-| Plugin | 图标 | 说明 | 包含 Skills |
-|--------|------|------|-------------|
-| [video-processing](./plugins/video-processing) | 🎬 | 视频处理 | bilibili-to-obsidian, bilibili-batch, video-to-text, m3u8-dl, fix-neat-video |
-| [dev-tools](./plugins/dev-tools) | 🛠️ | 开发工具 | github-repo-publish, gsd-creator-skills, long-running-agent, skill-researcher, repo-study, vscode-extension-dev, doc-to-tutorial, feature-tracker, gh-workflow-generator, skill-optimizer, task-harness, task-memory, task-workflow |
-| [translation-tools](./plugins/translation-tools) | 🌐 | 翻译工具 | parallel-translation |
-| [obsidian-tools](./plugins/obsidian-tools) | 📝 | Obsidian 工具 | config-obsidian, ob-summary |
-| [language-skills](./plugins/language-skills) | 🗣️ | 语言技能 | spoken-english-coach |
-| [learning-tools](./plugins/learning-tools) | 📚 | 学习工具 | learn-repo |
-| [troubleshooting](./plugins/troubleshooting) | 🔍 | 故障排查 | agent-browser-troubleshooting, tauri-troubleshooting |
-| [skills-management](./plugins/skills-management) | 📦 | Skills 管理 | j-skills, link-all-skills |
-| [dev-advanced](./plugins/dev-advanced) | 🚀 | 高级开发 | multi-agent, web-to-tauri-migration-loop |
-| [monitoring](./plugins/monitoring) | 📊 | 监控调试 | claude-monitor |
+| Plugin | 图标 | 版本 | 说明 | 包含 Skills |
+|--------|------|------|------|-------------|
+| [video-processing](./plugins/video-processing) | 🎬 | 1.7.1 | 视频与音频处理 | audio-to-obsidian, audio-to-subtitle, bilibili-video-list, extract-url-media, write-obsidian-note, youtube-video-list |
+| [dev-tools](./plugins/dev-tools) | 🛠️ | 2.0.0 | 开发工具 | github-repo-publish, feature-tracker, task-harness, task-memory, task-workflow, efficiency-audit |
+| [knowledge-base](./plugins/knowledge-base) | 💡 | 1.0.0 | 知识库与工具集 | chrome-ext-ai-script, gh-workflow-generator, github-profile-coolify, harness-benchmark, npm-publish, vscode-extension-dev, web-to-tauri-migration-loop |
+| [skill-tooling](./plugins/skill-tooling) | 🔧 | 1.0.0 | Skill 开发工具 | gsd-creator-skills, skill-optimizer, skill-researcher |
+| [ticktick-manager](./plugins/ticktick-manager) | ✅ | 1.2.1 | 滴答清单管理 | tt, tt-defer, tt-worker |
+| [learning-tools](./plugins/learning-tools) | 📚 | 1.1.1 | 学习与研究 | doc-to-tutorial, learn-repo, repo-study |
+| [monitoring](./plugins/monitoring) | 📊 | 2.5.0 | 监控与历史 | cc-history, claude-monitor |
+| [translation-tools](./plugins/translation-tools) | 🌐 | 1.0.0 | 翻译工具 | parallel-translation |
+| [obsidian-tools](./plugins/obsidian-tools) | 📝 | 1.0.0 | Obsidian 工具 | config-obsidian, ob-summary |
+| [claude-config](./plugins/claude-config) | ⚙️ | 0.3.0 | Claude Code 配置 | statusline-setup |
+| [distiller-tools](./plugins/distiller-tools) | 🧪 | 1.1.0 | 提示词精炼 | distiller |
+| [evaluators](./plugins/evaluators) | 📐 | 1.0.0 | 评估工具 | harness-evaluator |
+| [language-skills](./plugins/language-skills) | 🗣️ | 1.0.0 | 语言技能 | spoken-english-coach |
+| [troubleshooting](./plugins/troubleshooting) | 🔍 | 1.1.0 | 故障排查 | agent-browser-troubleshooting, cli-tool-troubleshooting, tauri-troubleshooting |
+| [skills-management](./plugins/skills-management) | 📦 | 1.0.1 | Skills 管理 | j-skills, link-all-skills |
 
 ---
 
@@ -121,9 +126,8 @@ j-skills uninstall <name> -g  # 卸载
     "video-processing@jacky-skills": true,
     "dev-tools@jacky-skills": true,
     "obsidian-tools@jacky-skills": false,
-    "troubleshooting@jacky-skills": true,
-    "skills-management@jacky-skills": true,
-    "dev-advanced@jacky-skills": false
+    "ticktick-manager@jacky-skills": true,
+    "skills-management@jacky-skills": true
   }
 }
 ```
@@ -188,83 +192,134 @@ j-skills install video-processing -g
 
 ### 🎬 Video Processing
 
-| Skill | 触发场景 | 说明 |
-|-------|----------|------|
-| bilibili-to-obsidian | B站视频提取字幕 | 从B站视频提取文案并整理到Obsidian |
-| bilibili-batch | 批量提取UP主视频 | 从B站UP主空间批量提取视频字幕 |
-| video-to-text | 从视频提取文字 | 从视频平台提取文案（支持抖音等） |
-| m3u8-dl | 下载视频、m3u8链接 | 下载M3U8/HLS视频流 |
-| fix-neat-video | 修复.mp4.ts文件 | 修复Neat Download下载的分段视频 |
+> 视频与音频处理工作流，支持 B站/YouTube 视频列表获取、字幕提取、Obsidian 笔记生成等。
 
-### 🌐 Translation Tools
-
-| Skill | 触发场景 | 说明 |
-|-------|----------|------|
-| parallel-translation | 多文件翻译 | 使用haiku模型低成本翻译 |
+| Skill | 触发词 | 说明 |
+|-------|--------|------|
+| audio-to-obsidian | 视频转笔记、提取字幕到obsidian | 渐进式音视频处理编排器：URL/本地视频/本地音频 → 提取字幕 → 同步到 Obsidian，支持断点续传和 Sub Agent 并行 |
+| audio-to-subtitle | 音频转字幕、转录字幕 | 音视频转字幕工具，支持 mp3/wav/m4a/mp4 转录为 SRT/VTT/TXT/MD 格式，支持本地 MLX-Whisper 和豆包云端两种引擎 |
+| bilibili-video-list | B站视频列表、UP主视频 | 获取 B 站 UP 主完整视频列表，支持 API（Cookie）和浏览器双模式，输出 JSON |
+| extract-url-media | 提取视频信息、获取音频 | 从 URL 提取媒体元信息和音频文件，封装 yt-dlp 的元信息获取 + 音频提取为标准化接口 |
+| write-obsidian-note | 写入obsidian笔记、生成笔记 | 生成统一格式的 Obsidian 笔记（原文 + 归纳），写入指定目录，支持 category 和 extraContent 参数适配不同来源 |
+| youtube-video-list | YouTube频道视频、YouTube视频列表 | 获取 YouTube 频道完整视频列表，基于 yt-dlp，无需 API Key，支持频道 ID、handle、URL 和名字搜索 |
 
 ### 🛠️ Dev Tools
 
-| Skill | 触发场景 | 说明 |
-|-------|----------|------|
-| github-repo-publish | 发布到GitHub | 一键发布仓库到GitHub |
-| gsd-creator-skills | 创建/优化skill | GSD风格技能创建与依赖管理 |
-| long-running-agent | continue development | 跨会话开发项目 |
-| skill-researcher | 研究skills | 研究、对比、分析Skills项目 |
-| repo-study | 研究GitHub仓库 | 调研开源项目技术实现 |
-| vscode-extension-dev | VSCode插件开发 | 插件开发脚手架 |
-| doc-to-tutorial | 文档转教程 | 生成交互式教程并启动预览 |
-| feature-tracker | 功能追踪/规格管理 | 生成线框图、编号功能清单与测试用例 |
-| gh-workflow-generator | 生成自动化采集仓库 | 快速生成 GitHub Actions 项目模板 |
-| skill-optimizer | 优化skill触发/流程 | 诊断并修复 skill 执行问题 |
-| task-harness | 验收边界设计 | 基于 TDD 生成验收用例 |
-| task-memory | 跨会话任务记忆 | 记录进展、偏差与复盘 |
-| task-workflow | 任务编排 | 整合 task-memory/superpowers/task-harness |
+> 开发效率工具集，覆盖发布、测试、任务管理、效率审计等场景。
 
-### 📝 Obsidian Tools
+| Skill | 触发词 | 说明 |
+|-------|--------|------|
+| github-repo-publish | publish to GitHub、push to remote | 一键发布本地代码仓库到 GitHub，支持创建远程仓库、推送代码、生成 README、设置 about 信息、发布 VSCode 扩展等 |
+| feature-tracker | 功能追踪、功能规格、写测试 | 项目功能规格书生成器：为项目页面生成带线框图、编号功能清单、步骤化测试用例的产品规格文档 |
+| task-harness | 验收边界、测试用例、harness 设计 | BDD 验收边界设计，生成 BDD case 文件和测试脚本，融入项目现有 tests/bdd/ 体系 |
+| task-memory | 跨会话任务、任务记忆 | 跨多个会话持续推进的任务持久化记录：进展、偏差和复盘，在新会话快速恢复上下文 |
+| task-workflow | 工作流编排、任务流程 | 任务工作流编排工具，整合 task-memory、superpowers、task-harness 形成完整的任务执行流程 |
+| efficiency-audit | 效率分析、耗时分析、为什么这么慢 | 分析当前会话的任务执行效率：定位耗时瓶颈、拆解步骤耗时、给出具体优化方案 |
 
-| Skill | 触发场景 | 说明 |
-|-------|----------|------|
-| config-obsidian | 配置Obsidian同步 | 配置Obsidian同步环境 |
-| ob-summary | Obsidian概览 | 知识库概览总结 |
+### 💡 Knowledge Base
 
-### 🗣️ Language Skills
+> 知识库与工具集，包含开发脚手架、发布工具、参考方案等。
 
-| Skill | 触发场景 | 说明 |
-|-------|----------|------|
-| spoken-english-coach | 英语口语表达 | 英语口语表达教练，建立个性化表达库 |
+| Skill | 触发词 | 说明 |
+|-------|--------|------|
+| chrome-ext-ai-script | Chrome 扩展参考、Plasmo 参考 | AI 驱动的 Chrome Extension 架构参考方案：Plasmo + Vercel AI SDK，侧边栏对话生成并执行页面脚本 |
+| gh-workflow-generator | 定时采集、GitHub Actions | 快速生成带 GitHub Actions Workflow 的自动化采集项目 |
+| github-profile-coolify | GitHub Profile、美化主页 | 一键优化 GitHub Profile README（酷炫风格、Snake 动画、图卡健康检查与自动回退） |
+| harness-benchmark | harness 评估、skill 基准 | Harness Engineering Benchmark — 7 维度 70 分制评估 Skill 智能体驾驭能力 |
+| npm-publish | npm publish、发布 npm 包 | npm 包发布知识库与自动化指南，覆盖 2FA/OTP、Access Token 等常见问题 |
+| vscode-extension-dev | VSCode 插件开发、创建插件 | VSCode 插件完整开发脚手架，从项目初始化、功能模块生成到发布自动化 |
+| web-to-tauri-migration-loop | Tauri migration、dev:tauri | Web-first 到 Tauri v2 迁移，合约优先架构、双传输适配器、fail-fast 运行时检查 |
+
+### 🔧 Skill Tooling
+
+> Skill 开发工具集，覆盖创建、优化、研究全流程。
+
+| Skill | 触发词 | 说明 |
+|-------|--------|------|
+| gsd-creator-skills | 创建 skill、新 skill、gsd skill | 基于 GSD 风格的 skills 生成与指导型元技能，支持外部 skill 依赖管理（离线/j-skills 两种模式） |
+| skill-optimizer | 优化 skill、skill 没触发、skill 诊断 | 诊断并优化 Skills 的持续改进工具，支持调用 efficiency-audit 进行效率审计 |
+| skill-researcher | 研究 skills、对比 skills | 研究 Claude Code Skills 的元技能，支持搜索热门项目、下载翻译、生成对比报告 |
+
+### ✅ TickTick Manager
+
+> 滴答清单集成，支持任务管理、延迟、自动执行。
+
+| Skill | 触发词 | 说明 |
+|-------|--------|------|
+| tt | /tt、日程、待办、滴答清单 | TickTick 日程管理：日程复盘、补全日程、回顾今天、时间统计 |
+| tt-defer | 推到待办、明天再做、推迟任务 | 将任务推送到滴答清单任务池，支持自然语言触发 |
+| tt-worker | 执行任务池、跑任务池、自动执行 | 读取滴答清单任务池中的任务并自动执行 |
 
 ### 📚 Learning Tools
 
-| Skill | 触发场景 | 说明 |
-|-------|----------|------|
-| learn-repo | 学习仓库 | 克隆仓库、翻译文档并生成定制 CLAUDE.md |
+> 学习与研究工具，支持仓库学习、文档转教程、技术调研。
 
-### 🔍 Troubleshooting
-
-| Skill | 触发场景 | 说明 |
-|-------|----------|------|
-| agent-browser-troubleshooting | agent-browser失败 | agent-browser故障排查 |
-| tauri-troubleshooting | Tauri插件权限 | Tauri v2故障排查 |
-
-### 📦 Skills Management
-
-| Skill | 触发场景 | 说明 |
-|-------|----------|------|
-| j-skills | 管理skills | Agent Skills管理CLI工具 |
-| link-all-skills | 链接所有skills | 将所有skills链接到全局注册表 |
-
-### 🚀 Dev Advanced
-
-| Skill | 触发场景 | 说明 |
-|-------|----------|------|
-| multi-agent | 多Agent协作 | 并行调用多个AI模型 |
-| web-to-tauri-migration-loop | Web到Tauri迁移 | Web到Tauri v2迁移工作流 |
+| Skill | 触发词 | 说明 |
+|-------|--------|------|
+| doc-to-tutorial | 文档转教程、生成交互式教程 | 将任意内容（文件夹/文件/文字）转换为交互式教程并启动预览服务 |
+| learn-repo | 学习仓库、初始化学习项目 | 初始化 GitHub 仓库学习项目：克隆仓库、翻译文档、生成定制化 CLAUDE.md |
+| repo-study | 调研、研究仓库、分析开源项目 | 研究 GitHub 仓库的特定技术实现 |
 
 ### 📊 Monitoring
 
-| Skill | 触发场景 | 说明 |
-|-------|----------|------|
-| claude-monitor | 监控Claude Code | 监控 Claude Code 运行状态、工具调用与性能信息 |
+> Claude Code 运行监控与历史记录查询。
+
+| Skill | 触发词 | 说明 |
+|-------|--------|------|
+| cc-history | CC 历史、今天做了什么、工作记录 | 查询 Claude Code 会话历史记录 |
+| claude-monitor | 监控 Claude、Claude 在做什么 | Claude Code 原生悬浮窗通知，在 macOS 状态栏显示实时工作状态（思考中、执行工具、等待输入、任务完成） |
+
+### 🌐 Translation Tools
+
+| Skill | 触发词 | 说明 |
+|-------|--------|------|
+| parallel-translation | 翻译、translate、多文件翻译 | 智能翻译调度器：自动判断单文件/多文件，使用 haiku 模型低成本翻译 |
+
+### 📝 Obsidian Tools
+
+| Skill | 触发词 | 说明 |
+|-------|--------|------|
+| config-obsidian | 配置 Obsidian、同步 | 配置 Obsidian 同步环境，支持 Remotely Save 后台触发和 REST API 配置 |
+| ob-summary | Obsidian 概览、知识库总结 | Obsidian 知识库概览总结，了解内容结构、查找特定主题的笔记 |
+
+### ⚙️ Claude Config
+
+| Skill | 触发词 | 说明 |
+|-------|--------|------|
+| statusline-setup | 状态栏、statusline、配置状态栏 | 交互式配置 Claude Code 状态栏，支持多种方案切换 |
+
+### 🧪 Distiller Tools
+
+| Skill | 触发词 | 说明 |
+|-------|--------|------|
+| distiller | 蒸馏、distill、提炼、知识提炼 | 万物皆可蒸馏 — 从代码、技术栈、文章等资源中提炼可复用的核心知识，支持产出代码模板、技术方案整合、知识卡片 |
+
+### 📐 Evaluators
+
+| Skill | 触发词 | 说明 |
+|-------|--------|------|
+| harness-evaluator | 评估任务、设计评估、质量评估 | 基于 Anthropic Harness 框架的任务目标评估器，生成器-评估器分离架构，支持前端设计和全栈开发 4 维度评估 |
+
+### 🗣️ Language Skills
+
+| Skill | 触发词 | 说明 |
+|-------|--------|------|
+| spoken-english-coach | 口语表达、这个用英文怎么说 | 英语口语表达教练，建立个性化表达库，支持口述文章处理 |
+
+### 🔍 Troubleshooting
+
+| Skill | 触发词 | 说明 |
+|-------|--------|------|
+| agent-browser-troubleshooting | agent-browser 失败、浏览器无法启动 | agent-browser 故障排查：命令失败、连接超时、页面操作异常 |
+| cli-tool-troubleshooting | CLI 报错、npm 全局包、spawnSync 错误 | 通用 CLI 工具故障排查：npm 全局包安装后运行报错、二进制文件损坏、optional 依赖缺失等 |
+| tauri-troubleshooting | Tauri 插件权限、Tauri 命令调用 | Tauri v2 开发中常见问题的故障排查指南 |
+
+### 📦 Skills Management
+
+| Skill | 触发词 | 说明 |
+|-------|--------|------|
+| j-skills | 管理 skills、link、install | Agent Skills 管理 CLI 工具，支持 link、install、跨 35+ Agent 环境管理 |
+| link-all-skills | 链接所有 skills、批量链接 | 将当前项目下所有 skills 链接到全局注册表并安装到所有环境 |
 
 ---
 
@@ -276,20 +331,21 @@ jacky-skills/
 │   ├── plugin.json           # 元插件清单
 │   └── marketplace.json      # 市场配置
 ├── plugins/                  # 子插件目录
-│   ├── video-processing/     # 视频处理
-│   │   ├── .claude-plugin/
-│   │   │   ├── plugin.json
-│   │   │   └── marketplace.json
-│   │   └── skills/
-│   ├── dev-tools/            # 开发工具
-│   ├── translation-tools/    # 翻译工具
-│   ├── obsidian-tools/       # Obsidian工具
-│   ├── language-skills/      # 语言技能
-│   ├── learning-tools/       # 学习工具
-│   ├── troubleshooting/      # 故障排查
-│   ├── skills-management/    # Skills管理
-│   ├── dev-advanced/         # 高级开发
-│   └── monitoring/           # 监控调试
+│   ├── video-processing/     # 🎬 视频与音频处理
+│   ├── dev-tools/            # 🛠️ 开发工具
+│   ├── knowledge-base/       # 💡 知识库与工具集
+│   ├── skill-tooling/        # 🔧 Skill 开发工具
+│   ├── ticktick-manager/     # ✅ 滴答清单管理
+│   ├── learning-tools/       # 📚 学习与研究
+│   ├── monitoring/           # 📊 监控与历史
+│   ├── translation-tools/    # 🌐 翻译工具
+│   ├── obsidian-tools/       # 📝 Obsidian 工具
+│   ├── claude-config/        # ⚙️ Claude Code 配置
+│   ├── distiller-tools/      # 🧪 提示词精炼
+│   ├── evaluators/           # 📐 评估工具
+│   ├── language-skills/      # 🗣️ 语言技能
+│   ├── troubleshooting/      # 🔍 故障排查
+│   └── skills-management/    # 📦 Skills 管理
 ├── install.sh                # 一键安装脚本
 ├── CLAUDE.md                 # 项目配置
 └── README.md                 # 本文件

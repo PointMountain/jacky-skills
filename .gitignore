@@ -12,3 +12,7 @@ plugins/language-skills/**/vocabulary.json
 content/
 .hooks-test
 .omc
+
+# Python cache artifacts
+**/__pycache__/
+*.pyc

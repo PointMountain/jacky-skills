@@ -18,6 +18,12 @@ push to remote
 create GitHub repo
 release extension
 发布到 GitHub
+npm publish
+发布 npm 包
+发布到 npm
+publish to npm
+配置自动发布
+setup npm auto publish
 ```
 </trigger>
 
@@ -241,13 +247,145 @@ git tag "v$VERSION" && git push origin "v$VERSION"
 gh release create "v$VERSION" --title "v$VERSION" --notes "Release v$VERSION" "*.vsix"
 ```
 
-#### Node.js 库 → 提示 npm
+#### Node.js 库 → npm 发布
+
+**Step 1：检查 npm 环境**
 
 ```bash
-echo "检测到 Node.js 库，如需发布到 npm："
-echo "  npm publish --access public  # scoped packages"
-echo "  npm publish                  # regular packages"
+npm whoami 2>/dev/null
 ```
+- 未登录 → 提示用户运行 `npm login`，不自动登录
+- 已登录 → 继续
+
+**Step 2：检测自动发布（CI/CD）是否已配置**
+
+```bash
+# 检查是否存在 GitHub Actions 发布工作流
+ls .github/workflows/npm-publish.yml 2>/dev/null
+# 检查 NPM_TOKEN 是否已配置到 GitHub Secrets
+gh secret list 2>/dev/null | grep NPM_TOKEN
+```
+
+| 状态 | 动作 |
+|------|------|
+| workflow + NPM_TOKEN 都有 | 自动发布已就绪，跳到 Step 4（仅 tag 触发） |
+| 缺少任一项 | 进入 Step 3 引导配置 |
+
+**Step 3：配置自动发布（首次或缺失时）**
+
+当检测到项目未配置自动发布时，使用 `AskUserQuestion` 询问用户：
+
+> "检测到这是一个 npm 包但未配置自动发布。是否现在配置？
+> 配置后 `git push --tags` 即可自动触发 npm 发布，无需手动操作。"
+
+如果用户同意，按以下步骤配置：
+
+1. **检查 npm token 类型**（是否支持绕过 2FA）
+   ```bash
+   # 检查 ~/.npmrc 中的 token
+   grep '_authToken' ~/.npmrc | head -1
+   ```
+   - 无 token → 引导用户创建 Granular Access Token（见下方参考）
+   - 有 token → 验证是否可用：`npm whoami`
+
+2. **创建 GitHub Actions 工作流**（如不存在）
+   创建 `.github/workflows/npm-publish.yml`：
+   ```yaml
+   name: npm Publish
+
+   on:
+     push:
+       tags:
+         - 'v*.*.*'
+
+   jobs:
+     publish:
+       runs-on: ubuntu-latest
+       permissions:
+         contents: read
+       steps:
+         - uses: actions/checkout@v4
+         - uses: actions/setup-node@v4
+           with:
+             node-version: '20'
+             cache: 'npm'
+         - run: npm ci
+         - run: npm test
+         - run: npm publish
+           env:
+             NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+   ```
+
+3. **配置 NPM_TOKEN Secret**（如未配置）
+   ```bash
+   # 从 ~/.npmrc 提取 token
+   NPM_TOKEN=$(grep '_authToken' ~/.npmrc | head -1 | sed 's/.*_authToken=//')
+   gh secret set NPM_TOKEN --body "$NPM_TOKEN"
+   ```
+
+4. **提交工作流文件**
+   ```bash
+   git add .github/workflows/npm-publish.yml
+   git commit -m "ci: 添加 npm 自动发布工作流"
+   git push origin $(git branch --show-current)
+   ```
+
+**Step 4：执行发布**
+
+根据自动发布配置状态选择不同路径：
+
+**路径 A：已配置自动发布（推荐）**
+```bash
+VERSION=$(node -p "require('./package.json').version")
+git tag "v$VERSION" && git push origin "v$VERSION"
+# CI 自动执行 npm publish
+```
+
+**路径 B：手动发布（未配置或用户跳过）**
+```bash
+PKG_NAME=$(node -p "require('./package.json').name")
+# scoped package（如 @wangjs-jacky/xxx）需要 --access public
+echo "$PKG_NAME" | grep -q '^@' && npm publish --access public || npm publish
+```
+
+> **注意**：
+> - 如果 `package.json` 中有 `prepublishOnly` 脚本，会自动先构建
+> - 发布失败时检查：1) 版本号是否已存在 2) npm login 是否过期 3) 网络代理
+> - 网络不通时尝试：`npm publish --access public --registry https://registry.npmjs.org/`
+
+---
+
+<details>
+<summary>📚 npm Granular Access Token 创建指南（展开查看）</summary>
+
+如果用户没有可用的 npm token，引导以下步骤：
+
+1. 访问 [npmjs.com](https://www.npmjs.com) → 点击头像 → **Access Tokens**
+2. 点击 **Generate New Token** → 选择 **Granular Access Token**
+3. 填写配置：
+
+| 配置项 | 推荐值 |
+|--------|--------|
+| Token name | `publish-automation` 或项目名 |
+| Expiration | 90 天 |
+| Packages | **Read and write** |
+| Organizations | 选择对应 org（如 `@wangjs-jacky`） |
+
+4. 复制 token（只显示一次）
+5. 写入本地配置：
+   ```bash
+   echo '//registry.npmjs.org/:_authToken=npm_你的token' >> ~/.npmrc
+   npm whoami  # 验证
+   ```
+
+**Token 类型对比**：
+
+| 类型 | 绕过 2FA | 限定包范围 | 设过期时间 | 推荐 |
+|------|----------|-----------|-----------|------|
+| **Granular Access Token** | ✅ | ✅ | ✅ | **首选** |
+| Legacy Automation | ✅ | ❌ | ❌ | 旧项目兼容 |
+
+</details>
 
 **Checkpoint**：项目特定发布流程已完成
 
@@ -258,6 +396,7 @@ echo "  npm publish                  # regular packages"
 - [ ] About 信息（中文描述 + Topics）
 - [ ] Tauri 应用：Release 只包含 `.dmg`（无 `.zip`）
 - [ ] VSCode 插件：Release 包含 `.vsix`
+- [ ] Node.js 库：npm 发布成功，`npm view <pkg>@<version>` 可查
 
 ## 快速参考
 
@@ -267,6 +406,8 @@ echo "  npm publish                  # regular packages"
 | 设置描述 | `gh repo edit --description "$中文描述"` |
 | Tauri Release | `gh release create $TAG --title "$TITLE" "$DMG_PATH"` |
 | VSCode Release | `gh release create $TAG --title "$TITLE" "*.vsix"` |
+| npm 发布（scoped） | `npm publish --access public` |
+| npm 发布（regular） | `npm publish` |
 | 推送更新 | `git push origin <branch>` |
 
 ## 错误处理
@@ -278,6 +419,9 @@ echo "  npm publish                  # regular packages"
 | 仓库已存在 | 直接推送更新 |
 | 代理连接失败 | 使用正确端口（HTTP: 10802）或直连 |
 | `.vsix already exists` | 删除旧文件重新打包 |
+| npm 403/未登录 | `npm login` |
+| npm 版本已存在 | 更新 package.json 版本号后重试 |
+| npm 网络超时 | 加 `--registry https://registry.npmjs.org/` 或配代理 |
 
 ## 禁止事项
 
