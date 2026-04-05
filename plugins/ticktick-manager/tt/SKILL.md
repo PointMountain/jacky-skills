@@ -30,6 +30,9 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
       <constraint>历史任务（时间已过）必须自动标记为完成</constraint>
       <constraint>时区规则：API 返回的时间为 UTC（+0000/Z 后缀），必须 +8 转换为上海本地时间（CLI 已修复，直接使用 new Date() 解析即可）</constraint>
       <constraint>非今日任务查询必须用 --start/--end 日期范围参数，禁止用 --query yesterday（不支持）</constraint>
+      <constraint>⚡ 效率要求：任务操作必须在 1 分钟内完成。优先使用 --json 获取结构化数据，避免文本解析和多次 CLI 调用</constraint>
+      <constraint>批量更新任务时，必须用 --json 获取 task ID，然后用 tt task-batch-update --stdin 一次完成，禁止逐个更新</constraint>
+      <constraint>获取 task ID 的优先路径：tt task undone --json → tt project-tasks <id> --json → tt task-search --json（按可用性降序）</constraint>
     </constraints>
   </gsd:meta>
 
@@ -122,11 +125,13 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
 | 场景 | CLI 命令 |
 |------|---------|
 | 查看未完成今日任务 | `tt task undone --query today` |
+| 查看未完成今日任务（结构化） | `tt task undone --query today --json` ⚡ |
 | 查看未完成昨日任务 | `tt task undone --start 2026-04-03 --end 2026-04-04` |
 | 查看未完成指定日期任务 | `tt task undone --start <startDate> --end <endDate>` |
 | 查看已完成今日任务 | `tt task completed --start <date> --end <date>` |
-| 搜索任务 | `tt task search <keyword>` |
-| 按ID查找任务 | `tt task find <taskId>` |
+| 搜索任务 | `tt task-search <keyword>` |
+| 搜索任务（结构化） | `tt task-search <keyword> --json` ⚡ |
+| 按ID查找任务 | `tt task-find <taskId>` |
 | 创建任务 | `tt task-add <title> -p <projectId> --start-date <date> --due-date <date>` |
 | 批量创建任务 | `echo '[...]' | tt task-batch-add --stdin` |
 | 完成任务 | `tt task-done <projectId> <taskId>` |

@@ -1,6 +1,6 @@
 ---
 name: skill-optimizer
-description: "诊断并优化 Skills 的持续改进工具。触发词：优化 skill、skill 没触发、为什么没有、skill 诊断、skill-optimizer"
+description: "诊断并优化 Skills 的持续改进工具，支持调用 efficiency-audit 进行效率审计。触发词：优化 skill、skill 没触发、为什么没有、skill 诊断、skill-optimizer"
 ---
 
 <role>
@@ -35,18 +35,20 @@ xxx skill 有问题，为什么没有触发 yyy
   <gsd:meta>
     <name>skill-optimizer</name>
     <trigger>优化 skill、skill 没触发、为什么没有、skill 诊断</trigger>
-    <requires>Read, Glob, Grep, Agent</requires>
+    <requires>Read, Glob, Grep, Agent, Skill</requires>
     
     <!-- 必须阅读的标准参考 -->
     <require_read>
       <ref id="gsd-creator-skills" required="true">GSD 风格 Skill 创建与管理标准</ref>
+      <ref id="efficiency-audit" required="false">效率审计 Skill（可选依赖，用于分析当前会话执行效率）</ref>
     </require_read>
-    
+
     <!-- 执行前检查点 -->
     <checkpoints>
       <checkpoint order="1">已提取 skill 名称和问题描述</checkpoint>
       <checkpoint order="2">已定位 skill 文件路径</checkpoint>
-      <checkpoint order="3">已输出诊断报告并获得用户确认</checkpoint>
+      <checkpoint order="3">已完成智能效率审计评估（自动触发或跳过）</checkpoint>
+      <checkpoint order="4">已输出诊断报告并获得用户确认</checkpoint>
     </checkpoints>
     
     <!-- 安全约束 -->
@@ -65,14 +67,21 @@ xxx skill 有问题，为什么没有触发 yyy
     <gsd:checkpoint>确认 skill 存在且可访问</gsd:checkpoint>
   </gsd:phase>
 
-  <gsd:phase name="diagnose" order="2">
+  <gsd:phase name="audit" order="2" condition="自动评估或用户选择执行效率审计">
+    <gsd:step>评估当前任务复杂度和已耗时，决定是否自动触发效率审计</gsd:step>
+    <gsd:step>若触发（自动或用户确认），使用 Skill 工具调用 efficiency-audit</gsd:step>
+    <gsd:step>提取审计报告中的反模式和优化建议</gsd:step>
+    <gsd:checkpoint>完成效率审计（如已触发）</gsd:checkpoint>
+  </gsd:phase>
+
+  <gsd:phase name="diagnose" order="3">
     <gsd:step>阅读 skill 完整内容</gsd:step>
     <gsd:step>分析 skill 结构（触发条件/流程/命令）</gsd:step>
     <gsd:step>诊断问题根因</gsd:step>
     <gsd:checkpoint>输出诊断报告，确认优化方向</gsd:checkpoint>
   </gsd:phase>
 
-  <gsd:phase name="optimize" order="3">
+  <gsd:phase name="optimize" order="4">
     <gsd:step>设计优化方案</gsd:step>
     <gsd:step>使用 Agent 在独立上下文中执行优化</gsd:step>
     <gsd:step>验证优化结果</gsd:step>
@@ -109,6 +118,45 @@ find ~/jacky-github/jacky-skills -name "SKILL.md" -exec grep -l "name: xxx" {} \
 - `~/jacky-github/jacky-skills/skills/**/SKILL.md` (独立 skills)
 
 **Checkpoint**: 如果找不到 skill 文件，询问用户确认 skill 名称是否正确。
+
+---
+
+## Phase 1.5: 智能效率审计 (audit)
+
+> 此阶段为智能触发步骤。大模型根据任务复杂度和已耗时自动判断是否触发，无需用户手动决定。
+
+### Step 1.5.1: 自动评估触发条件
+
+**自动触发规则**（无需询问用户）：
+
+| 条件 | 动作 |
+|------|------|
+| 当前任务已执行 ≥ 1 小时 | **必须触发** — 自动调用 efficiency-audit |
+| 会话中工具调用 ≥ 50 次 | **必须触发** — 说明任务复杂度高 |
+| 用户提到"慢"、"耗时"、"效率" | **自动触发** — 用户已关注效率问题 |
+| 任务执行 ≤ 15 分钟且步骤 ≤ 10 | **跳过** — 简单任务无需审计 |
+| 其他情况 | 根据上下文复杂度自行判断 |
+
+### Step 1.5.2: 调用 efficiency-audit
+
+触发后，使用 Skill 工具调用：
+
+```
+Skill(skill: "efficiency-audit")
+```
+
+### Step 1.5.3: 提取审计关键信息
+
+从审计报告中提取与当前 skill 相关的信息：
+
+| 审计指标 | 对诊断的价值 |
+|----------|------------|
+| 重复读文件 | 判断 skill 是否导致冗余文件访问 |
+| 串行可并行 | 判断 skill 流程是否可优化并行度 |
+| 过度管理 | 判断 skill 是否有不必要的步骤 |
+| 遗漏导致返工 | 判断 skill 设计是否完整 |
+
+**Checkpoint**: 审计结果将作为 Phase 2 诊断的输入之一。若未触发审计，直接进入 Phase 2。
 
 ---
 
@@ -430,7 +478,8 @@ description: 扩展后的描述，包含更多触发词： xxx, yyy, zzz, aaa
 <success_criteria>
 - [ ] 正确解析 skill 名称和问题描述
 - [ ] 定位到 skill 文件
-- [ ] 分析 skill 结构
+- [ ] 可选：已自动评估并执行效率审计（如触发条件满足）
+- [ ] 分析 skill 结构（结合审计数据，如适用）
 - [ ] 诊断出问题根因
 - [ ] 输出诊断报告
 - [ ] 获得用户确认
