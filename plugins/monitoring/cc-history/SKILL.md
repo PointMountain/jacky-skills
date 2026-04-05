@@ -1,37 +1,36 @@
 ---
-name: today-history
-description: "查看 Claude Code 工作记录。触发词：today-history、今日工作、今天做了什么、cc-history、今日记录、昨天做了什么、历史工作、今天的工作。"
-trigger: today-history, 今日工作, 今天做了什么, cc-history, 今日记录, 昨天做了什么, 历史工作, 今天的工作
+name: cc-history
+description: "查询 Claude Code 会话历史记录。触发词：cc-history、CC 历史、今天做了什么、昨天做了什么、工作记录、会话记录。"
+trigger: cc-history, CC 历史, 今天做了什么, 昨天做了什么, 工作记录, 会话记录, today-history
 ---
 
-# today-history
+# cc-history
 
-通过 Python 脚本直接读取 `~/.claude/projects/<encoded-path>/*.jsonl` 会话文件，解析时间戳和用户/助手消息，**无需大模型参与**即可输出结构化工作摘要。
+通过 Python 脚本读取 `~/.claude/projects/<encoded-path>/*.jsonl` 会话文件，解析时间戳和用户/助手消息，**无需大模型参与**即可输出结构化工作摘要。
 
 ## ⚠️ 强制规则
 
-> **当用户问"今天做了什么/工作记录"时，必须第一时间运行本脚本，禁止手动 git log / find / grep 搜索。**
-> 脚本执行仅需 ~2 秒，手动搜索浪费 5+ 分钟。
+> **当用户问"今天做了什么/工作记录/CC 历史"时，必须第一时间运行本脚本，禁止手动 git log / find / grep 搜索。**
 
 执行优先级：
 
 ```
-1. python3 <脚本路径> --all --summary    # 第一步：全项目汇总（2 秒）
-2. 根据 --summary 输出 → 提交滴答清单    # 第二步：按需提交
-3. python3 <脚本路径> --all --ticktick   # 第三步：生成滴答清单 JSON（可选）
+1. python3 <脚本路径> [参数]              # 第一步：查询历史记录
+2. 根据 --summary 输出 → 提交滴答清单     # 第二步：按需提交（可选）
+3. python3 <脚本路径> --all --ticktick    # 第三步：生成滴答清单 JSON（可选）
 ```
 
 <gsd:workflow>
   <gsd:meta>
-    <name>today-history</name>
-    <trigger>today-history, 今日工作, 今天做了什么, cc-history, 今日记录, 昨天做了什么, 历史工作, 今天的工作</trigger>
+    <name>cc-history</name>
+    <trigger>cc-history, CC 历史, 今天做了什么, 昨天做了什么, 工作记录, 会话记录</trigger>
     <requires>Python 3, Bash</requires>
     <checkpoints>
       <checkpoint order="1">脚本可执行性验证（python3 可用）</checkpoint>
       <checkpoint order="2">输出结果展示后等待下一步指令</checkpoint>
     </checkpoints>
     <constraints>
-      <constraint>时间必须从 UTC +8 转换为本地时间（脚本已内置处理）</constraint>
+      <constraint>时间自动从 UTC +8 转换为本地时间（脚本已内置处理）</constraint>
       <constraint>脚本路径使用绝对路径，支持在任意目录执行</constraint>
       <constraint>默认查看今天，不加参数时只查当前项目</constraint>
       <constraint>用户要求查看所有项目时使用 --all 参数</constraint>
@@ -39,7 +38,7 @@ trigger: today-history, 今日工作, 今天做了什么, cc-history, 今日记�
     </constraints>
   </gsd:meta>
 
-  <gsd:goal>快速输出指定日期的 Claude Code 工作记录，支持按项目或全局查看，并可联动 tt skill 提交到滴答清单。</gsd:goal>
+  <gsd:goal>快速查询 Claude Code 会话历史，支持按日期、项目、范围过滤，并可联动 tt skill 提交到滴答清单。</gsd:goal>
 
   <gsd:phase name="query" order="1">
     <gsd:step>解析用户意图：日期（今天/昨天/指定日期）、范围（当前项目/所有项目/指定项目）</gsd:step>
@@ -55,36 +54,41 @@ trigger: today-history, 今日工作, 今天做了什么, cc-history, 今日记�
   </gsd:phase>
 </gsd:workflow>
 
-<commands>
-```
-today-history              # 查看今天（当前项目）
-today-history --all        # 查看今天（所有项目）
-today-history --yesterday  # 查看昨天（当前项目）
-today-history --date 2026-04-04           # 查看指定日期
-today-history --all --yesterday           # 所有项目 + 昨天
-today-history --project /path/to/project  # 指定项目
-```
-</commands>
+## 参数说明
 
-## 执行流程
+| 参数 | 说明 | 示例 |
+|------|------|------|
+| （无参数） | 查看今天，当前项目 | `python3 cc-history.py` |
+| `--all` | 扫描所有项目的会话 | `python3 cc-history.py --all` |
+| `--project <path>` | 指定项目路径 | `python3 cc-history.py --project ~/jacky-github/tt-cli` |
+| `--yesterday` | 查看昨天 | `python3 cc-history.py --yesterday` |
+| `--date YYYY-MM-DD` | 查看指定日期 | `python3 cc-history.py --date 2026-04-04` |
+| `--summary` | 汇总模式（每会话一行） | `python3 cc-history.py --all --summary` |
+| `--ticktick` | 输出滴答清单 JSON（自动合并相近会话） | `python3 cc-history.py --all --ticktick` |
+| `--merge-gap <min>` | 滴答清单合并间隔（默认 15 分钟） | `python3 cc-history.py --all --ticktick --merge-gap 30` |
+| `--no-merge` | 滴答清单不合并（每个会话一条任务） | `python3 cc-history.py --all --ticktick --no-merge` |
 
-### Phase 1: 查询工作记录
+参数可组合使用，如 `--all --yesterday` 表示查看所有项目昨天的记录。
 
-**Step 1 — 解析用户意图**
+## 意图解析
 
 | 用户说法 | 日期参数 | 范围参数 |
 |----------|---------|---------|
-| "今天做了什么" / "今日工作" | （默认今天） | （默认当前项目） |
+| "今天做了什么" / "CC 历史" | （默认今天） | （默认当前项目） |
 | "昨天做了什么" | `--yesterday` | （默认当前项目） |
 | "所有项目今天做了什么" | （默认今天） | `--all` |
 | "4月3号的工作" | `--date 2026-04-03` | （默认当前项目） |
 | "所有项目昨天做了什么" | `--yesterday` | `--all` |
 
-**Step 2 — 执行脚本**
+## 执行流程
+
+### Phase 1: 查询历史记录
+
+**Step 1 — 解析意图，执行脚本**
 
 脚本绝对路径：
 ```
-/Users/jiashengwang/jacky-github/jacky-skills/plugins/monitoring/today-history/scripts/today-history.py
+/Users/jiashengwang/jacky-github/jacky-skills/plugins/monitoring/cc-history/scripts/cc-history.py
 ```
 
 ```bash
@@ -100,7 +104,7 @@ python3 <脚本路径> --project ~/jacky-github/tt-cli  # 指定项目
 python3 <脚本路径> --all --yesterday      # 所有项目 + 昨天
 ```
 
-**Step 3 — 展示结果**
+**Step 2 — 展示结果**
 
 脚本输出格式示例：
 
@@ -152,29 +156,6 @@ python3 <脚本路径> --all --yesterday      # 所有项目 + 昨天
    - 标题 ≤15 字，具体细节写入 content
 4. **确认结果**：展示创建的任务清单
 
-**联动命令参考**（由 tt skill 执行）：
-```bash
-# 批量创建任务
-echo '[{"title":"简短标题","content":"- 要点1\n- 要点2","projectId":"...","startDate":"...","dueDate":"..."}]' | tt task-batch-add --stdin
-
-# 历史任务标记完成
-tt task-batch-done <projectId> --task-ids <ids> --force
-```
-
-> **Checkpoint**: 批量创建前展示汇总确认
-
-## 参数说明
-
-| 参数 | 说明 | 示例 |
-|------|------|------|
-| （无参数） | 查看今天，当前项目 | `python3 today-history.py` |
-| `--all` | 扫描所有项目的会话 | `python3 today-history.py --all` |
-| `--project <path>` | 指定项目路径 | `python3 today-history.py --project ~/jacky-github/tt-cli` |
-| `--yesterday` | 查看昨天 | `python3 today-history.py --yesterday` |
-| `--date YYYY-MM-DD` | 查看指定日期 | `python3 today-history.py --date 2026-04-04` |
-
-参数可组合使用，如 `--all --yesterday` 表示查看所有项目昨天的工作记录。
-
 ## 脚本工作原理
 
 1. 根据参数定位会话目录：
@@ -191,7 +172,7 @@ tt task-batch-done <projectId> --task-ids <ids> --force
 - 时间已从 UTC 自动 +8 转换为本地时间（CST）
 - Skill 加载等超长内容会被自动过滤，只保留有效用户输入
 - 每个会话显示统计：用户消息数、编辑数、命令数
-- `--all` 模式下项目名通过读取 JSONL 文件中的 cwd 字段获取，部分无法获取的会显示为编码名
+- `--all` 模式下项目名通过读取 JSONL 文件中的 cwd 字段获取
 - 脚本支持在任意目录执行，无需从 skill 目录运行
 
 ## Check List

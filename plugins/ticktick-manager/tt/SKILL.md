@@ -137,7 +137,8 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
 | 搜索任务 | `tt task-search <keyword>` |
 | 搜索任务（结构化） | `tt task-search <keyword> --json` ⚡ |
 | 按ID查找任务 | `tt task-find <taskId>` |
-| 创建任务 | `tt task-add <title> -p <projectId> --content <text> --start-date <date> --due-date <date>` |
+| 创建任务（不含时间） | `tt task-add <title> -p <projectId> --content <text>` |
+| 创建任务（两步法，含时间） | 先 `tt task-add`，再 `tt task-update <taskId> -p <projectId> --startDate 'YYYY-MM-DDTHH:mm' --dueDate 'YYYY-MM-DDTHH:mm'` |
 | 批量创建任务 | `echo '[...]' | tt task-batch-add --stdin` |
 | 完成任务 | `tt task-done <projectId> <taskId>` |
 | 批量完成 | `tt task-batch-done <projectId> --task-ids <ids>` |
@@ -208,9 +209,15 @@ tt project-list
 ### 时间解析
 
 自然语言 → CLI 日期参数：
-- "晚上7:30" → `--start-date "2026-04-04T19:30:00+08:00"`
-- "下午3点" → `--start-date "2026-04-04T15:00:00+08:00"`
-- "早上9点到10点" → `--start-date "2026-04-04T09:00:00+08:00" --due-date "2026-04-04T10:00:00+08:00"`
+- "晚上7:30" → `--startDate '2026-04-04T19:30'`
+- "下午3点" → `--startDate '2026-04-04T15:00'`
+- "早上9点到10点" → `--startDate '2026-04-04T09:00' --dueDate '2026-04-04T10:00'`
+
+> ⚠️ **重要**：`task-add` 的 `--startDate`/`--dueDate` 参数有 bug，创建时传入会被忽略。必须分两步：
+> 1. `tt task-add "标题" -p <projectId> --content "内容"`（不含日期）
+> 2. `tt task-update <taskId> -p <projectId> --startDate 'YYYY-MM-DDTHH:mm' --dueDate 'YYYY-MM-DDTHH:mm'`
+>
+> 日期格式用 `'YYYY-MM-DDTHH:mm'`，**不要带时区后缀**（`+08:00` 会被 shell 解析为选项导致报错）。
 
 ## 执行流程
 
@@ -290,13 +297,20 @@ wait
 
 **历史任务**（时间已过）：
 ```bash
-tt task-add "简短标题" -p <projectId> --content "- 要点1\n- 要点2" --start-date <start> --due-date <end>
+# 第一步：创建任务（不含日期）
+tt task-add "简短标题" -p <projectId> --content "要点1\n要点2"
+# 第二步：补上时间
+tt task-update <taskId> -p <projectId> --startDate '<start>' --dueDate '<end>'
+# 第三步：标记完成
 tt task-done <projectId> <taskId>
 ```
 
 **未来任务**（时间未到）：
 ```bash
-tt task-add "简短标题" -p <projectId> --content "- 要点1\n- 要点2" --start-date <start> --due-date <end>
+# 第一步：创建任务（不含日期）
+tt task-add "简短标题" -p <projectId> --content "要点1\n要点2"
+# 第二步：补上时间
+tt task-update <taskId> -p <projectId> --startDate '<start>' --dueDate '<end>'
 ```
 
 **批量创建**（日程复盘等场景）：

@@ -4,14 +4,15 @@
 通过读取本地 JSONL 文件提取指定日期的工作内容，无需大模型分析。
 
 用法:
-  python3 today-history.py                       # 查看今天（当前项目）
-  python3 today-history.py --all                 # 查看今天（所有项目）
-  python3 today-history.py --all --summary       # 全项目汇总（一行一条工作）
-  python3 today-history.py --all --ticktick      # 输出滴答清单 JSON
-  python3 today-history.py --project /path/to/prj # 查看指定项目今天
-  python3 today-history.py --yesterday           # 查看昨天
-  python3 today-history.py --date 2026-04-04     # 查看指定日期
-  python3 today-history.py --all --yesterday     # 所有项目昨天
+  python3 cc-history.py                       # 查看今天（当前项目）
+  python3 cc-history.py --all                 # 查看今天（所有项目）
+  python3 cc-history.py --all --summary       # 全项目汇总（一行一条工作）
+  python3 cc-history.py --all --ticktick      # 输出滴答清单 JSON（自动合并）
+  python3 cc-history.py --all --ticktick --merge-gap 30  # 合并间隔 30 分钟
+  python3 cc-history.py --all --ticktick --no-merge      # 不合并
+  python3 cc-history.py --project /path/to/prj # 查看指定项目今天
+  python3 cc-history.py --yesterday           # 查看昨天
+  python3 cc-history.py --date 2026-04-04     # 查看指定日期
 """
 
 import json
@@ -366,13 +367,87 @@ def print_summary(date_str, project_results, home):
     print()
 
 
-def print_ticktick(date_str, project_results, ticktick_project_id):
-    """滴答清单模式：输出 JSON 数组，可直接用 tt task-batch-add --stdin 创建。"""
+def time_to_minutes(t_str):
+    """HH:MM → 当天分钟数"""
+    h, m = t_str.split(":")
+    return int(h) * 60 + int(m)
+
+
+def merge_nearby_sessions(results, gap_minutes=15):
+    """将同一项目中时间相近/重叠的会话合并为一组。
+
+    合并规则（传递性）：
+    1. 同一项目内
+    2. 相邻会话时间间隔 < gap_minutes（默认 15 分钟）
+    3. 重叠会话必然合并
+
+    返回 [{'fpaths': [...], 'events': [...]}] 列表。
+    """
+    if not results:
+        return []
+
+    # 按 events 首条时间排序
+    sorted_results = sorted(
+        results,
+        key=lambda x: time_to_minutes(x[1][0][0]) if x[1] else 0,
+    )
+
+    groups = []
+    current = {
+        "fpaths": [sorted_results[0][0]],
+        "events": list(sorted_results[0][1]),
+    }
+
+    for fpath, events in sorted_results[1:]:
+        if not events:
+            continue
+        last_end = time_to_minutes(current["events"][-1][0])
+        this_start = time_to_minutes(events[0][0])
+
+        if this_start - last_end < gap_minutes:
+            # 合并到当前组
+            current["fpaths"].append(fpath)
+            current["events"].extend(events)
+            current["events"].sort(key=lambda e: time_to_minutes(e[0]))
+        else:
+            groups.append(current)
+            current = {"fpaths": [fpath], "events": list(events)}
+
+    groups.append(current)
+    return groups
+
+
+def get_merge_gap_arg():
+    """获取 --merge-gap 参数值（分钟），默认 15。"""
+    for i, a in enumerate(sys.argv):
+        if a == "--merge-gap" and i + 1 < len(sys.argv):
+            try:
+                return int(sys.argv[i + 1])
+            except ValueError:
+                pass
+    return 15
+
+
+def print_ticktick(date_str, project_results, ticktick_project_id, merge=True):
+    """滴答清单模式：输出 JSON 数组，可直接用 tt task-batch-add --stdin 创建。
+
+    同一项目中时间相近的会话自动合并为一条任务，避免碎片化。
+    """
     import json as _json
 
+    gap = get_merge_gap_arg() if merge else 0
     tasks = []
+
     for readable_name, results in project_results:
-        for fpath, events in results:
+        if merge:
+            session_groups = merge_nearby_sessions(results, gap_minutes=gap)
+        else:
+            session_groups = [
+                {"fpaths": [fpath], "events": events} for fpath, events in results
+            ]
+
+        for group in session_groups:
+            events = group["events"]
             time_start = events[0][0]
             time_end = events[-1][0]
             summary = summarize_session(events)
@@ -388,6 +463,8 @@ def print_ticktick(date_str, project_results, ticktick_project_id):
                     bash_descs.append(content[:60])
 
             content_parts = []
+            if len(group["fpaths"]) > 1:
+                content_parts.append(f"（{len(group['fpaths'])} 个会话合并）")
             if edit_files:
                 content_parts.append("文件: " + ", ".join(sorted(edit_files)[:8]))
             if bash_descs:
@@ -504,7 +581,8 @@ def main():
             sys.exit(0)
         # 默认大模型清单 ID，可通过 --ticktick-project 覆盖
         ticktick_pid = get_ticktick_project_arg() or "69d12132e4b05178c14facf2"
-        print_ticktick(date_str, project_results, ticktick_pid)
+        merge = not has_flag("--no-merge")
+        print_ticktick(date_str, project_results, ticktick_pid, merge=merge)
 
     elif mode_summary:
         # ── 汇总模式 ──
