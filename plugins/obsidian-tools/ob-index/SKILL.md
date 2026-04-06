@@ -1,0 +1,213 @@
+---
+name: ob-index
+description: "Obsidian 知识库索引构建与维护。当用户想要编译未处理资料、更新索引、整理知识库、发现笔记关联时触发此 skill。"
+---
+
+<role>Obsidian 知识库索引引擎，负责编译原始资料、构建/更新索引、发现知识关联、生成综合文章。</role>
+<purpose>维护 wiki/index.md 作为知识库的导航核心，确保所有内容可被发现和关联。运行反思引擎发现二阶知识。</purpose>
+<trigger>
+
+```text
+触发词：
+- 编译知识库
+- 更新索引
+- 整理知识库
+- ob-index
+- 处理未编译内容
+- 发现关联
+- 反思引擎
+
+示例：
+- "ob-index"
+- "编译知识库"
+- "帮我整理一下知识库索引"
+- "有哪些内容还没处理"
+```
+
+</trigger>
+<gsd:workflow xmlns:gsd="urn:gsd:workflow">
+  <gsd:meta>requires=OBSIDIAN_REPO; focus=compile,index,reflect</gsd:meta>
+  <gsd:goal>处理所有未编译内容，维护索引完整性，发现知识间关联并生成综合文章。</gsd:goal>
+  <gsd:phase>获取 OBSIDIAN_REPO，检查 .kb/manifest.json 中未编译的条目。</gsd:phase>
+  <gsd:phase>对每个未编译条目执行编译流程（同 ob-learn 的第五步）。</gsd:phase>
+  <gsd:phase>编译完成后运行反思引擎：从索引摘要中发现跨领域主题、隐含关系、矛盾和空白。</gsd:phase>
+  <gsd:phase>对证据充分的关联生成 synthesis 综合文章，更新索引。</gsd:phase>
+</gsd:workflow>
+
+# Obsidian 知识库索引 (ob-index)
+
+编译未处理内容，构建/更新知识库索引，发现关联并生成综合文章。
+
+## 配置检查
+
+1. 检查全局 CLAUDE.md 中 `OBSIDIAN_REPO` 配置变量
+2. 如果未定义，使用 AskUserQuestion 询问用户
+
+## 执行流程
+
+### 第一步：检查未编译内容
+
+读取 `$OBSIDIAN_REPO/.kb/manifest.json`，筛选 `status: uncompiled` 的条目。
+
+如果没有未编译内容：
+
+```
+所有资料已编译。是否需要：
+1. 重建完整索引
+2. 运行反思引擎
+3. 退出
+```
+
+使用 AskUserQuestion 让用户选择。
+
+### 第二步：编译未处理资料
+
+对每个 `status: uncompiled` 的条目：
+
+1. 读取 `$OBSIDIAN_REPO/raw/{type}/{slug}.md`
+2. 执行编译流程（与 ob-learn 第五步相同）：
+   - 生成 wiki/sources/{slug}.md
+   - 创建/更新 wiki/concepts/{concept}.md
+   - 更新 wiki/index.md
+   - 追加 wiki/log.md
+3. 更新 manifest.json 中该条目 status 为 `compiled`
+
+**概念去重**（关键步骤）：
+
+编译时如果发现 `wiki/concepts/` 中已有相似概念文章：
+1. 读取现有文章
+2. 用新信息更新，不创建重复文件
+3. 如果新旧信息矛盾，在文章中用 `> [!warning] 矛盾标注` callout 标注
+
+### 第三步：重建索引（可选）
+
+如果用户选择重建完整索引：
+
+1. 扫描 `$OBSIDIAN_REPO/wiki/` 下所有 `.md` 文件（排除 index.md、log.md）
+2. 读取每个文件的 frontmatter 和第一段
+3. 重新生成 `$OBSIDIAN_REPO/wiki/index.md`：
+
+```markdown
+# 知识库索引
+
+> 最后更新：{日期}
+> 文章总数：{数量}
+
+## 概念
+{按字母排序的概念条目，每行一个}
+
+## 实体
+{按字母排序的实体条目}
+
+## 来源
+{按日期倒序排列的来源条目}
+
+## 综合
+{按日期倒序排列的综合条目}
+```
+
+**索引条目格式**（每行一个）：
+```
+- [[{相对路径}]] — {一句话描述，≤ 80 字}
+```
+
+**渐进式索引**：
+
+当文章总数超过 200 篇时，拆分为子索引：
+- `wiki/concepts/index.md` 只含概念条目
+- `wiki/entities/index.md` 只含实体条目
+- `wiki/sources/index.md` 只含来源条目
+- 主 `wiki/index.md` 只保留分类标题和子索引链接
+
+### 第四步：运行反思引擎
+
+编译完成后自动运行两阶段反思：
+
+**阶段 1 — 发现（仅读索引）**
+
+读取 `$OBSIDIAN_REPO/wiki/index.md`，从单行摘要中识别：
+
+| 发现类型 | 检测方法 |
+|----------|----------|
+| 跨领域主题 | 一个概念出现在多个不相关来源中 |
+| 隐含关系 | 两个概念看似相关但无 wikilink |
+| 矛盾 | 不同来源对同一概念持对立立场 |
+| 空白 | 多来源暗示但无专门文章的主题 |
+
+输出 3-5 个候选关联，展示给用户：
+
+```
+发现以下潜在关联：
+1. [[concepts/attention]] 和 [[concepts/rlhf]] — 都涉及"为相关性分配标量分数"
+2. [[concepts/transformer]] 和 [[concepts/rlhf]] — transformer 是 RLHF 的基础架构
+3. 空白：缺少 "scaling laws" 概念文章（3 个来源引用但无独立文章）
+
+是否生成综合文章？（可选择感兴趣的关联）
+```
+
+**阶段 2 — 综合（定向深度阅读）**
+
+对用户确认的候选：
+1. 读取相关文章全文
+2. 如果证据充分，生成 `$OBSIDIAN_REPO/wiki/synthesis/{slug}.md`
+
+```markdown
+---
+tags: [synthesis, {相关标签}]
+type: synthesis
+created_by: ob-index-reflect
+updated_at: {日期}
+---
+
+# {综合标题}
+
+> 这是一篇综合文章，从已有知识中发现的新关联。
+
+## 关联发现
+
+{描述发现的关联或模式}
+
+## 分析
+
+{≤ 500 字的综合分析}
+
+## 证据
+- [[sources/{来源 1}]] — {贡献}
+- [[sources/{来源 2}]] — {贡献}
+
+## 相关概念
+- [[concepts/{概念 1}]]
+- [[concepts/{概念 2}]]
+```
+
+3. 更新 index.md 在"综合"分类下追加条目
+4. 追加 log.md
+
+### 第五步：首次初始化
+
+如果检测到 `$OBSIDIAN_REPO/raw/` 和 `$OBSIDIAN_REPO/wiki/` 不存在，执行首次初始化：
+
+1. 创建完整目录结构（raw/、wiki/ 及子目录、outputs/、.kb/）
+2. 扫描 `$OBSIDIAN_REPO/` 中所有 `.md` 文件（排除 `.obsidian/`、`.kb/`、`raw/`、`wiki/`、`outputs/`）
+3. 分类现有笔记：
+   - **结构化笔记**（有标题、有内容、> 100 字）→ 复制到 `wiki/concepts/` 或 `wiki/sources/`
+   - **碎片笔记**（短文本、速记、< 100 字）→ 复制到 `raw/notes/`
+4. 生成初始 `wiki/index.md`
+5. 创建 `.kb/manifest.json`
+6. 生成初始 `wiki/log.md`
+
+**注意**：不删除或移动原始文件，只读取和复制到新目录。
+
+### 输出
+
+执行完成后展示：
+
+```
+编译完成：
+- 新编译：{数量} 篇
+- 新概念：{数量} 个
+- 新综合文章：{数量} 篇
+- 索引更新：{数量} 条
+
+索引总计：{总文章数} 篇文章
+```
