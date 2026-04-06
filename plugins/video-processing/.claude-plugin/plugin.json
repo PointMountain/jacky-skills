@@ -1,6 +1,6 @@
 {
   "name": "video-processing",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "音视频处理工具集 - 音视频转文字、内容提取、Obsidian 笔记生成",
   "author": {
     "name": "Jacky Wang",

@@ -44,25 +44,27 @@ description: "获取 B 站 UP 主完整视频列表。支持 API（Cookie）和�
   <gsd:goal>获取 UP 主完整视频列表并保存为 JSON 文件。</gsd:goal>
 
   <gsd:phase name="mode-select" order="1">
-    <gsd:step>检查 Cookie 是否可用（环境变量 BILIBILI_SESSDATA 或配置文件 ~/.config/bilibili-cookies.json）。</gsd:step>
-    <gsd:step>有 Cookie → API 模式（快速、精确、无风控风险）。</gsd:step>
-    <gsd:step>无 Cookie → 浏览器模式（需 agent-browser，有风控风险）。</gsd:step>
+    <gsd:step>优先尝试 API 模式：运行 python3 scripts/api-fetch.py。</gsd:step>
+    <gsd:step>如果脚本退出码为 2（NO_COOKIE）或执行失败 → 自动降级到浏览器模式（agent-browser）。</gsd:step>
+    <gsd:step>如果 API 模式成功 → 跳过浏览器模式，直接进入导出阶段。</gsd:step>
     <gsd:checkpoint>采集模式确定</gsd:checkpoint>
   </gsd:phase>
 
   <gsd:phase name="parse" order="2">
     <gsd:step>从输入中提取 UID / URL / 名字，确定排序方式和数量限制。</gsd:step>
     <gsd:step>排序参数：未指定→pubdate，"播放量"/"热门"→click，"收藏"→stow。</gsd:step>
+    <gsd:step>如果输入是名字且降级到浏览器模式 → 先用 references/uid-resolution.md 搜索 UID。</gsd:step>
     <gsd:checkpoint>UID + 参数解析完成</gsd:checkpoint>
   </gsd:phase>
 
   <gsd:phase name="api-collect" order="3" condition="API 模式">
     <gsd:step>运行 python3 scripts/api-fetch.py（见 API 模式执行流程）。</gsd:step>
-    <gsd:checkpoint>数据采集完成</gsd:checkpoint>
+    <gsd:step>检查退出码：0=成功 → 进入导出；2=NO_COOKIE → 降级到浏览器模式；其他=错误。</gsd:step>
+    <gsd:checkpoint>数据采集完成或降级到浏览器模式</gsd:checkpoint>
   </gsd:phase>
 
-  <gsd:phase name="browser-collect" order="3" condition="浏览器模式">
-    <gsd:step>用 --headed 模式打开空间页，等待 8 秒（SPA 渲染）。</gsd:step>
+  <gsd:phase name="browser-collect" order="3" condition="浏览器模式（API 降级）">
+    <gsd:step>用 agent-browser --headed 模式打开空间页，等待 8 秒（SPA 渲染）。</gsd:step>
     <gsd:step>关闭登录弹窗，验证视频卡片数量。</gsd:step>
     <gsd:step>如遇 -352 风控，按 references/anti-detection.md 处理。</gsd:step>
     <gsd:step>切换排序（非默认时点击 `.radio-filter__item` 按钮）。</gsd:step>
@@ -97,7 +99,9 @@ cat ~/.config/bilibili-cookies.json 2>/dev/null
 | 条件 | 模式 | 优势 |
 |------|------|------|
 | Cookie 可用 | **API 模式** | 快速、精确、额外字段（评论/收藏/弹幕数） |
-| Cookie 不可用 | **浏览器模式** | 无需登录，但有风控风险 |
+| Cookie 不可用 | **浏览器模式**（自动降级） | 无需登录，但有风控风险 |
+
+> **降级机制**：优先尝试 API 模式（`api-fetch.py`），如果脚本输出 `NO_COOKIE` 并以退出码 2 退出，自动降级到 agent-browser 浏览器模式。
 
 > **推荐**：配置 Cookie 后使用 API 模式。获取方式见 [api-mode.md](references/api-mode.md)。
 

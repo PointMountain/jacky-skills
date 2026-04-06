@@ -9,10 +9,11 @@ B站 API 方式获取 UP 主视频列表
     python3 api-fetch.py --mid 1039025435 --order click --limit 50
     python3 api-fetch.py --name "摩的司机徐师傅" --order click
 
-配置 Cookie（三选一）：
+配置 Cookie（自动 + 手动，优先级从高到低）：
     1. 命令行参数：--sessdata YOUR_SESSDATA
     2. 环境变量：export BILIBILI_SESSDATA=YOUR_SESSDATA
     3. 配置文件：~/.config/bilibili-cookies.json
+    4. 自动提取：从 Chrome / Edge 浏览器 Cookie 数据库读取（macOS）
 """
 
 import argparse
@@ -20,6 +21,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -69,9 +71,96 @@ def wbi_sign(params: dict, img_key: str, sub_key: str) -> dict:
 DEFAULT_CONFIG_PATH = Path.home() / '.config' / 'bilibili-cookies.json'
 
 
+def _extract_browser_cookie() -> str | None:
+    """从 Chrome/Edge 浏览器 Cookie 数据库提取 SESSDATA（仅 macOS）。"""
+    import shutil
+    import struct
+    import tempfile
+
+    # macOS Chrome/Edge Cookie 路径
+    browser_paths = [
+        ('Chrome', Path.home() / 'Library/Application Support/Google/Chrome/Default/Cookies'),
+        ('Edge', Path.home() / 'Library/Application Support/Microsoft Edge/Default/Cookies'),
+    ]
+
+    for browser_name, cookie_path in browser_paths:
+        if not cookie_path.exists():
+            continue
+
+        try:
+            # 复制到临时文件，避免锁定问题
+            with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+                tmp_path = Path(tmp.name)
+            shutil.copy2(cookie_path, tmp_path)
+
+            # 从 macOS Keychain 获取 Safe Storage 密钥
+            safe_storage_name = f'{browser_name} Safe Storage'
+            result = subprocess.run(
+                ['security', 'find-generic-password', '-w', '-s', safe_storage_name],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode != 0:
+                continue
+
+            password = result.stdout.strip().encode('utf-8')
+            # Chrome v80+ 使用 PBKDF2 派生密钥
+            import hashlib as _hl
+            key = _hl.pbkdf2_hmac('sha1', password, b'saltysalt', 1003, dklen=16)
+
+            # 读取加密的 Cookie
+            import sqlite3
+            conn = sqlite3.connect(str(tmp_path))
+            cursor = conn.execute(
+                "SELECT encrypted_value FROM cookies WHERE host_key LIKE '%.bilibili.com%' AND name = 'SESSDATA' LIMIT 1"
+            )
+            row = cursor.fetchone()
+            conn.close()
+            tmp_path.unlink(missing_ok=True)
+
+            if not row or not row[0]:
+                continue
+
+            encrypted = row[0]
+            # v10 前缀表示 AES-CBC 加密
+            if encrypted[:3] == b'v10':
+                from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+                from cryptography.hazmat.backends import default_backend
+                cipher = Cipher(algorithms.AES(key), modes.CBC(b' ' * 16), backend=default_backend())
+                decryptor = cipher.decryptor()
+                decrypted = decryptor.update(encrypted[3:]) + decryptor.finalize()
+                # 去除 PKCS7 填充
+                pad_len = decrypted[-1]
+                if 1 <= pad_len <= 16 and all(b == pad_len for b in decrypted[-pad_len:]):
+                    decrypted = decrypted[:-pad_len]
+                # 解密后前面可能有 Chrome 内部 metadata 字节
+                # SESSDATA 是 URL 编码格式（含 %2C 等），用正则提取
+                text = decrypted.decode('latin-1')
+                match = re.search(r'[a-f0-9]+%2C\d+%2C', text)
+                if match:
+                    # 找到 SESSDATA 模式的起始位置
+                    start = match.start()
+                    # 从这个位置往前看看有没有更多 hex 字符
+                    while start > 0 and text[start-1] in '0123456789abcdefABCDEF%':
+                        start -= 1
+                    sessdata = text[start:].strip()
+                    if sessdata and len(sessdata) > 20:
+                        print(f"从 {browser_name} 浏览器提取到 SESSDATA（长度 {len(sessdata)}）", file=sys.stderr)
+                        return sessdata
+        except Exception as e:
+            print(f"从 {browser_name} 提取 Cookie 失败：{e}", file=sys.stderr)
+            continue
+
+    return None
+
+
 def get_cookie(sessdata_arg: str | None = None) -> dict:
-    """获取 Cookie 配置，优先级：命令行 > 环境变量 > 配置文件"""
+    """获取 Cookie 配置，优先级：命令行 > 环境变量 > 配置文件 > 浏览器自动提取"""
     cookies = {}
+
+    # 0. 浏览器自动提取（最低优先级，作为兜底）
+    browser_sessdata = _extract_browser_cookie()
+    if browser_sessdata:
+        cookies['SESSDATA'] = browser_sessdata
 
     # 1. 配置文件
     if DEFAULT_CONFIG_PATH.exists():
@@ -167,29 +256,54 @@ class BilibiliAPI:
         return data['data']
 
     def search_user(self, keyword: str) -> list:
-        """搜索 UP 主（通过名字）"""
-        params = {
-            'search_type': 'bili_user',
-            'keyword': keyword,
-        }
-        resp = self.session.get(
-            'https://api.bilibili.com/x/web-interface/search/type',
-            params=params
-        )
-        data = resp.json()
-        if data['code'] != 0:
-            print(f"搜索失败: {data.get('message', '未知错误')}", file=sys.stderr)
-            return []
+        """搜索 UP 主（通过名字），优先使用 WBI 签名搜索"""
+        # 方法 1：WBI 签名搜索（最可靠）
+        try:
+            data = self._signed_get(
+                'https://api.bilibili.com/x/web-interface/search/type',
+                params={'search_type': 'bili_user', 'keyword': keyword}
+            )
+            if data.get('code') == 0 and data.get('data', {}).get('result'):
+                results = []
+                for user in data['data']['result']:
+                    results.append({
+                        'mid': user['mid'],
+                        'name': user.get('uname', user.get('title', '')),
+                        'fans': user.get('fans', 0),
+                        'videos': user.get('videos', 0),
+                    })
+                return results
+            print(f"WBI 搜索返回 code={data.get('code')}，尝试备用", file=sys.stderr)
+        except Exception as e:
+            print(f"WBI 搜索异常: {e}", file=sys.stderr)
 
-        results = []
-        for user in data.get('data', {}).get('result', []):
-            results.append({
-                'mid': user['mid'],
-                'name': user.get('uname', user.get('title', '')),
-                'fans': user.get('fans', 0),
-                'videos': user.get('videos', 0),
-            })
-        return results
+        # 方法 2：直接 HTTP 请求（不经过 session）
+        try:
+            headers = dict(HEADERS)
+            headers['Referer'] = 'https://search.bilibili.com'
+            if self.cookie_header:
+                headers['Cookie'] = self.cookie_header
+            resp = requests.get(
+                'https://api.bilibili.com/x/web-interface/search/type',
+                params={'search_type': 'bili_user', 'keyword': keyword},
+                headers=headers, timeout=10
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get('code') == 0 and data.get('data', {}).get('result'):
+                    results = []
+                    for user in data['data']['result']:
+                        results.append({
+                            'mid': user['mid'],
+                            'name': user.get('uname', user.get('title', '')),
+                            'fans': user.get('fans', 0),
+                            'videos': user.get('videos', 0),
+                        })
+                    return results
+        except Exception as e:
+            print(f"直接搜索也失败: {e}", file=sys.stderr)
+
+        return []
 
     def get_video_list(self, mid: int, order: str = 'pubdate',
                        page: int = 1, page_size: int = 50) -> dict:
@@ -450,13 +564,12 @@ def main():
     # 获取 Cookie
     cookies = get_cookie(args.sessdata)
     if not cookies.get('SESSDATA'):
-        print("错误：未提供 SESSDATA Cookie。请通过以下方式之一配置：", file=sys.stderr)
+        print("NO_COOKIE: 未找到 SESSDATA Cookie，AI 应降级到浏览器模式", file=sys.stderr)
+        print("  配置方式：", file=sys.stderr)
         print("  1. 命令行参数：--sessdata YOUR_SESSDATA", file=sys.stderr)
         print("  2. 环境变量：export BILIBILI_SESSDATA=YOUR_SESSDATA", file=sys.stderr)
         print(f"  3. 配置文件：{DEFAULT_CONFIG_PATH}", file=sys.stderr)
-        print("", file=sys.stderr)
-        print("获取方式：浏览器登录 B 站 → F12 → Application → Cookies → SESSDATA", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(2)
 
     # 初始化 API 客户端
     api = BilibiliAPI(cookies)
@@ -482,7 +595,12 @@ def main():
             return
 
     # --- API 获取 ---
-    user_info = api.get_user_info(uid)
+    try:
+        user_info = api.get_user_info(uid)
+    except SystemExit:
+        # 风控校验失败时，用搜索结果中的名字代替
+        user_info = {'name': args.name or args.mid, 'mid': uid}
+        print(f"跳过用户验证，使用名字：{user_info['name']}", file=sys.stderr)
     uploader_name = user_info.get('name', 'unknown')
     print(f"\nUP 主：{uploader_name} (UID: {uid})", file=sys.stderr)
 

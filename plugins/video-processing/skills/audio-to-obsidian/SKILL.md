@@ -1,6 +1,6 @@
 ---
 name: audio-to-obsidian
-description: "渐进式音视频处理编排器：URL/本地视频/本地音频/URL文件 → 提取字幕 → 同步到 Obsidian。支持断点续传、Sub Agent 并行。触发词：视频转笔记、提取字幕到obsidian、audio-to-obsidian。"
+description: "渐进式音视频处理编排器：URL/本地视频/本地音频/URL文件 → 提取字幕 → 同步到 Obsidian。支持断点续传、Sub Agent 并行、UP主订阅管理。触发词：视频转笔记、提取字幕到obsidian、订阅UP主、同步视频、audio-to-obsidian。"
 ---
 
 <role>
@@ -70,7 +70,7 @@ description: "渐进式音视频处理编排器：URL/本地视频/本地音频/
     </constraints>
   </gsd:meta>
 
-  <gsd:goal>输入 → 一次性确认参数 → 自动协调三个原子 skill → Obsidian 原文 + 归纳笔记。</gsd:goal>
+  <gsd:goal>输入 → 一次性确认参数 → 自动协调三个原子 skill → Obsidian raw 原始字幕 + wiki 归纳笔记（llm-wiki 模式）。</gsd:goal>
 
   <!-- ==================== Phase 1: 环境检查 ==================== -->
   <gsd:phase name="precheck" order="1">
@@ -385,8 +385,8 @@ wait
 ✅ 成功: 8 (耗时: 12m30s)    ❌ 失败: 1    ⏭ 跳过: 1
 
 生成文件:
-  • $OBSIDIAN_REPO/00-Inbox/Audio/作者/标题-原文.md
-  • $OBSIDIAN_REPO/00-Inbox/Audio/作者/标题-归纳.md
+  • $OBSIDIAN_REPO/raw/作者/标题.md
+  • $OBSIDIAN_REPO/wiki/标题-归纳.md
 
 失败项:
   • https://... → 转录失败: API timeout
@@ -472,3 +472,98 @@ python3 scripts/pipeline.py --resume --engine local --obsidian-repo "$OBSIDIAN_R
 | 下载自己上传的内容 | 批量商业盈利 |
 | CC 授权 / 无版权内容 | 绕过付费墙并分享 |
 | 语言学习字幕提取 | 侵犯知识产权 |
+
+---
+
+## 订阅管理（Subscription Layer）
+
+> 持久化追踪 UP 主视频列表，增量发现新视频，一键处理。
+
+### 触发词
+
+```text
+- 订阅这个UP主 / subscribe
+- 同步视频 / sync
+- 处理新视频 / process
+- 查看订阅状态
+- 清理临时文件
+```
+
+### 架构
+
+```
+subscription.py (Layer 2.5)
+    │
+    ├── bilibili-video-list/api-fetch.py → 获取视频列表
+    ├── diff subscription.json        → 发现新视频
+    ├── audio-to-obsidian/pipeline.py → 处理新视频
+    └── pipeline meta.json             → 同步处理状态
+```
+
+### 数据模型
+
+**路径**: `~/Downloads/video-pipeline/subscriptions/bilibili/{uid}.json`
+
+每个 UP 主一个 JSON 文件，以 bvid 为 key 追踪每个视频状态：
+
+| 状态 | 含义 |
+|------|------|
+| `new` | 刚发现，未处理 |
+| `pending` | 已加入处理队列 |
+| `processing` | 处理中 |
+| `completed` | 处理完成 |
+| `failed` | 处理失败（可重试） |
+| `skipped` | 手动跳过 |
+
+### CLI 命令
+
+```bash
+SCRIPT="plugins/video-processing/skills/audio-to-obsidian/scripts/subscription.py"
+
+# 订阅
+python3 "$SCRIPT" subscribe --name "姜汁汽水"
+
+# 同步（发现新视频）
+python3 "$SCRIPT" sync --uid <UID>
+python3 "$SCRIPT" sync --all
+
+# 状态
+python3 "$SCRIPT" status --uid <UID>
+
+# 导出未处理 URL
+python3 "$SCRIPT" export --uid <UID> --output /tmp/new.txt
+
+# 处理新视频
+python3 "$SCRIPT" process --uid <UID> --obsidian-repo "$OBSIDIAN_REPO"
+
+# 跳过
+python3 "$SCRIPT" skip --uid <UID> --bvids BV1xx,BV1yy
+
+# 刷新 pipeline 状态
+python3 "$SCRIPT" refresh --uid <UID>
+
+# 清理临时文件
+python3 "$SCRIPT" cleanup --uid <UID>
+
+# 取消订阅
+python3 "$SCRIPT" unsubscribe --uid <UID>
+```
+
+### 典型工作流
+
+```
+用户: 订阅姜汁汽水
+  → subscribe --name "姜汁汽水"
+  → sync --uid <UID>
+
+用户: 处理新视频
+  → process --uid <UID> --obsidian-repo ... --max-items 10
+
+用户: 清理临时文件
+  → cleanup --uid <UID>
+```
+
+### 临时文件清理
+
+`cleanup` 命令会删除已完成任务的 `audio.wav`、`audio.md`、`subtitle.srt` 等，
+保留 `meta.json`，释放磁盘空间。

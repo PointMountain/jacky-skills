@@ -4,7 +4,7 @@ description: "Obsidian 知识库采集与编译。当用户想要采集网页/PD
 ---
 
 <role>Obsidian 知识库采集助手，负责从多种来源提取内容，预览确认后编译为结构化 wiki 笔记。</role>
-<purpose>将任何来源（URL/PDF/视频/文本）采集到知识库 raw/ 层，编译为 ≤ 500 字的 wiki 文章，建立概念索引和双链。</purpose>
+<purpose>将任何来源（URL/PDF/视频/文本）采集到知识库 raw/ 层，编译为 wiki 文章（建议 ≤ 500 字，超出部分用 [[reference]] 链接补充），建立概念索引和双链。</purpose>
 <trigger>
 
 ```text
@@ -29,7 +29,7 @@ description: "Obsidian 知识库采集与编译。当用户想要采集网页/PD
   <gsd:meta>requires=OBSIDIAN_REPO; focus=ingest,compile</gsd:meta>
   <gsd:goal>将用户提供的来源采集到 raw/ 并编译到 wiki/，生成结构化笔记、概念文章和索引条目。</gsd:goal>
   <gsd:phase>获取 OBSIDIAN_REPO 路径，识别输入类型（URL/PDF/视频/文本）。</gsd:phase>
-  <gsd:phase>提取内容：URL 用 WebFetch 抓取正文，PDF 用 Read 读取，视频调用视频转文本能力，文本直接使用。</gsd:phase>
+  <gsd:phase>提取内容：URL 用 WebFetch 抓取正文，PDF 用 Read 读取，视频直接调用 audio-to-obsidian，文本直接使用。</gsd:phase>
   <gsd:phase>展示提取的关键点和摘要给用户预览，等待确认。</gsd:phase>
   <gsd:phase>确认后写入 raw/（带 frontmatter），编译到 wiki/：生成 source 摘要、创建/更新 concept 文章、更新 index.md 和 log.md。</gsd:phase>
 </gsd:workflow>
@@ -102,7 +102,7 @@ $OBSIDIAN_REPO/.kb/
 |----------|------|----------|
 | 以 `http://` 或 `https://` 开头 | URL | WebFetch 抓取正文 |
 | 以 `.pdf` 结尾的本地路径 | PDF | Read 工具读取 |
-| 以视频平台域名开头（youtube/bilibili 等） | 视频 | 调用视频转文本能力 |
+| 以视频平台域名开头（youtube/bilibili 等） | 视频 | 直接调用 `audio-to-obsidian` |
 | 纯文本内容 | 笔记 | 直接使用 |
 
 ### 第二步：提取内容
@@ -121,8 +121,9 @@ $OBSIDIAN_REPO/.kb/
 
 **视频**：
 ```
-如果已有视频转文本 skill（如 video-to-text），调用它提取文字稿
-否则提示用户先提供视频的文字稿或摘要
+直接调用 `audio-to-obsidian` skill 处理（路径：`/Users/jiashengwang/jacky-github/jacky-skills/plugins/video-processing/skills/audio-to-obsidian`）
+不要使用 `video-to-text`（已废弃）
+如果 `audio-to-obsidian` 不可用，再提示用户提供视频文字稿或摘要
 ```
 
 **笔记**：
@@ -203,7 +204,7 @@ updated_at: {日期}
 
 ## 详细内容
 
-{≤ 500 字的结构化摘要}
+{结构化摘要，建议 ≤ 500 字，超出部分拆分到关联文章并通过 [[reference]] 链接}
 
 ## 关联概念
 - [[concepts/{概念 1}]] — 关联原因
