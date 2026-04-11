@@ -185,7 +185,7 @@ def get_cookie(sessdata_arg: str | None = None) -> dict:
 def build_cookie_header(cookies: dict) -> str:
     """构建 Cookie 请求头"""
     parts = []
-    for key in ['SESSDATA', 'bili_jct', 'DedeUserID']:
+    for key in ['SESSDATA', 'bili_jct', 'DedeUserID', 'buvid3', 'buvid4']:
         if cookies.get(key):
             parts.append(f'{key}={cookies[key]}')
     return '; '.join(parts)
@@ -197,9 +197,18 @@ HEADERS = {
     'User-Agent': (
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
         'AppleWebKit/537.36 (KHTML, like Gecko) '
-        'Chrome/120.0.0.0 Safari/537.36'
+        'Chrome/131.0.0.0 Safari/537.36'
     ),
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
     'Referer': 'https://www.bilibili.com',
+    'Origin': 'https://www.bilibili.com',
+    'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+    'Sec-Ch-Ua-Mobile': '?0',
+    'Sec-Ch-Ua-Platform': '"macOS"',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'same-site',
 }
 
 
@@ -242,6 +251,17 @@ class BilibiliAPI:
         img_key, sub_key = self._get_wbi_keys()
         signed_params = wbi_sign(params, img_key, sub_key)
         resp = self.session.get(url, params=signed_params)
+
+        # 412 风控拦截：等待后重试一次
+        if resp.status_code == 412:
+            print("遇到 412 风控，等待 3 秒后重试...", file=sys.stderr)
+            time.sleep(3)
+            resp = self.session.get(url, params=signed_params)
+
+        if resp.status_code != 200:
+            print(f"请求失败: HTTP {resp.status_code}", file=sys.stderr)
+            return {'code': -resp.status_code, 'message': f'HTTP {resp.status_code}'}
+
         return resp.json()
 
     def get_user_info(self, mid: int) -> dict:
@@ -564,11 +584,14 @@ def main():
     # 获取 Cookie
     cookies = get_cookie(args.sessdata)
     if not cookies.get('SESSDATA'):
-        print("NO_COOKIE: 未找到 SESSDATA Cookie，AI 应降级到浏览器模式", file=sys.stderr)
-        print("  配置方式：", file=sys.stderr)
-        print("  1. 命令行参数：--sessdata YOUR_SESSDATA", file=sys.stderr)
-        print("  2. 环境变量：export BILIBILI_SESSDATA=YOUR_SESSDATA", file=sys.stderr)
-        print(f"  3. 配置文件：{DEFAULT_CONFIG_PATH}", file=sys.stderr)
+        print("NO_COOKIE: 未找到 SESSDATA Cookie", file=sys.stderr)
+        print("  AI 应按以下顺序降级：", file=sys.stderr)
+        print("  1. CDP 模式（Chrome DevTools MCP，复用用户浏览器）", file=sys.stderr)
+        print("  2. agent-browser 模式（最后兜底，有风控风险）", file=sys.stderr)
+        print("  手动配置 Cookie 方式：", file=sys.stderr)
+        print("    --sessdata YOUR_SESSDATA", file=sys.stderr)
+        print("    export BILIBILI_SESSDATA=YOUR_SESSDATA", file=sys.stderr)
+        print(f"    配置文件：{DEFAULT_CONFIG_PATH}", file=sys.stderr)
         sys.exit(2)
 
     # 初始化 API 客户端

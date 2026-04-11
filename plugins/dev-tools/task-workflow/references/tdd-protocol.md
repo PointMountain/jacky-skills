@@ -152,6 +152,22 @@ FOR each task in PLAN:
      - Task 完成
      - 更新 workflow.json 中对应的 harnessTests 状态
      - 进入下一个 task
+
+  7. **强制 Checkpoint**（每个 task 完成后必须执行）
+     a. 更新 execute/progress.md — 标记当前 task 为 [x] + 时间戳
+     b. 更新 workflow.json 的 executeProgress：
+        - currentTaskId 指向下一个 task
+        - completedTasks 计数 +1
+        - taskStatus[当前 task] = "completed"
+     c. 更新 .harness/current.json 的 executeCheckpoint：
+        - completedTaskIds 追加当前 task
+        - currentTaskId 指向下一个 task
+        - lastUpdatedAt 更新时间戳
+     d. 如有偏差，写入 execute/deviations.md
+```
+
+> **为什么每个 task 都要 checkpoint？** context 可能在任意时刻被截断。
+> 哪怕只完成了 1 个 task，状态也已持久化，恢复时不会重复执行。
 ```
 
 ---

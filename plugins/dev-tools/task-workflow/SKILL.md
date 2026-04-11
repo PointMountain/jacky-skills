@@ -14,6 +14,7 @@ description: "任务工作流编排工具。整合 task-memory、superpowers、t
 | `/task-workflow <描述>` | 标准模式 |
 | `/task-workflow quick <描述>` | 跳过 BRAINSTORM |
 | `/task-workflow yolo <描述>` | 全自动，无门控确认，失败中止（**HARNESS 阶段不可跳过**） |
+| `/task-workflow ralph <描述>` | EXECUTE 阶段使用 ralph-loop 循环执行，解决 context 溢出 |
 | `/task-workflow status` | 查看当前状态 |
 | `/task-workflow end` | 结束工作流，生成复盘 |
 
@@ -23,9 +24,10 @@ description: "任务工作流编排工具。整合 task-memory、superpowers、t
 |--------|------|----------|----------|
 | 简单 | 影响文件 ≤ 3，无跨模块依赖 | quick | 自动通过 BRAINSTORM，HARNESS 必须执行 |
 | 中等 | 影响文件 4-8，有模块间依赖 | standard | HARNESS + PLAN 需确认 |
-| 复杂 | 影响文件 > 8，跨系统/架构级变更 | standard | BRAINSTORM + HARNESS + PLAN 需确认 |
+| 复杂 | 影响文件 > 8，跨系统/架构级变更 | **ralph** | BRAINSTORM + HARNESS + PLAN 需确认 |
 
 > 用户可覆盖推荐模式。yolo 模式仅跳过门控确认，**不跳过任何阶段本身的执行**。
+> **复杂任务推荐 ralph 模式**：EXECUTE 阶段使用 ralph-loop 循环，每轮处理一个 task，避免 context 溢出。
 
 ## 工作流阶段
 
@@ -96,16 +98,35 @@ INIT → BRAINSTORM → HARNESS → PLAN → EXECUTE → REVIEW
 
 **门控**：所有复杂度都需要用户确认执行计划。yolo 模式自动确认。
 
-### EXECUTE（含 TDD 红绿循环验证）
+### EXECUTE（含 TDD 红绿循环验证 + 任务粒度 Checkpoint）
 
 逐个执行 PLAN.md 中的任务，严格按 **TDD 红→绿** 顺序：
 
 1. **Red**：基于 PLAN 中 `harness_ref` 关联的 BDD 测试用例，写失败测试，运行确认失败
 2. **Green**：写最小实现代码，测试通过
-3. **记录执行偏差**：每个偏差记录到 `.harness/tasks/{slug}/execute/deviations.md`
+3. **强制 Checkpoint**：每个 task 完成后（Green 通过后）**必须**立即执行：
+   - 更新 `execute/progress.md` — 标记 task 为 `[x]` + 时间戳
+   - 更新 `workflow.json` 的 `executeProgress` — currentTaskId 指向下一个
+   - 更新 `.harness/current.json` 的 `executeCheckpoint` — completedTaskIds 追加
+   - 如有偏差，写入 `execute/deviations.md`
 4. **红绿循环检查点**：每完成一个任务，运行对应的 BDD 测试确认通过
 
+> **为什么每个 task 都要 checkpoint？** context 可能在任意时刻被截断。哪怕只完成了 1 个 task，状态也已持久化，恢复时不会重复执行。
+
 验证失败时循环修复（最多 5 次），超过上限暂停询问用户。
+
+**Context 溢出检测**：如果 EXECUTE 阶段 task 数 > 5，主动提示用户切换到 ralph 模式。
+
+**Ralph 模式执行**（`/task-workflow ralph` 或 EXECUTE 阶段回复 `ralph`）：
+
+EXECUTE 阶段使用 `/ralph-loop` 启动循环，每轮只处理一个 task：
+- 每轮读取 `progress.md` 找到下一个未完成 task
+- 执行 TDD 红绿循环
+- 完成后强制 checkpoint
+- 输出 `<promise>TASK_DONE</promise>` 触发下一轮
+- 所有 task 完成时输出 `<promise>ALL_TASKS_COMPLETE</promise>` 退出循环
+
+> 详细 ralph 执行模式见 `references/ralph-execute.md`
 
 **偏差记录格式**：
 
@@ -175,15 +196,25 @@ INIT → BRAINSTORM → HARNESS → PLAN → EXECUTE → REVIEW
 
 ## 恢复机制
 
-检测到 `.harness/current.json` 且 status ≠ completed 时，展示断点摘要并询问恢复策略（continue / restart-stage / abort）。
+检测到 `.harness/current.json` 且 status ≠ completed 时，展示断点摘要并询问恢复策略。
+
+### EXECUTE 阶段恢复
+
+1. 读取 `execute/progress.md` → 确认哪些 task 已完成
+2. 读取 `current.json` 的 `executeCheckpoint` → 获取 currentTaskId
+3. 从下一个未完成的 task 继续，跳过已完成的
+
+恢复策略选项：`continue` / `ralph`（切换到 ralph 模式） / `restart-stage` / `abort`
+
+> 详细恢复流程见 `references/stage-transitions.md`
 
 ## 存储结构
 
 ```
 .harness/
-├── current.json                    # 当前活跃任务指针
+├── current.json                    # 当前活跃任务指针（含 executeCheckpoint）
 └── tasks/{slug}/
-    ├── workflow.json               # 工作流状态（含 stageTimeline）
+    ├── workflow.json               # 工作流状态（含 stageTimeline + executeProgress）
     ├── brainstorm/                 # BRAINSTORM 阶段产物（quick 模式跳过）
     │   ├── mindmap.md
     │   ├── options.md
@@ -193,6 +224,7 @@ INIT → BRAINSTORM → HARNESS → PLAN → EXECUTE → REVIEW
     ├── plan/
     │   └── PLAN.md                 # 执行计划（含 harness_ref）
     ├── execute/
+    │   ├── progress.md             # 逐任务进度追踪（每个 task 完成后更新）
     │   └── deviations.md           # 执行偏差记录
     └── review/
         └── review.md               # 复盘报告
@@ -256,6 +288,7 @@ tests/                              # 测试文件放在项目 tests/ 目录下
 | 文件 | 内容 |
 |------|------|
 | `references/tdd-protocol.md` | TDD 哲学、Verify Loop 流程图、失败分析模板 |
-| `references/stage-transitions.md` | 阶段跳转规则、门控协议 |
+| `references/stage-transitions.md` | 阶段跳转规则、门控协议、恢复机制 |
 | `references/storage-structure.md` | 目录结构、task-slug 规则、模板 |
+| `references/ralph-execute.md` | Ralph 执行模式详细文档 |
 | `references/examples.md` | 完整示例 |

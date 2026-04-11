@@ -92,6 +92,15 @@ tests/bdd/
 - [ ] 生成 `current.json`
 - [ ] 评估复杂度
 
+---
+
+### BRAINSTORM 阶段
+
+**检查清单**：
+- [ ] 调用 superpowers:brainstorming（含需求澄清交互）
+- [ ] 生成 options.md（方案对比）
+- [ ] 生成 decision.md（最终决策）
+
 **workflow.json 模板**：
 
 ```json
@@ -257,6 +266,7 @@ FOR each task in PLAN:
 ├── plan/
 │   └── PLAN.md                 # 执行计划
 ├── execute/
+│   ├── progress.md             # 逐任务进度追踪
 │   └── deviations.md           # 偏差记录
 └── review/
     └── review.md               # 复盘报告
@@ -348,4 +358,103 @@ describe('T-GH1 仓库列表渲染', () => {
     // ... 空状态验证
   })
 })
+```
+
+---
+
+## 断点恢复示例
+
+```
+用户: /task-workflow status
+
+AI: ## 工作流恢复：GitHub 热榜页面
+
+**当前阶段**: EXECUTE (T4/8)
+**已耗时**: 45 分钟
+
+### 执行进度
+- [x] T1: 项目初始化 ✓
+- [x] T2: 数据层 ✓
+- [x] T3: 搜索功能 ✓
+- [ ] T4: 标签筛选 ← 从这里继续
+- [ ] T5: 排序功能
+- [ ] T6: 详情弹窗
+- [ ] T7: 主题切换
+- [ ] T8: 错误处理
+
+### 偏差记录
+- 无
+
+恢复策略？continue / ralph / restart-stage / abort
+
+用户: ralph
+
+AI: 启动 ralph 模式，从 T4 开始逐任务执行...
+（调用 /ralph-loop 执行）
+```
+
+---
+
+## Ralph 模式完整示例
+
+```
+用户: /task-workflow ralph 开发 GitHub 热榜页面
+
+AI: 启动任务工作流（ralph 模式）
+
+## INIT
+- 任务 ID: wf-2026-04-11-001
+- 复杂度评估: complex（影响 14+ 文件）
+- 推荐模式: ralph ✓
+
+## BRAINSTORM → HARNESS → PLAN
+（正常执行，与 standard 模式相同）
+
+## EXECUTE（Ralph Loop 模式）
+
+任务数 > 5，自动进入 ralph 模式。
+初始化 progress.md:
+- [ ] T1: 项目初始化
+- [ ] T2: 数据层
+- [ ] T3: 搜索功能
+- [ ] T4: 标签筛选
+- [ ] T5: 排序功能
+- [ ] T6: 详情弹窗
+- [ ] T7: 主题切换
+- [ ] T8: 错误处理
+
+启动 /ralph-loop ...
+
+--- 第 1 轮（全新 context）---
+读取 progress.md → 下一个未完成: T1
+执行 T1: 项目初始化
+  Red → Green → 通过
+Checkpoint:
+  progress.md: - [x] T1: 项目初始化 (completed 2026-04-11T10:05:00Z)
+  current.json: executeCheckpoint.completedTaskIds: ["T1"]
+输出: <promise>TASK_DONE</promise>
+
+--- 第 2 轮（全新 context）---
+读取 progress.md → 下一个未完成: T2
+执行 T2: 数据层 (harness_ref: T-GH1)
+  Red(T-GH1 失败) → Green(实现 types.ts + useRepos.ts) → 通过
+Checkpoint:
+  progress.md: - [x] T2: 数据层 (completed 2026-04-11T10:12:00Z)
+输出: <promise>TASK_DONE</promise>
+
+--- 第 3 轮 ---
+... T3 搜索功能 ...
+
+--- 第 8 轮 ---
+执行 T8: 错误处理 (harness_ref: T-GH7)
+  Red → Green → 通过
+Checkpoint:
+  progress.md: 全部 [x]
+输出: <promise>ALL_TASKS_COMPLETE</promise>
+
+Ralph 循环结束 → 进入 REVIEW
+
+## REVIEW
+生成复盘报告: review.md
+- MUST 条件覆盖率: 7/7 PASS
 ```

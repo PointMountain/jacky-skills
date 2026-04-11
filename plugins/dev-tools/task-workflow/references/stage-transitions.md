@@ -203,7 +203,72 @@ INIT -> BRAINSTORM -> HARNESS -> PLAN -> EXECUTE -> REVIEW
 
 ---
 
-## 阶段回退时保留的产物
+## 恢复机制
+
+当检测到 `.harness/current.json` 且 `status ≠ completed` 时，按以下流程恢复：
+
+### 恢复流程
+
+```
+1. 读取 current.json → 获取 activeTaskSlug + currentStage
+2. IF currentStage === "EXECUTE":
+     a. 读取 execute/progress.md → 获取已完成 task 列表
+     b. 读取 workflow.json 的 executeProgress → 获取 currentTaskId
+     c. 读取 PLAN.md → 获取当前 task 的详细信息
+     d. 展示断点摘要：
+        - 已完成：T1(项目初始化) T2(数据层) T3(搜索功能)
+        - 当前：T4(标签筛选)
+        - 剩余：T5 T6 T7 T8
+     e. 询问用户恢复策略：
+        - continue: 从 T4 继续
+        - ralph: 切换到 ralph-loop 模式从 T4 继续
+        - restart-stage: 重新执行整个 EXECUTE 阶段
+        - abort: 终止工作流
+3. ELSE:
+     正常阶段恢复（展示断点摘要 + 询问策略）
+```
+
+### 断点摘要格式
+
+```
+## 工作流恢复：{任务名称}
+
+**当前阶段**: EXECUTE (T4/8)
+**已耗时**: {{从 createdAt 到现在}}
+
+### 执行进度
+- [x] T1: 项目初始化 ✓
+- [x] T2: 数据层 ✓
+- [x] T3: 搜索功能 ✓
+- [ ] T4: 标签筛选 ← 从这里继续
+- [ ] T5: 排序功能
+- [ ] T6: 详情弹窗
+- [ ] T7: 主题切换
+- [ ] T8: 错误处理
+
+### 偏差记录
+- DEV-001: {{偏差描述}} (已处理)
+
+恢复策略：continue / ralph / restart-stage / abort
+```
+
+### Context 接近极限时的处理
+
+在 EXECUTE 阶段开头，如果检测到：
+- 任务数 > 5
+- 或用户之前已恢复过一次
+
+则主动提示：
+
+```
+⚠️ EXECUTE 阶段任务较多（{N} 个），context 可能在执行中途耗尽。
+
+建议：
+1. 回复 "ralph" → 启用 ralph-loop 循环模式（每轮处理一个 task，自动续跑）
+2. 继续当前会话 → 每个 task 完成后会自动 checkpoint，context 耗尽时可恢复
+```
+
+---
 
 | 回退到 | 保留产物 | 需重做产物 |
 |--------|----------|------------|

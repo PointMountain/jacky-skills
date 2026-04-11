@@ -6,10 +6,10 @@
 
 ```
 .harness/
-├── current.json                         # 活跃任务指针（仅一个）
+├── current.json                         # 活跃任务指针（含 executeCheckpoint）
 └── tasks/
     └── {task-slug}/                     # 每个任务独立目录
-        ├── workflow.json                # 工作流状态（含 stageTimeline）
+        ├── workflow.json                # 工作流状态（含 stageTimeline + executeProgress）
         ├── brainstorm/                  # BRAINSTORM 阶段产物（quick 模式跳过）
         │   ├── mindmap.md               # 设计脑图
         │   ├── options.md               # 方案对比
@@ -19,6 +19,7 @@
         ├── plan/                        # PLAN 阶段产物
         │   └── PLAN.md                  # 任务列表（含 harness_ref）
         ├── execute/                     # EXECUTE 阶段产物
+        │   ├── progress.md              # 逐任务进度追踪（每个 task 完成后更新）
         │   └── deviations.md            # 执行偏差记录
         └── review/                      # REVIEW 阶段产物
             └── review.md                # 复盘报告
@@ -64,6 +65,12 @@ tests/                                   # 测试文件放在项目 tests/ 目�
       "caseFile": "tests/bdd/cases/hot/T-GH1.js"
     }
   ],
+  "executeProgress": {
+    "totalTasks": 0,
+    "completedTasks": 0,
+    "currentTaskId": null,
+    "taskStatus": {}
+  },
   "dependencies": ["task-memory", "task-harness"]
 }
 ```
@@ -74,9 +81,31 @@ tests/                                   # 测试文件放在项目 tests/ 目�
 {
   "activeTaskSlug": "<task-slug>",
   "currentStage": "INIT",
+  "executeCheckpoint": {
+    "currentTaskId": null,
+    "completedTaskIds": [],
+    "lastUpdatedAt": null
+  },
   "updatedAt": "2026-03-22T10:00:00Z"
 }
 ```
+
+> `executeCheckpoint` 在 EXECUTE 阶段每个 task 完成后更新，用于断点恢复。
+
+### progress.md 模板
+
+EXECUTE 阶段自动生成，每完成一个 task 追加更新：
+
+```markdown
+# Execute Progress
+
+- [x] T1: 项目初始化 (completed 2026-04-11T10:00:00Z)
+- [x] T2: 数据层 (completed 2026-04-11T10:10:00Z)
+- [ ] T3: 搜索功能 (in_progress)
+- [ ] T4: 标签筛选
+```
+
+> **恢复时**：读取 progress.md 确认哪些 task 已完成，从下一个未完成的 task 继续。
 
 ---
 
