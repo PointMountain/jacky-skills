@@ -2,29 +2,30 @@
 # hooks/common/config.sh
 # 配置读取工具函数
 
-# 确保配置目录存在
-mkdir -p "$HOME/.claude-monitor" 2>/dev/null
-
-CONFIG_FILE="$HOME/.claude-monitor/config.json"
+# 监控配置文件路径（由 Tauri app 管理）
+MONITOR_CONFIG_DIR="$HOME/.config/j-skills"
+MONITOR_CONFIG_FILE="$MONITOR_CONFIG_DIR/monitor-config.json"
 
 # 引入二进制管理
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/ensure-binary.sh"
 
-# 读取配置值 (支持嵌套路径，如 "floatingWindow.scenarios.thinking.enabled")
-get_config() {
+# 读取监控配置值
+get_monitor_config() {
   local path="$1"
   local default="$2"
 
-  if [[ ! -f "$CONFIG_FILE" ]]; then
+  if [[ ! -f "$MONITOR_CONFIG_FILE" ]]; then
     echo "$default"
     return
   fi
 
-  # 将路径转换为 jq 格式
-  local jq_path=$(echo "$path" | sed 's/\./\./g')
+  if ! command -v jq &> /dev/null; then
+    echo "$default"
+    return
+  fi
 
-  local value=$(jq -r "$jq_path // \"$default\"" "$CONFIG_FILE" 2>/dev/null)
+  local value=$(jq -r "$path // \"$default\"" "$MONITOR_CONFIG_FILE" 2>/dev/null)
 
   if [[ -z "$value" ]] || [[ "$value" == "null" ]]; then
     echo "$default"
@@ -33,51 +34,16 @@ get_config() {
   fi
 }
 
-# 检查悬浮窗是否启用
+# 检查悬浮弹窗是否启用（默认关闭）
 is_floating_window_enabled() {
-  local enabled=$(get_config ".floatingWindow.enabled" "true")
+  local enabled=$(get_monitor_config ".floatingWindow.enabled" "false")
   [[ "$enabled" == "true" ]]
 }
 
-# 检查特定场景是否启用
-is_scenario_enabled() {
-  local scenario="$1"
-  local global_enabled=$(get_config ".floatingWindow.enabled" "true")
-  local scenario_enabled=$(get_config ".floatingWindow.scenarios.$scenario.enabled" "true")
+# 守护进程地址
+DAEMON_URL="http://127.0.0.1:17530"
 
-  [[ "$global_enabled" == "true" ]] && [[ "$scenario_enabled" == "true" ]]
-}
-
-# 获取场景持续时间
-get_scenario_duration() {
-  local scenario="$1"
-  local default="$2"
-  get_config ".floatingWindow.scenarios.$scenario.duration" "$default"
-}
-
-# 检查工具是否在过滤列表中
-is_tool_in_filter() {
-  local tool="$1"
-
-  # 获取工具过滤列表
-  local tools=$(get_config ".floatingWindow.scenarios.executing.tools" "")
-
-  # 如果为空，表示所有工具都显示
-  if [[ -z "$tools" ]] || [[ "$tools" == "[]" ]]; then
-    return 0
-  fi
-
-  # 检查工具是否在列表中
-  echo "$tools" | jq -e "index(\"$tool\")" >/dev/null 2>&1
-}
-
-# 检查依赖是否就绪（jq 等）
-# 返回值: 0=依赖就绪, 1=缺少关键依赖
-ensure_dependencies() {
-  if ! command -v jq &> /dev/null; then
-    echo "[claude-monitor] jq 未安装，部分功能可能受限。建议安装: brew install jq" >&2
-    # jq 缺失不阻塞，降级处理
-    return 0
-  fi
-  return 0
+# 获取悬浮窗二进制路径（仅在悬浮窗启用时调用）
+get_float_binary() {
+  get_binary_path
 }

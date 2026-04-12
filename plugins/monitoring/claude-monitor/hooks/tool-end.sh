@@ -1,19 +1,15 @@
 #!/bin/bash
 # hooks/tool-end.sh
-# 工具调用结束时调用 (PostToolUse Hook)
-# stdin 包含: {"tool": "Read", "success": true, "error": "..."}
+# 工具调用结束：更新守护进程状态 + 可选弹窗
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/common/config.sh"
 
-DAEMON_URL="http://127.0.0.1:17530"
 SESSION_PID=$PPID
 PROJECT_NAME=$(basename "$PWD")
 TERMINAL="${TERM_PROGRAM:-vscode}"
 
-# 标记文件目录
 MARKER_DIR="/tmp/claude-monitor"
-MARKER_FILE="$MARKER_DIR/tool_active_$SESSION_PID"
 
 # 从 stdin 读取 JSON 数据
 INPUT=$(cat)
@@ -40,7 +36,7 @@ if [ -z "$TOOL_CALL_ID" ] && [ -n "$TOOL" ]; then
   fi
 fi
 
-# 如果有 tool_call_id，更新状态（守护进程会自动更新会话状态）
+# 1. 始终向守护进程更新工具状态
 if [ -n "$TOOL_CALL_ID" ]; then
   ERROR_PART=""
   if [ -n "$ERROR" ]; then
@@ -48,30 +44,22 @@ if [ -n "$TOOL_CALL_ID" ]; then
     ERROR_PART=",\"error\":\"$ESCAPED_ERROR\""
   fi
 
-  RESPONSE=$(curl --noproxy "*" -s -X PATCH "$DAEMON_URL/api/sessions/$SESSION_PID/tools/$TOOL_CALL_ID" \
+  curl --noproxy "*" -s -X PATCH "$DAEMON_URL/api/sessions/$SESSION_PID/tools/$TOOL_CALL_ID" \
     -H "Content-Type: application/json" \
-    -d "{\"success\":$SUCCESS$ERROR_PART}" 2>/dev/null)
+    -d "{\"success\":$SUCCESS$ERROR_PART}" > /dev/null 2>&1
 
-  # 检查会话状态，如果所有工具完成则显示弹窗
-  SESSION_STATUS=$(curl --noproxy "*" -s "$DAEMON_URL/api/sessions/$SESSION_PID" 2>/dev/null | jq -r '.data.status // empty')
+  # 2. 悬浮弹窗（受开关控制）
+  if is_floating_window_enabled; then
+    SESSION_STATUS=$(curl --noproxy "*" -s "$DAEMON_URL/api/sessions/$SESSION_PID" 2>/dev/null | jq -r '.data.status // empty')
 
-  if [ "$SESSION_STATUS" = "tool_done" ]; then
-    # 所有工具完成，显示工具完成弹窗（但不显示任务完成）
-    if is_scenario_enabled "executing"; then
-      FLOAT_BIN=$(get_binary_path)
-      if [[ -n "$FLOAT_BIN" ]]; then
-        DURATION=1  # 短暂显示
-        "$FLOAT_BIN" tool_done "$PROJECT_NAME" "✓ $TOOL 完成" "$TERMINAL" "$DURATION" &
+    FLOAT_BIN=$(get_float_binary)
+    if [[ -n "$FLOAT_BIN" ]]; then
+      if [ "$SESSION_STATUS" = "tool_done" ]; then
+        "$FLOAT_BIN" tool_done "$PROJECT_NAME" "✓ $TOOL 完成" "$TERMINAL" 1 &
+      elif [ "$SESSION_STATUS" = "error" ]; then
+        "$FLOAT_BIN" error "$PROJECT_NAME" "✗ $TOOL 失败" "$TERMINAL" 2 &
       fi
-    fi
-  elif [ "$SESSION_STATUS" = "error" ]; then
-    # 出错
-    if is_scenario_enabled "executing"; then
-      FLOAT_BIN=$(get_binary_path)
-      if [[ -n "$FLOAT_BIN" ]]; then
-        DURATION=2
-        "$FLOAT_BIN" error "$PROJECT_NAME" "✗ $TOOL 失败" "$TERMINAL" "$DURATION" &
-      fi
+      disown 2>/dev/null || true
     fi
   fi
 fi
