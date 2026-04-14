@@ -181,6 +181,10 @@ gsd skill 创建
    ├── SKILL.md              # 必需
    ├── scripts/              # 可选（Resume 模式下必需）
    ├── references/           # 可选
+   ├── hooks/                # 可选（需要 Hook 自动化时）
+   │   ├── hooks.json        # Hook 注册声明
+   │   ├── common/           # 共享配置（可选）
+   │   └── *.sh              # Hook 脚本
    └── assets/               # 可选
    ```
 3. 从 `references/skill-templates.md` 选择并组装模板：
@@ -208,6 +212,24 @@ gsd skill 创建
 
 > ✅ **Checkpoint** — 确认 skill 安装成功并可触发
 
+### Phase 5.5: Hook 集成（条件执行）
+
+**触发条件**：skill 目录内包含 `hooks/` 目录
+
+**目标**：确保 hooks 按规范创建并正确注册
+
+**前置**：**必须先阅读 `references/hooks-creation-guide.md`**
+
+**检查项**：
+1. hooks 目录在 **skill 目录内**（不是 plugin 根目录）
+2. `hooks.json` 使用 `${CLAUDE_PLUGIN_ROOT}` 引用脚本路径
+3. hook 脚本有标准头部（`SCRIPT_DIR`、`SESSION_PID`）
+4. Stop hook 有防死循环机制
+5. 功能默认关闭，有开关控制
+6. SKILL.md 中说明 hook 的开关方式
+
+> ✅ **Checkpoint** — hooks 检查项全部通过
+
 ### Phase 6: 可选优化
 
 > 🔄 需要优化 → `j-skills run create-skills` / 跳过
@@ -222,7 +244,8 @@ gsd skill 创建
 | `references/llm-check-guide.md` | **LLM 验证指南**：静默测试步骤、错误映射、修复建议模板 |
 | `references/dependency-management.md` | 外部 skill 依赖管理详细步骤 |
 | `references/gsd-xml-tags.md` | GSD workflow XML 词汇表 |
-| `references/hooks-patterns.md` | Hook 与 checkpoint 模式 |
+| `references/hooks-patterns.md` | Hook 与 checkpoint 概念说明（多语言/多框架） |
+| `references/hooks-creation-guide.md` | **Hook 创建实操指南**：目录结构、脚本模板、防死循环、开关设计。创建带 hooks 的 skill **必须先读此文件** |
 | `references/scripting-workflow-techniques.md` | 脚本解耦、外置进度 |
 | `references/cross-session-workflow-skill-design.md` | 跨会话 workflow 设计（含 Resume 协议） |
 | `references/yolo-mode-patterns.md` | YOLO / Interactive 运行模式 |
@@ -244,7 +267,8 @@ gsd skill 创建
 7. `j-skills link --list` / `j-skills list -g` 能看到目标 skill
 8. 变更后已重启会话并用触发词验证
 9. `SKILL.md` 行数 ≤ 500，超出部分抽离到 `references/`
-9. `SKILL.md` 行数 ≤ 500，超出部分抽离到 `references/`
+10. **hooks 目录在 skill 目录内**（不是 plugin 根目录），参考 `references/hooks-creation-guide.md`
+11. **hook 脚本**有标准头部、守卫条件、静默失败、`exit 0`
 
 ---
 
