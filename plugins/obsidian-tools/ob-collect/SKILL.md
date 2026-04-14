@@ -1,38 +1,38 @@
 ---
 name: ob-collect
-description: "Obsidian 知识库采集与项目沉淀。采集网页/PDF/视频/文本到知识库，编译为结构化 wiki 笔记；或将项目知识沉淀到项目工作区。触发词：采集、导入知识库、ob-collect、ob-learn、项目沉淀。"
+description: "Obsidian 知识库采集助手。从多种来源（网页、微信公众号、视频、资讯、官方文档）采集内容到 raw/ 并编译为结构化 wiki 笔记。触发词：采集、导入知识库、ob-collect、ob-learn。"
 ---
 
-<role>Obsidian 知识库采集与项目沉淀助手。从多种来源提取内容，或从对话/项目中沉淀有价值知识，编译为结构化 wiki 笔记。</role>
-<purpose>两种模式：(1) 采集模式 — 将 URL/PDF/视频/文本采集到 raw/ 并编译到 wiki/；(2) 项目沉淀模式 — 将对话或项目中的有价值内容沉淀到 wiki/projects/{project}/。建议 ≤ 500 字，超出部分用 [[reference]] 链接补充。</purpose>
+<role>Obsidian 知识库采集助手。从网页、微信公众号、视频平台、资讯聚合、官方文档等来源提取内容，编译为结构化 wiki 笔记。</role>
+<purpose>采集模式 — 将 URL/PDF/视频/文本采集到 raw/ 并编译到 wiki/{theme}/。建议 ≤ 500 字，超出部分用 [[reference]] 链接补充。</purpose>
 <trigger>
 
 ```text
 触发词：
 - 采集文章 / 导入到知识库 / 学习记录 / 摄入资料
 - ob-collect / ob-learn / 把这个加到知识库 / 记录一下这篇文章
-- 项目沉淀 / 沉淀到项目 / 记录到项目 / 保存到项目知识库
-- 项目工作区 / project workspace
+- 采集视频 / 导入视频字幕 / 视频笔记
+- 采集公众号 / 微信文章
 
 示例：
 - "ob-collect https://example.com/article"
 - "帮我采集这篇文章到知识库"
 - "把这个 PDF 导入知识库"
 - "记录一下：RLHF 和 CoT 的关系"
-- "把这个架构分析沉淀到 jacky-skills-package 项目"
-- "保存这个设计决策到项目工作区"
+- "采集这个微信公众号文章"
+- "把这个 B 站视频的字幕导入"
 ```
 
 </trigger>
 <gsd:workflow xmlns:gsd="urn:gsd:workflow">
-  <gsd:meta>requires=OBSIDIAN_REPO; focus=ingest,compile,project</gsd:meta>
-  <gsd:goal>将来源采集到 raw/ 编译到 wiki/，或将项目知识沉淀到 wiki/projects/{project}/。</gsd:goal>
-  <gsd:phase>获取 OBSIDIAN_REPO 路径，判断模式：采集模式（URL/PDF/视频/文本）或项目沉淀模式（对话内容/项目知识）。</gsd:phase>
-  <gsd:phase>采集模式：提取内容，预览确认，写入 raw/ 编译到 wiki/。项目沉淀模式：识别项目名，提取有价值内容，预览确认，写入 wiki/projects/{project}/。</gsd:phase>
-  <gsd:phase>更新索引：wiki/index.md、wiki/log.md、.kb/manifest.json。</gsd:phase>
+  <gsd:meta>requires=OBSIDIAN_REPO; focus=ingest,compile</gsd:meta>
+  <gsd:goal>将来源采集到 raw/ 编译到 wiki/{theme}/。</gsd:goal>
+  <gsd:phase>获取 OBSIDIAN_REPO 路径，识别输入类型和来源平台。</gsd:phase>
+  <gsd:phase>平台检测 → 主题分类 → 提取内容 → 预览确认 → 写入 raw/ → 编译到 wiki/{theme}/。</gsd:phase>
+  <gsd:phase>更新索引：wiki/{theme}/index.md、wiki/index.md（新主题时）、wiki/log.md、.kb/manifest.json。</gsd:phase>
 </gsd:workflow>
 
-# Obsidian 知识库采集与项目沉淀 (ob-collect)
+# Obsidian 知识库采集 (ob-collect)
 
 ## 配置检查
 
@@ -47,21 +47,63 @@ description: "Obsidian 知识库采集与项目沉淀。采集网页/PDF/视频/
 首次使用时，确认以下目录存在（不存在则创建）：
 
 ```
-$OBSIDIAN_REPO/raw/{web,pdf,images,notes}/
-$OBSIDIAN_REPO/wiki/{concepts,entities,sources,synthesis,archive,projects}/
-$OBSIDIAN_REPO/outputs/
+$OBSIDIAN_REPO/raw/
+├── web/            # 通用网页采集（博客、技术文章等）
+├── wechat/         # 微信公众号文章
+├── videos/         # 视频平台字幕（B站、抖音、小红书等）
+├── news/           # 资讯聚合（Hacker News、Reddit 等）
+├── official/       # 官方文档和文章（Claude Code、OpenAI 等）
+└── notes/          # 自由笔记
+
+$OBSIDIAN_REPO/wiki/{ai,claude,current-affairs,career,dev-tools,front-end,obsidian,synthesis}/
 $OBSIDIAN_REPO/.kb/
 ```
 
-如果 `wiki/index.md` 不存在，创建初始索引（含 `## 项目` 分区）。
+如果 `wiki/index.md` 不存在，创建初始索引。
 
-## 模式判断
+## 来源平台检测
 
-| 用户意图 | 模式 | 输入类型 |
-|----------|------|----------|
-| 提供 URL/PDF/视频/文本 | 采集 | web/pdf/video/note |
-| "沉淀到项目"/"保存到项目" | 项目沉淀 | project |
-| 当前对话中有分析内容，用户说"记录一下" | 自动判断 | note/project |
+根据 URL 域名或内容来源自动识别平台，决定 raw/ 子目录：
+
+| 平台 | 域名/特征 | raw 子目录 | 说明 |
+|------|-----------|------------|------|
+| 微信公众号 | `mp.weixin.qq.com` | `raw/wechat/` | 微信公众号文章 |
+| 通用网页 | 其他 HTTP URL | `raw/web/` | 博客、技术文章、个人网站 |
+| B 站 | `bilibili.com` | `raw/videos/` | 视频字幕采集 |
+| 抖音 | `douyin.com` | `raw/videos/` | 短视频 |
+| 小红书 | `xiaohongshu.com` | `raw/videos/` | 图文+视频 |
+| YouTube | `youtube.com`, `youtu.be` | `raw/videos/` | YouTube 视频 |
+| Hacker News | `news.ycombinator.com` | `raw/news/` | 科技资讯 |
+| Reddit | `reddit.com` | `raw/news/` | 社区讨论 |
+| Claude Code | Claude Code 官方文档/博客 | `raw/official/` | Anthropic 官方 |
+| OpenAI | OpenAI 官方文档/博客 | `raw/official/` | OpenAI 官方 |
+| PDF | 本地 `.pdf` 文件 | `raw/web/` | PDF 文档 |
+| 纯文本 | 无 URL | `raw/notes/` | 用户自由输入 |
+
+**检测优先级**：域名精确匹配 → 平台关键词 → 默认归类
+
+## 主题分类
+
+采集内容需要确定目标 wiki 主题目录。按以下优先级判断：
+
+1. **用户指定**：用户说"放到 Claude"、"归类到时事" → 直接使用
+2. **关键词匹配**：根据内容关键词自动推荐
+
+### 主题关键词映射
+
+| 主题 | 目录 | 关键词 |
+|------|------|--------|
+| AI 技术 | `wiki/ai/` | AI, LLM, GPT, transformer, 机器学习, 深度学习 |
+| Claude 生态 | `wiki/claude/` | Claude, Claude Code, Skills, MCP, hooks, Subagents |
+| 开发工具 | `wiki/dev-tools/` | VSCode, IDE, 编辑器, CLI, 终端, Git |
+| 前端开发 | `wiki/front-end/` | React, JavaScript, TypeScript, CSS, 前端, 算法 |
+| 时事分析 | `wiki/current-affairs/` | 经济, 政治, 国际, 金融, 投资, 时事 |
+| 职业发展 | `wiki/career/` | 职级, 面试, 求职, 职业规划 |
+| Obsidian | `wiki/obsidian/` | Obsidian, 知识管理, 笔记, 双链 |
+
+无匹配时归入 `wiki/synthesis/`（跨主题综合）。
+
+匹配后展示推荐主题，用户可在确认时修改。
 
 ## 采集模式
 
@@ -70,10 +112,12 @@ $OBSIDIAN_REPO/.kb/
 ### 流程概要
 
 1. **识别输入类型**：URL → WebFetch，PDF → Read，视频 → audio-to-obsidian，文本 → 直接使用
-2. **提取内容**：抓取/读取正文，提取关键要点（3-5 条）
-3. **预览确认**：展示标题、来源、要点、标签、相关 wiki，等待用户确认
-4. **写入 raw/**：带 frontmatter 的原始笔记
-5. **编译到 wiki/**：生成 source 摘要 → 创建/更新 concept → 更新 index/log/manifest
+2. **平台检测**：根据 URL 域名确定 raw/ 子目录
+3. **主题分类**：根据关键词映射确定目标主题目录
+4. **提取内容**：抓取/读取正文，提取关键要点（3-5 条）
+5. **预览确认**：展示平台、主题、标题、来源、要点、标签，等待用户确认
+6. **写入 raw/**：带 frontmatter 的原始笔记
+7. **编译到 wiki/{theme}/**：生成主题文章 → 创建/更新概念 → 更新主题 index → 更新全局 index/log/manifest
 
 ### 关键规则
 
@@ -82,64 +126,13 @@ $OBSIDIAN_REPO/.kb/
 - 概念冲突时：标注矛盾，追加说明
 - 详细模板见 [references/compile-templates.md](references/compile-templates.md)
 
-## 项目沉淀模式
-
-详见 [references/project-mode.md](references/project-mode.md)
-
-### 目录结构
-
-```
-wiki/projects/{project-slug}/
-├── README.md              — 项目概述（名称、仓库、技术栈、描述）
-├── decisions/             — 架构/设计决策记录（ADR）
-│   └── {YYYY-MM-DD}-{slug}.md
-├── insights/              — 从对话中沉淀的知识洞察
-│   └── {YYYY-MM-DD}-{slug}.md
-├── architecture/          — 架构分析文档
-│   └── {slug}.md
-└── changelog.md           — 项目知识变更日志
-```
-
-### 流程概要
-
-1. **识别项目**：从当前工作目录 git 信息或用户指定获取项目名
-2. **提取内容**：从对话中提取有价值的知识（架构决策、设计模式、踩坑经验等）
-3. **预览确认**：展示项目名、内容分类、摘要，等待确认
-4. **写入项目目录**：按分类写入对应子目录
-5. **更新项目 README.md 和 changelog.md**
-6. **更新 wiki/index.md 的 `## 项目` 分区**
-
-### 项目 README.md 模板
-
-```markdown
----
-type: project
-repo: {仓库路径或 URL}
-tech_stack: [{技术栈}]
-created_at: {日期}
-updated_at: {日期}
----
-# {项目名称}
-
-> {一句话描述}
-
-## 架构概览
-
-{简要架构说明}
-
-## 知识索引
-
-### 设计决策
-### 知识洞察
-### 架构分析
-```
-
 ## 异常处理
 
 | 场景 | 处理 |
 |------|------|
 | URL 抓取失败 | 提示用户检查 URL 或手动粘贴内容 |
 | 内容为空或过短 | 提示用户确认是否继续 |
-| 概念/项目文章已存在 | 读取并更新，不创建重复 |
-| 项目目录不存在 | 自动创建完整目录结构 |
+| 概念文章已存在 | 读取并更新，不创建重复 |
 | 概念冲突 | 在文章中标注矛盾，追加说明 |
+| 主题无法自动匹配 | 归入 synthesis/，用户可在确认时修改 |
+| 视频字幕提取失败 | 调用 audio-to-obsidian skill，不可用时提示用户提供文字稿 |
