@@ -1,6 +1,6 @@
 ---
 name: write-obsidian-note
-description: "生成 Obsidian 笔记，遵循 llm-wiki 模式：raw/ 保存原始字幕，wiki/ 保存归纳笔记并引用 raw。触发词：写入obsidian笔记、生成笔记、write-obsidian-note。"
+description: "[已废弃] 笔记模板和规则已合并到 ob-collect。此 skill 仅保留 write_note.py 脚本供 pipeline.py 调用，后续将移除。"
 ---
 
 <role>

@@ -124,3 +124,4 @@
 3. 每个维度可能有多个文件（如 `architecture.md` 和 `data-flow.md`）
 4. 不要求每次对话都覆盖所有维度，有就提取，没有就跳过
 5. **涉及具体代码时**，生成 code-ref callout 而非嵌入代码片段（详见 [code-ref-format.md](code-ref-format.md)）
+6. **写入时按 [writing-quality.md](writing-quality.md) 的类型标准执行**，确保文章结构完整、深度达标

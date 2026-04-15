@@ -1,6 +1,6 @@
 {
   "name": "video-processing",
-  "version": "1.9.1",
+  "version": "2.0.0",
   "description": "音视频处理工具集 - 音视频转文字、内容提取、Obsidian 笔记生成",
   "author": {
     "name": "Jacky Wang",
@@ -23,7 +23,6 @@
     "./skills/audio-to-obsidian/",
     "./skills/extract-url-media/",
     "./skills/audio-to-subtitle/",
-    "./skills/write-obsidian-note/",
     "./skills/bilibili-video-list/",
     "./skills/youtube-video-list/"
   ]

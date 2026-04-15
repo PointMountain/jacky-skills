@@ -53,7 +53,8 @@ $OBSIDIAN_REPO/raw/
 ├── videos/         # 视频平台字幕（B站、抖音、小红书等）
 ├── news/           # 资讯聚合（Hacker News、Reddit 等）
 ├── official/       # 官方文档和文章（Claude Code、OpenAI 等）
-└── notes/          # 自由笔记
+├── notes/          # 自由笔记
+└── [作者名]/       # 音视频按作者归档（write-obsidian-note 兼容）
 
 $OBSIDIAN_REPO/wiki/{ai,claude,current-affairs,career,dev-tools,front-end,obsidian,synthesis}/
 $OBSIDIAN_REPO/.kb/
@@ -125,6 +126,143 @@ $OBSIDIAN_REPO/.kb/
 - 概念文章已存在时：读取并合并，不覆盖
 - 概念冲突时：标注矛盾，追加说明
 - 详细模板见 [references/compile-templates.md](references/compile-templates.md)
+
+## 视频/音频采集模式
+
+当采集来源为视频（YouTube/B站/播客等）或音频时，使用以下专用模板和规则。
+
+> 此模式合并自 write-obsidian-note skill，统一由 ob-collect 管理。
+
+### raw 模板（带时间轴分段）
+
+视频/音频的 raw 层按作者名归档：`raw/[作者名]/标题.md`
+
+```markdown
+---
+source: "https://..."
+author: "作者名"
+ingested_at: {YYYY-MM-DD}
+type: transcript
+category: Audio
+duration: "10:30"
+status: uncompiled
+tags: [音频笔记, {作者名}]
+---
+
+# 标题
+
+### 0:00 主题段落标题
+
+句子内容，可以多句组成一个语义完整的段落。
+每段以 `### M:SS 主题标题` 开头，方便 Obsidian heading 跳转。
+
+### 1:30 下一个主题段落标题
+
+下一段内容...
+
+---
+#音频笔记 #{作者名}
+```
+
+**关键规则**：
+- 每个语义段落用 `### M:SS 标题` 作为 heading
+- raw 层不可变：写入后不再修改
+- 文件名特殊字符替换为下划线，长度 ≤ 200 字符
+
+### wiki 归纳模板
+
+视频/音频的 wiki 层生成归纳笔记，用 `[[raw/作者名/标题]]` 引用 raw 层原文。
+
+```markdown
+---
+tags: [{主题标签}, {作者名}, 归纳]
+type: learning
+updated_at: {YYYY-MM-DD}
+---
+
+# 标题 - 归纳
+
+> **作者**: {author}
+> **来源**: {url}
+> **时长**: {duration}
+> **提取时间**: {date}
+> **原文**: [[raw/作者名/标题]]
+
+[embedCode — 如有则插入，如 B 站 iframe]
+
+## 音频来源
+
+> [!quote] 🔗 [点击播放]({url})
+
+---
+
+## 核心观点
+
+### 1. {观点标题}
+
+简明扼要地概括这个观点（2-5句话）。
+包括论据、因果逻辑、关键数据。
+
+→ [[raw/作者名/标题#1:30]] ~ [[raw/作者名/标题#3:45]]
+
+### 2. {观点标题}
+
+下一个核心观点的概括。
+
+→ [[raw/作者名/标题#5:00]] ~ [[raw/作者名/标题#7:20]]
+
+## 关键引用
+
+> [原文金句1] — [[raw/作者名/标题#2:15]]
+
+> [原文金句2] — [[raw/作者名/标题#8:30]]
+
+## 我的思考
+
+[待补充]
+
+---
+#音频笔记 #{作者名} #归纳
+```
+
+### 归纳生成规则
+
+AI 归纳视频/音频内容时遵循以下原则：
+
+1. **观点拆解**：将内容拆解为 3-7 个核心观点/论点，每个有独立标题
+2. **raw 引用**：每个观点必须用 `[[raw/作者名/标题#M:SS]]` 链接到 raw 层原文的 heading
+3. **时间范围**：观点跨多段时用 `~` 连接起止：`[[raw/作者名/标题#1:30]] ~ [[raw/作者名/标题#3:45]]`
+4. **不搬运原文**：归纳用自己的话概括，不直接复制原文句子
+5. **关键结论**：提炼 3-5 条一句话可消化的结论，附链接
+6. **金句引用**：选取 2-4 条原文中最有表达力的原话，附链接
+7. **我的思考**：留空，供用户自行补充
+8. **不做延伸**：只归纳，不添加 transcript 中没有的观点
+
+### 作者索引
+
+视频/音频写入后自动维护 `raw/index.md` 作者索引：
+
+```markdown
+---
+type: index
+updated_at: {YYYY-MM-DD}
+authors: {N}
+files: {N}
+---
+
+# 作者索引
+
+> 自动维护 · {N} 位作者 · {N} 篇资料
+
+## 作者A
+
+- [[raw/作者A/标题1]] — {YYYY-MM-DD}
+- [[raw/作者A/标题2]] — {YYYY-MM-DD}
+
+## 作者B
+
+- [[raw/作者B/标题3]] — {YYYY-MM-DD}
+```
 
 ## 异常处理
 

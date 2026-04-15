@@ -4,7 +4,7 @@ description: "渐进式音视频处理编排器：URL/本地视频/本地音频/
 ---
 
 <role>
-你是音视频内容处理编排器，协调 extract-url-media、audio-to-subtitle、write-obsidian-note 三个原子 skill 完成端到端流程。
+你是音视频内容处理编排器，协调 extract-url-media、audio-to-subtitle 两个原子 skill，以及 ob-collect（Obsidian 笔记写入）完成端到端流程。
 </role>
 
 <purpose>
@@ -46,11 +46,10 @@ description: "渐进式音视频处理编排器：URL/本地视频/本地音频/
   <gsd:meta>
     <name>audio-to-obsidian</name>
     <owner>video-processing</owner>
-    <requires>extract-url-media, audio-to-subtitle, write-obsidian-note, OBSIDIAN_REPO</requires>
+    <requires>extract-url-media, audio-to-subtitle, OBSIDIAN_REPO</requires>
     <deps>
       <dep name="extract-url-media" source="local" localPath="../extract-url-media/" />
       <dep name="audio-to-subtitle" source="local" localPath="../audio-to-subtitle/" />
-      <dep name="write-obsidian-note" source="local" localPath="../write-obsidian-note/" />
     </deps>
     <checkpoints>
       <checkpoint order="1">环境依赖就绪</checkpoint>
@@ -74,7 +73,7 @@ description: "渐进式音视频处理编排器：URL/本地视频/本地音频/
 
   <!-- ==================== Phase 1: 环境检查 ==================== -->
   <gsd:phase name="precheck" order="1">
-    <gsd:step>检查 OBSIDIAN_REPO、extract-url-media、audio-to-subtitle、write-obsidian-note 四个依赖。</gsd:step>
+    <gsd:step>检查 OBSIDIAN_REPO、extract-url-media、audio-to-subtitle 三个依赖。</gsd:step>
     <gsd:step>任一缺失 → AskUserQuestion 告知安装命令。</gsd:step>
     <gsd:step>检查是否有可恢复任务：扫描 pipeline-dir 下 meta.json，发现 status != completed 的任务。</gsd:step>
     <gsd:step>如有可恢复任务，在 Phase 2 中展示恢复选项。</gsd:step>
@@ -126,8 +125,8 @@ description: "渐进式音视频处理编排器：URL/本地视频/本地音频/
   <gsd:phase name="process" order="4">
     <gsd:step>根据调度决策表执行任务（直接或 Sub Agent 并行）。</gsd:step>
     <gsd:step>对每个任务按输入类型走对应管线（跳过已完成步骤）：</gsd:step>
-    <gsd:step>URL 管线：extract-url-media → audio-to-subtitle（无内嵌字幕时）→ write-obsidian-note</gsd:step>
-    <gsd:step>本地管线：audio-to-subtitle → write-obsidian-note</gsd:step>
+    <gsd:step>URL 管线：extract-url-media → audio-to-subtitle（无内嵌字幕时）→ ob-collect（笔记写入）</gsd:step>
+    <gsd:step>本地管线：audio-to-subtitle → ob-collect（笔记写入）</gsd:step>
     <gsd:step>每个阶段自动记录 startedAt/completedAt/duration 到 meta.json。</gsd:step>
     <gsd:step>阶段失败：自动重试（指数退避，最多 3 次），清理部分产物。</gsd:step>
     <gsd:step>单个失败 → 记录错误，继续下一个（批量时）。</gsd:step>
@@ -146,7 +145,7 @@ description: "渐进式音视频处理编排器：URL/本地视频/本地音频/
 # Audio to Obsidian — 渐进式音视频处理编排器
 
 > 🚀 **一次确认，全程自动** — 所有交互集中在 Phase 2，Phase 4 零交互。
-> 🧩 **纯编排器** — 业务逻辑委托给 extract-url-media / audio-to-subtitle / write-obsidian-note。
+> 🧩 **纯编排器** — 业务逻辑委托给 extract-url-media / audio-to-subtitle，笔记写入由 ob-collect 统一管理。
 > ⚡ **Sub Agent 加速** — 大批量自动并行处理。
 
 ## 可执行脚本
@@ -192,18 +191,18 @@ audio-to-obsidian（编排器，Layer 2）
 │
 ├── extract-url-media      ← Layer 1: URL → 元信息 + 音频 + 内嵌字幕
 ├── audio-to-subtitle      ← Layer 0: 音频/视频 → ASR 转录文字
-└── write-obsidian-note    ← Layer 1: 元信息 + 文案 → Obsidian 笔记
+└── ob-collect (笔记写入)  ← Layer 1: 元信息 + 文案 → Obsidian 笔记（模板见 ob-collect 视频/音频模式）
 ```
 
 ## 处理管线
 
 ```
 URL 输入:
-  extract-url-media ──→ (无内嵌字幕?) ──→ audio-to-subtitle ──→ write-obsidian-note
+  extract-url-media ──→ (无内嵌字幕?) ──→ audio-to-subtitle ──→ ob-collect
   [元信息+音频+字幕]                       [ASR 转录]              [笔记写入]
 
 本地视频/音频:
-  audio-to-subtitle ──→ write-obsidian-note
+  audio-to-subtitle ──→ ob-collect
   [ASR 转录]              [笔记写入]
 ```
 

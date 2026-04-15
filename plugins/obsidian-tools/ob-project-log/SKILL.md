@@ -88,10 +88,23 @@ description: "项目知识沉淀到 Obsidian。三种模式：自动沉淀（Hoo
 - 已经沉淀过的重复内容
 - 仅涉及文件编辑/创建（无知识增量）
 
+### 2.5 读取质量偏好
+
+如果 `$OBSIDIAN_REPO/wiki/.rating-preferences.md` 存在：
+1. 读取偏好文件，提取核心偏好规则
+2. 在后续提取和写入时参考这些规则：
+   - 内容需要有深度和干货（非表面介绍）
+   - 标题需准确反映内容
+   - 文章间应互相串联（使用 [[wikilinks]]）
+   - 包含 reference/相关链接
+   - 其他偏好规则作为写作质量指引
+3. 不存在则跳过，使用默认标准
+
 ### 3. 提取与写入
 
 - 按维度提取内容（参考 [references/study-dimensions.md](references/study-dimensions.md)）
 - **涉及具体代码时**：生成 code-ref callout 引用，不嵌入代码片段（参考 [references/code-ref-format.md](references/code-ref-format.md)）
+- **质量规范**：判断文章类型，按 [references/writing-quality.md](references/writing-quality.md) 对应类型标准写入
 - 提取 git remote URL 生成 GitHub 链接（`git remote get-url origin` → 提取 `owner/repo`）
 - 匹配已有文件或新建文件
 - 追加/合并内容，不覆盖
@@ -115,6 +128,21 @@ echo $(date +%s) > /tmp/ob-project-log-synced-$PPID
 本次对话无需沉淀（未发现项目知识增量）
 ```
 
+### 6. 偏好自学习
+
+沉淀完成后（无论是否有内容写入），分析本次对话中的偏好信号并更新 `$OBSIDIAN_REPO/wiki/.rating-preferences.md`：
+
+1. 扫描对话，识别以下偏好信号：
+   - 用户对文章内容做了修改/调整（说明偏好某种写法）
+   - 用户要求补充或删除某些内容（反映质量偏好）
+   - 用户对结构、格式、深度表达了满意或不满
+   - 用户主动提到"我喜欢/不喜欢"某种风格
+2. 如果发现新的偏好信号，追加到 `.rating-preferences.md` 的**偏好规则**部分：
+   - 新增规则用 `###` 标题 + 规则内容
+   - 标注 `(auto-learned {date})` 标记来源
+3. 如果已有规则在本次对话中被验证或强化，更新其 `支撑` 描述
+4. 无新偏好信号时跳过，不修改文件
+
 ---
 
 ## 模式二：手动沉淀
@@ -130,6 +158,8 @@ git remote origin → basename → 当前目录名 → 询问用户
 目录：`$OBSIDIAN_REPO/wiki/projects/{project}/`
 
 ### 2. 提取内容
+
+如果 `$OBSIDIAN_REPO/wiki/.rating-preferences.md` 存在，先读取偏好规则作为内容质量指引。
 
 分析当前对话，按 [references/study-dimensions.md](references/study-dimensions.md) 中的维度提取有价值内容。
 
@@ -158,18 +188,36 @@ git remote origin → basename → 当前目录名 → 询问用户
 
 ### 4. 写入规则
 
+#### 基本规则
+
 - **不覆盖**：已有内容保留，新内容追加或合并
 - **去重**：相同主题合并，不重复
 - **敏感信息**：API key、密码、token → `{REDACTED}`
 - **简洁**：每条点到为止
-- **代码引用**：涉及具体代码时使用 code-ref callout，格式见 [references/code-ref-format.md](references/code-ref-format.md)
-  ```
-  > [!code-ref] {描述}
-  > **仓库**: {repo} | **路径**: `{path}:{line_start}-{line_end}`
-  > 🔗 [GitHub]({github_url}#L{start}-L{end})
-  >
-  > {设计意图}
-  ```
+
+#### 代码引用
+
+涉及具体代码时使用 code-ref callout，格式见 [references/code-ref-format.md](references/code-ref-format.md)：
+```
+> [!code-ref] {描述}
+> **仓库**: {repo} | **路径**: `{path}:{line_start}-{line_end}`
+> 🔗 [GitHub]({github_url}#L{start}-L{end})
+>
+> {设计意图}
+```
+
+#### 质量规范（必须遵循）
+
+写入前判断文章类型，按 [references/writing-quality.md](references/writing-quality.md) 中对应类型的标准执行：
+
+| 类型 | 触发信号 | 必填要素 |
+|------|----------|----------|
+| **概念/分析** | 架构、原理、对比 | 独到视角 + 关键论点有 code-ref 支撑 + 底部参考 |
+| **操作指南** | 安装、配置、教程 | 前置条件 + 编号步骤 + 代码示例 + 常见问题 |
+| **踩坑记录** | Bug、兼容性、意外行为 | 症状 + 根因 + 方案 + 预防 |
+| **决策记录** | 选型、方案取舍 | 背景 + 备选方案 + 对比 + 选择理由 |
+
+**质量底线**：文章必须通过 [质量自检清单](references/writing-quality.md)，不达标的先补充再写入。
 
 ### 5. 输出摘要
 
@@ -180,6 +228,10 @@ git remote origin → basename → 当前目录名 → 询问用户
   - {filename}.md  → {做了什么}
   - {filename}.md  → {做了什么}（新建）
 ```
+
+### 6. 偏好自学习
+
+与自动沉淀模式 6 相同：分析本次对话中的偏好信号，更新 `.rating-preferences.md`。
 
 ---
 

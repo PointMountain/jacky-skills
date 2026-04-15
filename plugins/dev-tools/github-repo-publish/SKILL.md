@@ -1,6 +1,6 @@
 ---
 name: github-repo-publish
-description: "Use when user wants to publish local code repository to GitHub, needs to create remote repo, push code, generate README, set about info, or release packaged artifacts like VSCode extensions (.vsix). Triggers on requests like \"publish to GitHub\", \"push to remote\", \"create GitHub repo\", or \"release extension\"."
+description: "Use when user wants to publish, sync, push, or update local code repository to GitHub. Also triggers on requests to create remote repo, generate README, set about info, or release packaged artifacts like VSCode extensions (.vsix). Triggers on phrases like \"publish to GitHub\", \"push to remote\", \"sync to GitHub\", \"push to GitHub\", \"update to GitHub\", \"upload to GitHub\", \"帮我同步\", \"推送到 GitHub\", \"同步到 GitHub\", \"更新到 GitHub\", \"上传到 GitHub\", \"create GitHub repo\", or \"release extension\"."
 ---
 
 <role>
@@ -18,6 +18,13 @@ push to remote
 create GitHub repo
 release extension
 发布到 GitHub
+同步到 GitHub
+帮我同步一下
+sync to GitHub
+推送到 GitHub
+push to GitHub
+更新到 GitHub
+上传到 GitHub
 npm publish
 发布 npm 包
 发布到 npm

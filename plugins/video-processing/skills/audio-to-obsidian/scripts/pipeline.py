@@ -3,8 +3,8 @@
 audio-to-obsidian orchestration script.
 
 Pipeline:
-URL -> extract-url-media -> (subtitle or transcribe) -> write-obsidian-note
-Local media -> transcribe -> write-obsidian-note
+URL -> extract-url-media -> (subtitle or transcribe) -> write_note.py (ob-collect 笔记模板)
+Local media -> transcribe -> write_note.py (ob-collect 笔记模板)
 
 支持：
 - 时间记录（meta.json startedAt/completedAt/duration）
