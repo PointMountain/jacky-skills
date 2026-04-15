@@ -1,6 +1,6 @@
 {
   "name": "knowledge-base",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "个人知识库 - 教程、经验总结、参考方案，只读查阅型（类似个人版 Context7）",
   "author": {
     "name": "Jacky Wang",
@@ -19,6 +19,7 @@
   ],
   "skills": [
     "./skills/npm-publish/",
+    "./skills/vsix-publish/",
     "./skills/vscode-extension-dev/",
     "./skills/gh-workflow-generator/",
     "./skills/github-profile-coolify/",
