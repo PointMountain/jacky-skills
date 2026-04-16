@@ -1,6 +1,6 @@
 {
   "name": "obsidian-tools",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "description": "Obsidian 工具集 - 笔记同步、知识库管理",
   "author": {
     "name": "Jacky Wang",
@@ -25,6 +25,7 @@
     "./ob-chat/",
     "./ob-tidy/",
     "./ob-project-log/",
-    "./ob-rate/"
+    "./ob-rate/",
+    "./ob-topic/"
   ]
 }

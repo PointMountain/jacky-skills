@@ -106,8 +106,16 @@ description: "项目知识沉淀到 Obsidian。三种模式：自动沉淀（Hoo
 - **涉及具体代码时**：生成 code-ref callout 引用，不嵌入代码片段（参考 [references/code-ref-format.md](references/code-ref-format.md)）
 - **质量规范**：判断文章类型，按 [references/writing-quality.md](references/writing-quality.md) 对应类型标准写入
 - 提取 git remote URL 生成 GitHub 链接（`git remote get-url origin` → 提取 `owner/repo`）
+
+**索引加速匹配**：在匹配已有文件前，先检查 `index.md`：
+1. 读取 `$OBSIDIAN_REPO/wiki/projects/{project}/index.md`
+2. 如果存在：从索引表格中查找主题匹配的文件，无需全量读取所有文件
+3. 如果不存在：fallback 到原有逻辑（ls 目录 + 逐个读取文件），并在写入完成后创建索引
+
 - 匹配已有文件或新建文件
 - 追加/合并内容，不覆盖
+
+**更新索引**：写入完成后，同步更新 `index.md`（格式见下方"索引机制"章节）
 
 ### 4. 创建标记文件
 
@@ -179,12 +187,18 @@ git remote origin → basename → 当前目录名 → 询问用户
 
 ### 3. 匹配或创建文件
 
-列出 `$OBSIDIAN_REPO/wiki/projects/{project}/` 下已有文件，对每个内容块：
+**索引加速匹配**：先读取 `$OBSIDIAN_REPO/wiki/projects/{project}/index.md`：
+1. 如果索引存在：从索引表格中查找主题匹配的文件，无需全量读取
+2. 如果索引不存在：fallback 到原有逻辑（ls 目录 + 逐个读取文件内容），并在写入完成后创建索引
+
+对每个内容块：
 
 - 已有文件主题匹配 → 追加到该文件对应位置
 - 无匹配文件 → 新建 `{slug}.md`，slug 从主题生成（短英文+连字符）
 
 **不预设固定文件名**，完全根据对话内容动态决定。
+
+**更新索引**：写入完成后，同步更新 `index.md`（格式见下方"索引机制"章节）
 
 ### 4. 写入规则
 
@@ -251,6 +265,12 @@ git remote origin → basename → 当前目录名 → 询问用户
 目录：`$OBSIDIAN_REPO/wiki/projects/{project}/`
 
 ### 2. 列出文章
+
+**索引加速展示**：先读取 `$OBSIDIAN_REPO/wiki/projects/{project}/index.md`：
+1. 如果索引存在：直接从索引表格生成文章列表，无需逐个读取文件
+2. 如果索引不存在：fallback 到原有逻辑（ls 目录 + 逐个读取文件首部提取主题），并在展示完成后创建索引
+
+注意：`index.md` 是元数据文件，不出现在文章列表中。子目录中的文件以 `decisions/xxx.md` 格式列出。
 
 列出 `$OBSIDIAN_REPO/wiki/projects/{project}/` 下所有文件：
 
@@ -353,6 +373,40 @@ git remote origin → basename → 当前目录名 → 询问用户
 
 ---
 
+## 索引机制：index.md
+
+每个项目目录 `$OBSIDIAN_REPO/wiki/projects/{project}/` 下维护 `index.md`，用于加速文件匹配和列表展示，避免全量读取。
+
+### 索引文件格式
+
+```markdown
+---
+type: project-index
+project: {project-name}
+updated_at: {date}
+---
+
+# {project-name} 知识索引
+
+| 文件 | 主题 | 涵盖维度 | 更新日期 |
+|------|------|----------|----------|
+| terminal-jump-debug.md | 终端跳转实现指南 | 架构设计、踩坑记录、可复用方案 | 2026-04-15 |
+```
+
+### 索引更新规则
+
+- **触发时机**：每次写入/新建/更新文件后，同步更新 `index.md`
+- **更新内容**：文件名（含子目录前缀）、主题（从内容提取）、涵盖维度、更新日期
+- **排序**：按更新日期倒序排列（最新在前）
+- **子目录文件**：使用 `decisions/xxx.md` 格式，不以 `_` 开头的 `.md` 文件都应纳入索引
+
+### 向后兼容
+
+- 如果 `index.md` 不存在，skill 仍能正常工作（fallback 到 ls + 逐个读取文件）
+- fallback 完成后自动创建索引，后续操作即可加速
+
+---
+
 ## 异常处理
 
 | 场景 | 处理 |
@@ -364,3 +418,6 @@ git remote origin → basename → 当前目录名 → 询问用户
 | 追问模式无匹配文章 | 提示用户先沉淀，或创建新文章 |
 | 追问模式目录为空 | 提示先使用手动沉淀创建内容 |
 | Hook 触发但非 git 项目 | 跳过，不执行任何操作 |
+| `index.md` 不存在 | fallback 到原有逻辑（ls + 逐个读取），完成后自动创建索引 |
+| `index.md` 损坏或格式异常 | 忽略索引，fallback 到原有逻辑，下次写入时重建索引 |
+| 索引与实际文件不一致 | 以实际文件为准，更新索引 |
