@@ -7,8 +7,7 @@
 ```markdown
 ---
 tags: [{标签列表}]
-type: {topic|source}
-updated_at: {日期}
+type: {预定义类型}    # concept/tutorial/troubleshooting/learning/reference/note，见 frontmatter-schema
 ---
 
 # {标题}

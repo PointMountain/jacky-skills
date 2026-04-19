@@ -176,7 +176,7 @@ tags: [音频笔记, {作者名}]
 ```markdown
 ---
 tags: [{主题标签}, {作者名}, 归纳]
-type: learning
+type: {预定义类型}
 updated_at: {YYYY-MM-DD}
 ---
 
@@ -263,6 +263,14 @@ files: {N}
 
 - [[raw/作者B/标题3]] — {YYYY-MM-DD}
 ```
+
+### 写入后验证
+
+遵循 [frontmatter-schema](../references/frontmatter-schema.md) 中的验证清单：
+1. **Frontmatter**：确认 tags（非空）、type（预定义值）、updated_at 存在
+2. **Wikilink**：扫描所有 `[[xxx]]` 引用，确认目标文件存在于 vault 中
+3. **索引**：确认文章已出现在对应 `wiki/{theme}/index.md` 中
+4. **交叉引用**：在同目录已有文章中查找 tags 重叠的文章，添加反向链接
 
 ## 异常处理
 

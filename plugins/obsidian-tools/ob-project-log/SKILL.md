@@ -1,6 +1,6 @@
 ---
 name: ob-project-log
-description: "项目知识沉淀到 Obsidian。三种模式：自动沉淀（Hook）、手动沉淀、浏览追问。触发词：ob-project-log、项目沉淀、追问文章、继续讨论、开启项目沉淀、关闭项目沉淀。"
+description: "项目知识沉淀到 Obsidian。三种模式：自动沉淀（Hook）、手动沉淀、浏览追问。触发词：ob-project-log、项目沉淀、追问文章、继续讨论。"
 ---
 
 <role>Obsidian 项目知识沉淀助手。从 AI 对话中提取项目知识，支持自动沉淀、手动沉淀和浏览追问三种模式。</role>
@@ -12,7 +12,6 @@ description: "项目知识沉淀到 Obsidian。三种模式：自动沉淀（Hoo
 模式一（自动沉淀）：由 Stop Hook 自动触发，无需手动调用
 模式二（手动沉淀）：ob-project-log / 项目沉淀 / 记录到项目 / 沉淀对话
 模式三（浏览追问）：追问文章 / 继续讨论 / 优化笔记 / 项目追问 / 追问
-开关控制：开启项目沉淀 / 关闭项目沉淀
 
 示例：
 - "ob-project-log"
@@ -20,15 +19,13 @@ description: "项目知识沉淀到 Obsidian。三种模式：自动沉淀（Hoo
 - "项目沉淀"（手动沉淀模式）
 - "追问文章" → 列出文章 → 选择 → 追问优化
 - "继续讨论 架构设计" → 直接打开匹配文章
-- "开启项目沉淀" → 配置 Stop Hook 自动触发
-- "关闭项目沉淀" → 移除 Hook 配置
 ```
 
 </trigger>
 <gsd:workflow xmlns:gsd="urn:gsd:workflow">
   <gsd:meta>requires=OBSIDIAN_REPO</gsd:meta>
   <gsd:goal>三种模式：自动沉淀、手动沉淀、浏览追问，将项目知识写入 Obsidian。</gsd:goal>
-  <gsd:phase>模式判断：Hook 触发 → 自动沉淀；用户说"追问/优化/继续讨论" → 浏览追问；用户说"开启/关闭" → 开关控制；其他 → 手动沉淀。</gsd:phase>
+  <gsd:phase>模式判断：Hook 触发 → 自动沉淀；用户说"追问/优化/继续讨论" → 浏览追问；其他 → 手动沉淀。</gsd:phase>
   <gsd:phase>自动/手动沉淀：识别项目 → 分析对话 → 提取知识 → 匹配/创建文件 → 写入更新。</gsd:phase>
   <gsd:phase>浏览追问：列出文章 → 用户选择 → 读取全文 → 进入追问循环 → 更新文章。</gsd:phase>
 </gsd:workflow>
@@ -54,16 +51,12 @@ description: "项目知识沉淀到 Obsidian。三种模式：自动沉淀（Hoo
 | Stop Hook 自动触发 | **自动沉淀** | 分析对话，提取知识，静默写入 |
 | "项目沉淀" / "记录到项目" / "ob-project-log" | **手动沉淀** | 同上，但输出详细摘要 |
 | "追问文章" / "继续讨论" / "优化笔记" / "项目追问" | **浏览追问** | 列出文章，选择后进入追问循环 |
-| "开启项目沉淀" | **开关控制** | 配置 Stop Hook 自动触发 |
-| "关闭项目沉淀" | **开关控制** | 移除 Hook 配置 |
 
 ---
 
 ## 模式一：自动沉淀（Hook 触发）
 
-**前提**：已通过"开启项目沉淀"配置 Stop Hook（详见 [references/hook-setup.md](references/hook-setup.md)）。
-
-当对话即将结束时，Hook 触发，Claude 执行以下流程：
+Stop Hook 在每次对话结束时自动触发，Claude 执行以下流程：
 
 ### 1. 检测环境
 
@@ -114,6 +107,23 @@ description: "项目知识沉淀到 Obsidian。三种模式：自动沉淀（Hoo
 
 - 匹配已有文件或新建文件
 - 追加/合并内容，不覆盖
+
+**新建文件的 frontmatter 模板**（必填）：
+```yaml
+---
+tags: [{项目名}, {主题标签}]
+type: {预定义类型}    # concept/tutorial/troubleshooting/reference/note
+updated_at: {YYYY-MM-DD}
+created_at: {YYYY-MM-DD}
+source: conversation
+---
+```
+
+**写入后验证**（遵循 [frontmatter-schema](../references/frontmatter-schema.md)）：
+1. **Frontmatter**：确认 tags（非空）、type（预定义值）、updated_at 存在
+2. **Wikilink**：扫描 `[[xxx]]` 引用，确认目标文件存在
+3. **索引一致性**：确认新文件已出现在 `index.md` 表格中
+4. **交叉引用**：在同目录已有文章中查找相关主题，添加 `[[新文章名]]` 反向链接
 
 **更新索引**：写入完成后，同步更新 `index.md`（格式见下方"索引机制"章节）
 
@@ -341,35 +351,6 @@ git remote origin → basename → 当前目录名 → 询问用户
 - 如有未写入的讨论内容，提示是否更新
 - 输出本次追问摘要
 - 退出追问模式
-
----
-
-## 开关控制
-
-### 开启自动沉淀
-
-用户说"开启项目沉淀"时执行：
-
-1. 创建标记文件：`echo "enabled" > ~/.claude/ob-auto-sync.enabled`
-2. 告知用户已开启：
-```
-✅ 项目自动沉淀已开启
-
-每次对话结束时，会自动检查并沉淀项目知识到 Obsidian。
-关闭方式：说"关闭项目沉淀"
-```
-
-### 关闭自动沉淀
-
-用户说"关闭项目沉淀"时执行：
-
-1. 移除标记文件：`rm -f ~/.claude/ob-auto-sync.enabled`
-2. 告知用户已关闭：
-```
-✅ 项目自动沉淀已关闭
-
-如需重新开启：说"开启项目沉淀"
-```
 
 ---
 

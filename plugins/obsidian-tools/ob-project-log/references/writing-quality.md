@@ -173,6 +173,7 @@
 
 写入文章前，对照以下清单逐项检查：
 
+- [ ] **Frontmatter 完整**：tags（非空数组）、type（必须是预定义值之一：concept/tutorial/troubleshooting/learning/reference/note）、updated_at（有效日期）
 - [ ] **标题准确**：读者看标题就知道文章讲什么
 - [ ] **有信息增量**：不是搜索引擎第一条就能找到的内容
 - [ ] **结构完整**：有开头（背景/目的）、有正文、有收尾（参考/总结）

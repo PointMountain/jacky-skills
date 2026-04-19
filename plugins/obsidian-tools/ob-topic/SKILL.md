@@ -45,7 +45,8 @@ description: "对话中快速收藏通用知识点到 Obsidian 知识库。触�
 | 主题 | 目录 | 关键词 |
 |------|------|--------|
 | AI 技术 | `wiki/ai/` | AI, LLM, GPT, transformer, 机器学习, 深度学习, RAG, agent |
-| Claude 生态 | `wiki/claude/` | Claude, Claude Code, Skills, MCP, hooks, Subagents, Tauri |
+| Claude 生态 | `wiki/claude/` | Claude, Claude Code, Skills, MCP, hooks, Subagents |
+| Tauri | `wiki/tauri/` | Tauri, 桌面应用, tauri-app, Sidecar, invoke |
 | 开发工具 | `wiki/dev-tools/` | VSCode, IDE, 编辑器, CLI, 终端, Git, Zed |
 | 前端开发 | `wiki/front-end/` | React, JavaScript, TypeScript, CSS, 前端, Next.js, Vue |
 | 时事分析 | `wiki/current-affairs/` | 经济, 政治, 国际, 金融, 投资, 时事 |
@@ -57,12 +58,12 @@ description: "对话中快速收藏通用知识点到 Obsidian 知识库。触�
 
 ### 3. 写入笔记
 
-文件名：`{YYYY-MM-DD}-{slug}.md`，slug 用英文短横线连接。
+文件名：`{slug}.md`，slug 用英文短横线连接。
 
 ```markdown
 ---
 tags: [{主题标签}, {关键词}]
-type: topic
+type: {预定义类型}
 created_at: {YYYY-MM-DD}
 source: conversation
 ---
@@ -82,7 +83,26 @@ source: conversation
 3. {要点三}
 ```
 
-### 4. 更新索引
+**type 选择规则**（必须遵循 [frontmatter-schema](../references/frontmatter-schema.md)）：
+
+| 内容性质 | type |
+|---------|------|
+| 解释技术概念/术语 | `concept` |
+| 教程/操作步骤 | `tutorial` |
+| 问题排查/踩坑 | `troubleshooting` |
+| 学习记录 | `learning` |
+| 参考/对比/速查 | `reference` |
+| 其他 | `note` |
+
+### 4. 写入后验证
+
+遵循 [frontmatter-schema](../references/frontmatter-schema.md) 中的验证清单：
+1. **Frontmatter**：确认 tags（非空）、type（预定义值）、updated_at 存在
+2. **Wikilink**：扫描 `[[xxx]]` 引用，确认目标文件存在
+3. **索引**：确认文章已出现在对应 index.md
+4. **交叉引用**：在同目录已有文章中查找 tags 重叠的文章，添加 `[[新文章名]]` 反向链接
+
+### 5. 更新索引
 
 - 更新 `wiki/{theme}/index.md`：追加新条目到对应分类下
 - 新主题目录时创建 `wiki/{theme}/index.md`
