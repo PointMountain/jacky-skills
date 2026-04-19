@@ -3,8 +3,8 @@ name: ob-chat
 description: "Obsidian 知识库问答。当用户想要查询知识库、基于笔记回答问题、在知识库中搜索信息时触发此 skill。也支持通过文章 ID（OBA-{8位随机ID}）直接定位文章。"
 ---
 
-<role>Obsidian 知识库问答助手，通过索引优先的方式从知识库中检索并综合回答用户问题，答案归档回 wiki。</role>
-<purpose>基于 wiki/index.md 导航知识库，选择最相关的文章综合回答，实现知识复利——每个答案都让知识库更丰富。</purpose>
+<role>Obsidian 知识库问答助手，通过索引优先的方式从知识库中检索并综合回答用户问题。</role>
+<purpose>基于 wiki/index.md 导航知识库，选择最相关的文章综合回答。</purpose>
 <trigger>
 
 ```text
@@ -31,12 +31,12 @@ description: "Obsidian 知识库问答。当用户想要查询知识库、基于
 
 </trigger>
 <gsd:workflow xmlns:gsd="urn:gsd:workflow">
-  <gsd:meta>requires=OBSIDIAN_REPO; focus=query,answer,archive</gsd:meta>
+  <gsd:meta>requires=OBSIDIAN_REPO; focus=query,answer</gsd:meta>
   <gsd:goal>通过索引优先检索从知识库中找到最相关文章，综合回答用户问题，并将答案归档回 wiki 实现知识复利。</gsd:goal>
   <gsd:phase>获取 OBSIDIAN_REPO，读取 wiki/index.md 作为导航入口。</gsd:phase>
   <gsd:phase>从索引中定位 1-2 个最相关子分类，选择 3-5 篇具体文章。</gsd:phase>
   <gsd:phase>读取选中的完整文章，综合回答用户问题，带 [[wikilinks]] 引用。</gsd:phase>
-  <gsd:phase>将答案归档到 outputs/ 并追加回 index.md。</gsd:phase>
+
 </gsd:workflow>
 
 # Obsidian 知识库问答 (ob-chat)
@@ -138,44 +138,9 @@ description: "Obsidian 知识库问答。当用户想要查询知识库、基于
 - 引用项目知识文章时，在参考中标注 `[OBA-{id}]` + 文章标题
 - 方便用户后续直接用 ID 引用该文章
 
-### 第四步：归档答案
 
-将答案归档到 `$OBSIDIAN_REPO/outputs/{YYYY-MM-DD}-{slug}.md`：
 
-```markdown
----
-tags: [qa, {相关标签}]
-type: output
-question: {用户原始问题}
-created_at: {日期}
----
 
-# {回答标题}
-
-> 原始问题：{用户问题}
-
-{完整回答内容}
-
-### 参考
-- [[sources/{来源 1}]]
-- [[concepts/{概念 1}]]
-```
-
-### 第五步：更新索引（知识复利）
-
-在 `$OBSIDIAN_REPO/wiki/index.md` 的"综合"或新增"输出"分类下追加：
-
-```
-- [[outputs/{slug}]] — Q&A: {问题简述}
-```
-
-追加 `$OBSIDIAN_REPO/wiki/log.md`：
-
-```markdown
-## [{日期}] ask | {问题简述}
-- 参考文章：{引用列表}
-- 输出：outputs/{slug}.md
-```
 
 ### 无法回答时
 
