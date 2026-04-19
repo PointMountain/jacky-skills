@@ -32,14 +32,14 @@ description: "Obsidian 知识库健康检查与维护。当用户想要检查知
   <gsd:meta>requires=OBSIDIAN_REPO; focus=lint,fix,health</gsd:meta>
   <gsd:goal>检测知识库健康问题，生成报告并提供修复建议或自动修复。</gsd:goal>
   <gsd:phase>获取 OBSIDIAN_REPO，扫描 wiki/ 目录下所有文件。</gsd:phase>
-  <gsd:phase>运行十二项健康检查：标题清晰度、文章结构、断裂链接、孤立文章、低链接文章、重复概念、缺失概念、长文章、缺失索引、Frontmatter 规范、标签体系、内容新鲜度。</gsd:phase>
+  <gsd:phase>运行十四项健康检查：标题清晰度、文章结构、断裂链接、孤立文章、低链接文章、重复概念、缺失概念、长文章、缺失索引、Frontmatter 规范、标签体系、内容新鲜度、偏好规则遵循度、缺少 article_id。</gsd:phase>
   <gsd:phase>生成健康报告，展示问题清单（按优先级排序）。</gsd:phase>
   <gsd:phase>对可自动修复的问题提供修复选项，等待用户确认后执行。</gsd:phase>
 </gsd:workflow>
 
 # Obsidian 知识库维护 (ob-tidy)
 
-检测并修复知识库健康问题，生成健康报告。共 13 项检查，覆盖**可读性、链接引用、内容质量、组织规范、个性化偏好**五个维度。
+检测并修复知识库健康问题，生成健康报告。共 14 项检查，覆盖**可读性、链接引用、内容质量、组织规范、元数据完整性、个性化偏好**六个维度。
 
 ## 配置检查
 
@@ -54,7 +54,7 @@ description: "Obsidian 知识库健康检查与维护。当用户想要检查知
 
 扫描 `$OBSIDIAN_REPO/wiki/` 下所有 `.md` 文件（排除 `index.md`、`log.md`）：
 
-1. 读取每个文件的 frontmatter（tags、type、updated_at、created_at）
+1. 读取每个文件的 frontmatter（tags、type、updated_at、created_at、article_id）
 2. 提取所有 `[[wikilinks]]` 引用
 3. 统计文件字数
 4. 提取标题层级结构（H1-H4）
@@ -62,7 +62,7 @@ description: "Obsidian 知识库健康检查与维护。当用户想要检查知
 6. 读取 `$OBSIDIAN_REPO/wiki/index.md` 获取索引条目
 7. 如果 `$OBSIDIAN_REPO/wiki/.rating-preferences.md` 存在，读取偏好规则作为个性化检查依据
 
-### 第二步：运行十二项检查
+### 第二步：运行十四项检查
 
 ---
 
@@ -348,9 +348,52 @@ description: "Obsidian 知识库健康检查与维护。当用户想要检查知
 
 ---
 
+#### 维度五：元数据完整性
+
+##### 检查 14：缺少 article_id
+
+**目标**：确保每篇文章都有全局唯一的 article_id，便于跨系统引用。
+
+**article_id 规范**：
+
+| 规则 | 说明 |
+|------|------|
+| 格式 | `OBA-{8位随机小写字母数字}`（如 `OBA-k7jm2p9q`） |
+| 存储位置 | YAML frontmatter 的 `article_id` 字段 |
+| 唯一性 | 全局唯一，生成后需验证不重复 |
+
+**检测规则**：
+
+```
+1. 扫描 wiki/ 下所有 .md 文件
+2. 对每个文件：
+   a. 无 article_id 字段 → 标记为"缺少 article_id"
+   b. article_id 格式不符合 OBA-[a-z0-9]{8} → 标记为"article_id 格式错误"（兼容旧版 OBA-{N} 数字格式，标记为需迁移）
+3. 检查所有 article_id 是否有重复 → 标记为"article_id 重复"
+```
+
+**修复建议**：
+
+- 自动为缺少 ID 的文章分配 article_id
+- 分配方式：随机生成 8 位小写字母数字，验证唯一性后分配
+- 实现命令：
+  ```bash
+  # 生成随机 ID（8位小写字母+数字）
+  python3 -c "import random,string; print(''.join(random.choices(string.ascii_lowercase+string.digits,k=8)))"
+  ```
+- 唯一性验证：
+  ```bash
+  # 验证生成的 ID 不重复
+  grep -rh "OBA-{生成的ID}" "$OBSIDIAN_REPO/wiki/" --include="*.md"
+  ```
+  如果无结果则 ID 唯一，可使用；否则重新生成
+- 修复前展示预览：将给哪些文件分配哪些 ID，确认后批量执行
+
+---
+
 ### 第三步：生成健康报告
 
-**健康评分**：根据 13 项检查结果计算总分（满分 105）
+**健康评分**：根据 14 项检查结果计算总分（满分 105）
 
 ```
 评分权重：
@@ -367,6 +410,7 @@ description: "Obsidian 知识库健康检查与维护。当用户想要检查知
 - Frontmatter 规范（10 分）
 - 标签体系（5 分）
 - 偏好规则遵循度（5 分）- 基于用户主观评分的个性化标准（偏好文件不存在时满分）
+- 缺少 article_id（5 分）- 全局唯一 ID 是跨系统引用的基础
 ```
 
 **终端摘要**：
@@ -402,6 +446,7 @@ description: "Obsidian 知识库健康检查与维护。当用户想要检查知
   9. 1 篇文章 > 500 字
   10. 3 篇文章超过 6 个月未更新
   11. 6 个孤立标签
+  12. {n} 篇文章缺少 article_id（可自动修复）
 ```
 
 **完整报告**写入 `$OBSIDIAN_REPO/outputs/lint-{YYYY-MM-DD}.md`：
@@ -470,6 +515,9 @@ created_at: {日期}
 ### 标签体系（{n} 个问题）
 {孤立标签、相似标签等}
 
+### 缺少 article_id（{n} 篇）
+{缺少 article_id 的文章列表，附将分配的 ID 预览}
+
 ## 修复建议
 
 {按优先级排列的可执行修复步骤}
@@ -494,6 +542,7 @@ created_at: {日期}
 
 🟢 提示（可选）：
   □ 清理 6 个孤立标签（需确认合并方案）
+  □ 为 {n} 篇文章自动分配 article_id（自动）
 
 选择要执行的修复（可多选）
 ```

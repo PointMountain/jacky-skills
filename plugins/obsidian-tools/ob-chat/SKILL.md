@@ -1,6 +1,6 @@
 ---
 name: ob-chat
-description: "Obsidian 知识库问答。当用户想要查询知识库、基于笔记回答问题、在知识库中搜索信息时触发此 skill。"
+description: "Obsidian 知识库问答。当用户想要查询知识库、基于笔记回答问题、在知识库中搜索信息时触发此 skill。也支持通过文章 ID（OBA-{8位随机ID}）直接定位文章。"
 ---
 
 <role>Obsidian 知识库问答助手，通过索引优先的方式从知识库中检索并综合回答用户问题，答案归档回 wiki。</role>
@@ -16,10 +16,17 @@ description: "Obsidian 知识库问答。当用户想要查询知识库、基于
 - 在我的笔记中查找
 - 根据我的知识库回答
 
+文章 ID 触发（自动识别）：
+- 用户消息中包含 OBA-{8位随机ID} 格式的 ID（如 OBA-k7jm2p9q, OBA-xn8btf3w）
+- 自动理解为"基于该 ID 对应的 Obsidian 文章回答问题"
+- 无需显式调用 ob-chat
+
 示例：
 - "ob-chat RLHF 和 chain-of-thought 有什么关系？"
 - "在我的知识库中查找关于 Transformer 的内容"
 - "问一下：注意力机制和 RLHF 有什么共同点？"
+- "OBA-k7jm2p9q 里提到的终端跳转方案，能详细解释下吗？"
+- "看看 OBA-xn8btf3w 这篇文章"
 ```
 
 </trigger>
@@ -45,6 +52,19 @@ description: "Obsidian 知识库问答。当用户想要查询知识库、基于
 
 ## 执行流程
 
+### 第零步：文章 ID 识别（优先级最高）
+
+检查用户消息是否包含文章 ID（格式 `OBA-[a-z0-9]{8}`）：
+
+1. 如果包含 ID → 在所有项目的 `index.md` 中查找匹配行，获取文件路径
+2. 直接读取该文章全文，基于文章内容回答用户问题
+3. 跳过第一步和第二步（不需要索引检索）
+4. 回答中标注 `[OBA-{id}]` 引用来源
+
+**查找路径**：遍历 `$OBSIDIAN_REPO/wiki/projects/*/index.md`，匹配表格中 ID 列。
+
+**用户提到多个 ID 时**：读取所有匹配文章，综合回答。
+
 ### 第一步：读取索引
 
 读取 `$OBSIDIAN_REPO/wiki/index.md`，获取知识库全局导航。
@@ -56,7 +76,7 @@ description: "Obsidian 知识库问答。当用户想要查询知识库、基于
 
 **如果知识库为空**：
 ```
-知识库索引为空。请先使用 ob-learn 采集内容或使用 ob-index 初始化知识库。
+知识库索引为空。请先使用 ob-collect 采集内容或使用 ob-index 初始化知识库。
 ```
 
 ### 第二步：定位相关文章
@@ -106,12 +126,17 @@ description: "Obsidian 知识库问答。当用户想要查询知识库、基于
 - [[sources/{来源 1}]]
 - [[concepts/{概念 1}]]
 - [[synthesis/{综合文章}]]
+- [OBA-{id}] {文章标题}（如涉及项目知识文章）
 ```
 
 **code-ref 展示规则**：
 - 文章中的 code-ref callout 直接带入回答的"相关代码"部分
 - 如果用户问的是"怎么实现某功能"，优先展示与该功能相关的 code-ref
 - code-ref 中的 GitHub 链接直接呈现，用户可点击直达代码
+
+**文章 ID 展示规则**：
+- 引用项目知识文章时，在参考中标注 `[OBA-{id}]` + 文章标题
+- 方便用户后续直接用 ID 引用该文章
 
 ### 第四步：归档答案
 

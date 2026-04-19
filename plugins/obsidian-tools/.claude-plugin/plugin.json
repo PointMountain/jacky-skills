@@ -1,6 +1,6 @@
 {
   "name": "obsidian-tools",
-  "version": "2.8.0",
+  "version": "2.8.1",
   "description": "Obsidian 工具集 - 笔记同步、知识库管理",
   "author": {
     "name": "Jacky Wang",
@@ -19,7 +19,6 @@
   ],
   "skills": [
     "./config-obsidian/",
-    "./ob-summary/",
     "./ob-collect/",
     "./ob-index/",
     "./ob-chat/",

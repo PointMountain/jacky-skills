@@ -111,6 +111,7 @@ Stop Hook 在每次对话结束时自动触发，Claude 执行以下流程：
 **新建文件的 frontmatter 模板**（必填）：
 ```yaml
 ---
+article_id: OBA-{随机8位}
 tags: [{项目名}, {主题标签}]
 type: {预定义类型}    # concept/tutorial/troubleshooting/reference/note
 updated_at: {YYYY-MM-DD}
@@ -119,8 +120,15 @@ source: conversation
 ---
 ```
 
-**写入后验证**（遵循 [frontmatter-schema](../references/frontmatter-schema.md)）：
-1. **Frontmatter**：确认 tags（非空）、type（预定义值）、updated_at 存在
+**article_id 分配规则**（随机生成，无状态）：
+1. 生成方式：`OBA-` + 8位随机小写字母数字
+2. 生成命令：`python3 -c "import random,string; print(''.join(random.choices(string.ascii_lowercase+string.digits,k=8)))"`
+3. 生成后验证唯一性：`grep -rh "OBA-{生成的ID}" "$OBSIDIAN_REPO/wiki/" --include="*.md"`，如果已存在则重新生成
+4. 已有文章更新时**不修改** article_id
+5. ID 一旦分配即永久绑定，即使文章被删除，该 ID 也不会被复用
+
+**写入后验证**（遵循 [frontmatter-schema](references/frontmatter-schema.md)）：
+1. **Frontmatter**：确认 article_id、tags（非空）、type（预定义值）、updated_at 存在
 2. **Wikilink**：扫描 `[[xxx]]` 引用，确认目标文件存在
 3. **索引一致性**：确认新文件已出现在 `index.md` 表格中
 4. **交叉引用**：在同目录已有文章中查找相关主题，添加 `[[新文章名]]` 反向链接
@@ -287,16 +295,16 @@ git remote origin → basename → 当前目录名 → 询问用户
 ```
 📂 wiki/projects/{project}/
 
-  1. architecture.md — 架构设计
+  1. [OBA-k7jm2p9q] architecture.md — 架构设计
      更新于 2024-01-15 | 涵盖：目录结构、模块职责、数据流
 
-  2. decisions.md — 方案决策
+  2. [OBA-xn8btf3w] decisions.md — 方案决策
      更新于 2024-01-14 | 涵盖：技术选型、设计权衡
 
-  3. troubleshooting.md — 踩坑记录
+  3. [OBA-5qr2d7nk] troubleshooting.md — 踩坑记录
      更新于 2024-01-10 | 涵盖：bug 排查、兼容性问题
 
-请输入编号选择文章，或输入关键词搜索：
+请输入编号或文章 ID 选择文章，或输入关键词搜索：
 ```
 
 **如果用户指定了关键词**（如 "继续讨论 架构"）：直接模糊匹配文章，跳过选择步骤。
@@ -369,15 +377,23 @@ updated_at: {date}
 
 # {project-name} 知识索引
 
-| 文件 | 主题 | 涵盖维度 | 更新日期 |
-|------|------|----------|----------|
-| terminal-jump-debug.md | 终端跳转实现指南 | 架构设计、踩坑记录、可复用方案 | 2026-04-15 |
+| ID | 文件 | 主题 | 涵盖维度 | 更新日期 |
+|----|------|------|----------|----------|
+| OBA-k7jm2p9q | terminal-jump-debug.md | 终端跳转实现指南 | 架构设计、踩坑记录、可复用方案 | 2026-04-15 |
 ```
+
+### 全局 article_id 机制
+
+文章 ID 格式为 `OBA-{8位随机字母数字}`，全局唯一，随机生成。特性：
+- **生成**：8 位随机小写字母+数字，无需扫描现有 ID（极低碰撞概率）
+- **不变性**：ID 一旦分配，永不修改（即使文章被更新、移动或删除）
+- **唯一性验证**：生成后 grep 确认无碰撞，有碰撞则重新生成
+- **删除安全**：文章删除后 ID 不被复用，避免引用歧义
 
 ### 索引更新规则
 
 - **触发时机**：每次写入/新建/更新文件后，同步更新 `index.md`
-- **更新内容**：文件名（含子目录前缀）、主题（从内容提取）、涵盖维度、更新日期
+- **更新内容**：ID、文件名（含子目录前缀）、主题（从内容提取）、涵盖维度、更新日期
 - **排序**：按更新日期倒序排列（最新在前）
 - **子目录文件**：使用 `decisions/xxx.md` 格式，不以 `_` 开头的 `.md` 文件都应纳入索引
 

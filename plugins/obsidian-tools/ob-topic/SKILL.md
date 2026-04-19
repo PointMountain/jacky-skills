@@ -60,10 +60,26 @@ description: "对话中快速收藏通用知识点到 Obsidian 知识库。触�
 
 文件名：`{slug}.md`，slug 用英文短横线连接。
 
+**分配 article_id**：
+
+在写入前，为新文章分配全局唯一的 article_id（格式 `OBA-{8位随机小写字母数字}`，如 `OBA-k7jm2p9q`）。分配方式：
+
+```bash
+# 生成随机 ID（8位小写字母+数字）
+python3 -c "import random,string; print(''.join(random.choices(string.ascii_lowercase+string.digits,k=8)))"
+```
+
+- 生成后验证唯一性：
+  ```bash
+  grep -rh "OBA-{生成的ID}" "$OBSIDIAN_REPO/wiki/" --include="*.md"
+  ```
+  无结果则 ID 唯一，可使用；否则重新生成
+
 ```markdown
 ---
 tags: [{主题标签}, {关键词}]
 type: {预定义类型}
+article_id: OBA-{随机8位}
 created_at: {YYYY-MM-DD}
 source: conversation
 ---
@@ -83,7 +99,7 @@ source: conversation
 3. {要点三}
 ```
 
-**type 选择规则**（必须遵循 [frontmatter-schema](../references/frontmatter-schema.md)）：
+**type 选择规则**（必须遵循 [frontmatter-schema](references/frontmatter-schema.md)）：
 
 | 内容性质 | type |
 |---------|------|
@@ -96,7 +112,7 @@ source: conversation
 
 ### 4. 写入后验证
 
-遵循 [frontmatter-schema](../references/frontmatter-schema.md) 中的验证清单：
+遵循 [frontmatter-schema](references/frontmatter-schema.md) 中的验证清单：
 1. **Frontmatter**：确认 tags（非空）、type（预定义值）、updated_at 存在
 2. **Wikilink**：扫描 `[[xxx]]` 引用，确认目标文件存在
 3. **索引**：确认文章已出现在对应 index.md
@@ -108,7 +124,7 @@ source: conversation
 - 新主题目录时创建 `wiki/{theme}/index.md`
 - 新主题分类时更新 `wiki/index.md` 全局索引
 
-### 5. 返回结果
+### 6. 返回结果
 
 简短返回：文件路径、主题分类、标题。
 

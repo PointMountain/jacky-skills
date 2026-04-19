@@ -10,7 +10,7 @@ description: "Obsidian 知识库采集助手。从多种来源（网页、微信
 ```text
 触发词：
 - 采集文章 / 导入到知识库 / 学习记录 / 摄入资料
-- ob-collect / ob-learn / 把这个加到知识库 / 记录一下这篇文章
+- ob-collect / ob-learn / 把这个加到知识库
 - 采集视频 / 导入视频字幕 / 视频笔记
 - 采集公众号 / 微信文章
 
@@ -18,7 +18,7 @@ description: "Obsidian 知识库采集助手。从多种来源（网页、微信
 - "ob-collect https://example.com/article"
 - "帮我采集这篇文章到知识库"
 - "把这个 PDF 导入知识库"
-- "记录一下：RLHF 和 CoT 的关系"
+- "采集一下这篇文章：RLHF 和 CoT 的关系"
 - "采集这个微信公众号文章"
 - "把这个 B 站视频的字幕导入"
 ```
@@ -53,7 +53,8 @@ $OBSIDIAN_REPO/raw/
 ├── videos/         # 视频平台字幕（B站、抖音、小红书等）
 ├── news/           # 资讯聚合（Hacker News、Reddit 等）
 ├── official/       # 官方文档和文章（Claude Code、OpenAI 等）
-├── notes/          # 自由笔记
+├── notes/          # 自由笔记（人工输入的原始文档）
+├── ai-notes/       # AI 调研产出（AI 查询/分析/整理的原始资料）
 └── [作者名]/       # 音视频按作者归档（write-obsidian-note 兼容）
 
 $OBSIDIAN_REPO/wiki/{ai,claude,current-affairs,career,dev-tools,front-end,obsidian,synthesis}/
@@ -79,7 +80,8 @@ $OBSIDIAN_REPO/.kb/
 | Claude Code | Claude Code 官方文档/博客 | `raw/official/` | Anthropic 官方 |
 | OpenAI | OpenAI 官方文档/博客 | `raw/official/` | OpenAI 官方 |
 | PDF | 本地 `.pdf` 文件 | `raw/web/` | PDF 文档 |
-| 纯文本 | 无 URL | `raw/notes/` | 用户自由输入 |
+| 纯文本 | 无 URL，人工输入 | `raw/notes/` | 用户自由输入的原始文档 |
+| AI 调研 | 无 URL，AI 查询产出 | `raw/ai-notes/` | AI 分析/调研/整理的原始资料 |
 
 **检测优先级**：域名精确匹配 → 平台关键词 → 默认归类
 
@@ -123,6 +125,12 @@ $OBSIDIAN_REPO/.kb/
 ### 关键规则
 
 - 文件名规范：`{YYYY-MM-DD}-{slug}.md`
+- **article_id 分配**：每篇新建的 wiki 文章必须在 frontmatter 中包含 `article_id` 字段
+  - 格式：`OBA-{8位随机小写字母数字}`（如 `OBA-k7jm2p9q`）
+  - 全局唯一：随机生成后验证唯一性
+  - 生成命令：`python3 -c "import random,string; print(''.join(random.choices(string.ascii_lowercase+string.digits,k=8)))"`
+  - 验证命令：`grep -rh "OBA-{生成的ID}" "$OBSIDIAN_REPO/wiki/" --include="*.md"`（无输出则唯一）
+  - 如果碰撞则重新生成，直到唯一
 - 概念文章已存在时：读取并合并，不覆盖
 - 概念冲突时：标注矛盾，追加说明
 - 详细模板见 [references/compile-templates.md](references/compile-templates.md)
@@ -175,6 +183,7 @@ tags: [音频笔记, {作者名}]
 
 ```markdown
 ---
+article_id: OBA-k7jm2p9q
 tags: [{主题标签}, {作者名}, 归纳]
 type: {预定义类型}
 updated_at: {YYYY-MM-DD}
@@ -266,7 +275,7 @@ files: {N}
 
 ### 写入后验证
 
-遵循 [frontmatter-schema](../references/frontmatter-schema.md) 中的验证清单：
+遵循 [frontmatter-schema](references/frontmatter-schema.md) 中的验证清单：
 1. **Frontmatter**：确认 tags（非空）、type（预定义值）、updated_at 存在
 2. **Wikilink**：扫描所有 `[[xxx]]` 引用，确认目标文件存在于 vault 中
 3. **索引**：确认文章已出现在对应 `wiki/{theme}/index.md` 中

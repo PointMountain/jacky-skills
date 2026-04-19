@@ -6,6 +6,7 @@
 
 ```markdown
 ---
+article_id: OBA-{N}
 tags: [{标签列表}]
 type: {预定义类型}    # concept/tutorial/troubleshooting/learning/reference/note，见 frontmatter-schema
 ---
@@ -43,6 +44,7 @@ type: {预定义类型}    # concept/tutorial/troubleshooting/learning/reference
 
 ```markdown
 ---
+article_id: OBA-{N}
 tags: [{相关标签}]
 type: concept
 updated_at: {日期}

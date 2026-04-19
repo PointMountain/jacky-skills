@@ -1,6 +1,6 @@
 ---
 name: ob-index
-description: "Obsidian 知识库索引构建与维护。当用户想要编译未处理资料、更新索引、整理知识库、发现笔记关联时触发此 skill。"
+description: "Obsidian 知识库索引构建与维护。每篇 wiki 文章拥有全局唯一 article_id（格式 OBA-{8位随机ID}），索引时随机生成分配。当用户想要编译未处理资料、更新索引、整理知识库、发现笔记关联时触发此 skill。"
 ---
 
 <role>Obsidian 知识库索引引擎，负责编译原始资料、构建/更新索引、发现知识关联、生成综合文章。</role>
@@ -11,7 +11,6 @@ description: "Obsidian 知识库索引构建与维护。当用户想要编译未
 触发词：
 - 编译知识库
 - 更新索引
-- 整理知识库
 - ob-index
 - 处理未编译内容
 - 发现关联
@@ -20,7 +19,7 @@ description: "Obsidian 知识库索引构建与维护。当用户想要编译未
 示例：
 - "ob-index"
 - "编译知识库"
-- "帮我整理一下知识库索引"
+- "更新知识库索引"
 - "有哪些内容还没处理"
 ```
 
@@ -68,9 +67,31 @@ description: "Obsidian 知识库索引构建与维护。当用户想要编译未
 2. 执行编译流程（与 ob-learn 第五步相同）：
    - 生成 wiki/sources/{slug}.md
    - 创建/更新 wiki/concepts/{concept}.md
+   - 为每个新建的 wiki 文章分配 article_id（见下方 article_id 规则）
    - 更新 wiki/index.md
    - 追加 wiki/log.md
 3. 更新 manifest.json 中该条目 status 为 `compiled`
+
+**article_id 分配规则**：
+
+每篇 wiki 文章必须有 article_id，格式为 `OBA-{8位随机小写字母数字}`（如 `OBA-k7jm2p9q`）。
+
+分配流程：
+1. 生成 8 位随机 ID：
+   ```bash
+   python3 -c "import random,string; print(''.join(random.choices(string.ascii_lowercase+string.digits,k=8)))"
+   ```
+2. 验证唯一性（无输出则唯一）：
+   ```bash
+   grep -rh "OBA-{生成的ID}" "$OBSIDIAN_REPO/wiki/" --include="*.md"
+   ```
+3. 如果碰撞则重新生成，直到唯一
+4. 将 article_id 写入文章 YAML frontmatter 的 `article_id` 字段：
+   ```yaml
+   ---
+   article_id: OBA-k7jm2p9q
+   ---
+   ```
 
 **概念去重**（关键步骤）：
 
@@ -83,9 +104,17 @@ description: "Obsidian 知识库索引构建与维护。当用户想要编译未
 
 如果用户选择重建完整索引：
 
-1. 扫描 `$OBSIDIAN_REPO/wiki/` 下所有 `.md` 文件（排除 index.md、log.md）
-2. 读取每个文件的 frontmatter 和第一段
-3. 重新生成 `$OBSIDIAN_REPO/wiki/index.md`：
+1. **扫描 article_id 状态**：检查所有 wiki 文章是否都有 article_id
+   ```bash
+   # 列出缺少 article_id 的文章
+   find "$OBSIDIAN_REPO/wiki/" -name "*.md" ! -name "index.md" ! -name "log.md" -exec sh -c 'grep -L "article_id:" "$1" && echo "  缺少 article_id"' _ {} \;
+   ```
+   - 如果发现缺少 article_id 的文章，为每篇随机生成唯一 ID（使用上方生成命令 + 唯一性验证）
+   - 报告补分配结果
+
+2. 扫描 `$OBSIDIAN_REPO/wiki/` 下所有 `.md` 文件（排除 index.md、log.md）
+3. 读取每个文件的 frontmatter 和第一段
+4. 重新生成 `$OBSIDIAN_REPO/wiki/index.md`：
 
 ```markdown
 # 知识库索引
@@ -108,7 +137,7 @@ description: "Obsidian 知识库索引构建与维护。当用户想要编译未
 
 **索引条目格式**（每行一个）：
 ```
-- [[{相对路径}]] — {一句话描述，≤ 80 字}
+- [[{相对路径}]] `OBA-{随机ID}` — {一句话描述，≤ 80 字}
 ```
 
 **渐进式索引**：
@@ -190,7 +219,7 @@ updated_at: {日期}
 1. 创建完整目录结构（raw/、wiki/ 及子目录、outputs/、.kb/）
 2. 扫描 `$OBSIDIAN_REPO/` 中所有 `.md` 文件（排除 `.obsidian/`、`.kb/`、`raw/`、`wiki/`、`outputs/`）
 3. 分类现有笔记：
-   - **结构化笔记**（有标题、有内容、> 100 字）→ 复制到 `wiki/concepts/` 或 `wiki/sources/`
+   - **结构化笔记**（有标题、有内容、> 100 字）→ 复制到 `wiki/concepts/` 或 `wiki/sources/`，并分配 article_id
    - **碎片笔记**（短文本、速记、< 100 字）→ 复制到 `raw/notes/`
 4. 生成初始 `wiki/index.md`
 5. 创建 `.kb/manifest.json`
@@ -208,6 +237,8 @@ updated_at: {日期}
 - 新概念：{数量} 个
 - 新综合文章：{数量} 篇
 - 索引更新：{数量} 条
+- article_id 缺失：{数量} 篇（已自动补分配）
 
 索引总计：{总文章数} 篇文章
+所有 article_id 均为随机唯一 ID
 ```
