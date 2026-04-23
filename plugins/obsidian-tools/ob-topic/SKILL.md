@@ -3,19 +3,23 @@ name: ob-topic
 description: "对话中快速收藏通用知识点到 Obsidian 知识库。触发词：/save、/collect、收藏、记录一下、ob-topic。"
 ---
 
-<role>Obsidian 知识点快速收藏助手。从对话上下文中提取知识点，精炼概括后保存到 Obsidian wiki 主题目录。</role>
-<purpose>两种模式：1) 手动触发：用户说触发词 + 知识点描述，立即收藏；2) 自动提醒：对话中识别到通用知识点时主动询问是否收藏。</purpose>
+<role>Obsidian 知识点快速收藏助手。从对话上下文中提取知识点，精炼概括后保存到 Obsidian wiki 主题目录。写入后自动更新项目 CLAUDE.md 的 Obsidian 索引段。</role>
+<purpose>两种模式：1) 手动触发：用户说触发词 + 知识点描述，立即收藏；2) 自动提醒：对话中识别到通用知识点时主动询问是否收藏。写入后同步更新项目 CLAUDE.md。</purpose>
 <trigger>
 
 ```text
 触发词：
 - /save / /collect / 收藏 / 记录一下 / ob-topic
 - 把这个收藏 / 保存到知识库 / 记录一下这个知识点
+- 新增 topic / 新建 topic / 创建 topic
 
 示例：
 - "/save React Server Components 的流式渲染原理"
 - "收藏一下：Tauri Sidecar 的启动流程"
 - "记录一下：Node.js SEA 编译的局限性"
+- "新增一个 topic hermes"
+- "新建 topic crypto 关于加密货币"
+- "创建 topic rust，收藏 Rust 所有权机制"
 ```
 
 </trigger>
@@ -40,6 +44,26 @@ description: "对话中快速收藏通用知识点到 Obsidian 知识库。触�
 
 ### 2. 主题分类
 
+优先检测用户是否指定了 topic，再走自动匹配逻辑。
+
+#### 2a. 用户指定 topic（优先）
+
+解析用户输入，检测以下意图模式：
+
+- "新增 topic xxx" / "新建 topic xxx" / "创建 topic xxx"
+- "新增一个 topic xxx" / "新建一个 topic xxx"
+- "topic xxx 关于 yyy"
+
+**处理方式**：
+1. 提取 topic 名称（如 `hermes`、`crypto`、`rust`）
+2. 转为英文短横线命名作为目录名（如 `wiki/hermes/`、`wiki/crypto/`）
+3. 标记为 **新 topic**，后续执行 Step 2.5 创建目录
+4. 如果用户同时提供了知识点内容（如"创建 topic rust，收藏 Rust 所有权机制"），继续走 Step 3 写入笔记
+
+**注意**：如果用户指定的 topic 名称与已有分类表中的目录重名（如 `ai`、`claude`），直接使用已有目录，不重复创建。
+
+#### 2b. 自动匹配（无 topic 指定时）
+
 根据知识点关键词自动匹配主题目录：
 
 | 主题 | 目录 | 关键词 |
@@ -55,6 +79,44 @@ description: "对话中快速收藏通用知识点到 Obsidian 知识库。触�
 | 综合 | `wiki/synthesis/` | 兜底（无明确匹配时） |
 
 匹配后直接使用，不询问用户确认（全自动模式）。
+
+### 2.5 创建新 topic 目录（仅 Step 2a 触发时执行）
+
+当确定为新 topic 时，执行以下步骤：
+
+1. **检查目录是否已存在**：
+   ```bash
+   ls "$OBSIDIAN_REPO/wiki/{topic-name}/"
+   ```
+   如果已存在，跳过创建，直接使用。
+
+2. **创建目录**：
+   ```bash
+   mkdir -p "$OBSIDIAN_REPO/wiki/{topic-name}/"
+   ```
+
+3. **创建 index.md**，格式如下：
+   ```markdown
+   ---
+   tags: [{topic-name}, index]
+   type: index
+   updated_at: {YYYY-MM-DD}
+   ---
+
+   # {Topic 显示名}
+
+   > {一句话描述，来自用户输入或从上下文推断}
+
+   ## 文章列表
+
+   <!-- 后续文章会自动追加到这里 -->
+   ```
+
+4. **更新 wiki/index.md 全局索引**，在合适位置（按字母顺序或末尾）添加：
+   ```markdown
+   - [[{topic-name}/index|{Topic 显示名}]] — {一句话描述}
+   ```
+   如果 `wiki/index.md` 不存在，不创建（由 ob-index skill 统一管理）。
 
 ### 3. 写入笔记
 
@@ -121,8 +183,15 @@ source: conversation
 ### 5. 更新索引
 
 - 更新 `wiki/{theme}/index.md`：追加新条目到对应分类下
-- 新主题目录时创建 `wiki/{theme}/index.md`
-- 新主题分类时更新 `wiki/index.md` 全局索引
+- 新主题目录时创建 `wiki/{theme}/index.md`（Step 2.5 已处理，此处验证即可）
+- 新主题分类时更新 `wiki/index.md` 全局索引（Step 2.5 已处理，此处验证即可）
+- **对新 topic**：确认 `wiki/{topic-name}/index.md` 存在且包含新文章条目；确认 `wiki/index.md` 已包含该 topic 的链接
+
+### 5.5 更新项目 CLAUDE.md 索引段
+
+写入完成后，如果当前在 git 项目中，自动更新项目 CLAUDE.md 中的 Obsidian 索引段。流程参考 [ob-project-log/references/claude-index-format.md](../ob-project-log/references/claude-index-format.md) 中的"共享更新流程"。
+
+**注意**：ob-topic 写入的内容在主题目录（wiki/{theme}/），不一定有项目级索引。更新会静默跳过，不影响主流程。如果用户已为当前项目建立了 Obsidian 项目索引，则同步更新 CLAUDE.md。
 
 ### 6. 返回结果
 
