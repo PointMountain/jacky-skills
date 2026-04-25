@@ -71,9 +71,9 @@
 | `@action:git-checkout` | 恢复 Git 修改 | `git checkout -- <file>` |
 | 无 @action | 手动清理 | 仅提醒，不自动执行 |
 
-## 四、命令体系
+## 四、SKILL.md 完整结构
 
-### SKILL.md Frontmatter
+### Frontmatter
 
 ```yaml
 ---
@@ -82,6 +82,69 @@ description: "项目级 TODO 追踪：管理临时代码清理、待办事项、
 argument-hint: '[add|done|clean|list|setup|save|restore|add-file] [内容]'
 ---
 ```
+
+### 完整 SKILL.md 内容
+
+```xml
+<role>你是一个任务管理专家，帮助用户追踪和管理项目中的临时代码、待办事项、想法和临时文件。</role>
+
+<purpose>当用户需要管理项目中的临时任务、记录想法、追踪临时代码或恢复上下文时，使用此 skill。</purpose>
+
+<trigger>
+用户说 /todo、TODO、任务列表、临时文件清理、恢复上下文 时触发
+</trigger>
+
+<gsd:workflow>
+  <gsd:meta>
+    <name>todo</name>
+    <trigger>/todo, TODO, 任务列表, 临时文件, 清理, 想法</trigger>
+    <requires>Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion</requires>
+    <checkpoints>
+      <checkpoint order="1">命令解析完成</checkpoint>
+      <checkpoint order="2">文件操作确认</checkpoint>
+    </checkpoints>
+    <constraints>
+      <constraint>所有清理操作（delete/git-checkout）必须经过用户确认</constraint>
+      <constraint>删除操作必须校验路径在项目目录内</constraint>
+      <constraint>不修改 .todo.md 之外的任何项目文件（setup 命令除外）</constraint>
+    </constraints>
+  </gsd:meta>
+
+  <gsd:goal>为项目提供持久化的任务追踪，管理临时代码、待办事项、想法和临时文件</gsd:goal>
+
+  <gsd:phase name="parse" order="1">
+    <gsd:step>读取用户输入，解析子命令和参数</gsd:step>
+    <gsd:step>支持子命令：add, done, clean, list, setup, save, restore, add-file</gsd:step>
+    <gsd:step>解析选项：--cleanup, --idea, @file:, @action:</gsd:step>
+    <checkpoint>命令解析完成，确认操作意图</checkpoint>
+  </gsd:phase>
+
+  <gsd:phase name="execute" order="2">
+    <gsd:step>检查 .todo.md 是否存在，不存在则创建初始模板</gsd:step>
+    <gsd:step>根据命令执行对应操作</gsd:step>
+    <gsd:step>对于 clean 命令，执行路径安全校验和用户确认</gsd:step>
+    <gsd:step>更新 .todo.md 中的内容和时间戳</gsd:step>
+    <checkpoint>操作完成，反馈结果</checkpoint>
+  </gsd:phase>
+
+  <gsd:phase name="cleanup" order="3">
+    <gsd:step>展示操作结果</gsd:step>
+    <gsd:step>对于 clean 操作，执行后标记 checkbox 为 [x]</gsd:step>
+    <gsd:step>更新 最后更新 时间戳</gsd:step>
+  </gsd:phase>
+</gsd:workflow>
+```
+
+### 运行模式
+
+本 skill 采用 **门禁模式（Gate Mode）**，每个 phase 结束有 checkpoint 确认。
+
+原因：
+1. 涉及文件删除和代码恢复操作，需要谨慎确认
+2. 用户需要明确知道每一步将要做什么
+3. clean 命令尤其需要逐步确认，防止误删
+
+## 五、命令体系
 
 ### 命令列表
 
@@ -101,13 +164,40 @@ argument-hint: '[add|done|clean|list|setup|save|restore|add-file] [内容]'
 ### `/todo clean` 详细流程
 
 1. 读取 `.todo.md` 中 🧹 Cleanup 和 📁 Temp Files 的未完成项
-2. 展示待清理项列表，按编号排列
-3. 用户确认选择要清理的项（全部/选择编号/取消）
-4. 执行对应操作：
-   - `@action:delete` → `rm <file>`
+2. 对每项执行路径安全校验（见下方安全规则）
+3. 展示待清理项列表，按编号排列，标注不安全的项
+4. 用户确认选择要清理的项（全部/选择编号/取消）
+5. 执行对应操作：
+   - `@action:delete` → `rm <file>`（仅项目内路径）
    - `@action:git-checkout` → `git checkout -- <file>`
    - 无 @action → 仅提醒手动处理
-5. 标记对应项为 `[x]` 已完成
+6. 标记对应项为 `[x]` 已完成
+
+### 路径安全校验规则
+
+所有涉及文件操作（delete/git-checkout）的命令必须通过以下安全检查：
+
+| 检查项 | 规则 | 不通过时行为 |
+|--------|------|-------------|
+| **项目内路径** | 解析后的绝对路径必须在当前项目目录下 | 跳过该项，标注 ⚠️ 不安全 |
+| **路径穿越** | 不允许 `..`、符号链接指向项目外 | 跳过该项，标注 ⚠️ 不安全 |
+| **文件存在性** | `@file:` 标记的文件必须存在 | 跳过该项，提示文件不存在 |
+| **node_modules 保护** | `git checkout` 操作需额外确认 | 二次确认 |
+| **绝对路径禁止** | 不允许以 `/` 开头的绝对路径 | 拒绝执行 |
+
+安全检查实现：
+```bash
+# 路径安全校验
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+FILE_PATH="$PROJECT_ROOT/$RELATIVE_PATH"
+RESOLVED="$(realpath "$FILE_PATH" 2>/dev/null || echo '')"
+
+# 检查是否在项目内
+if [[ "$RESOLVED" != "$PROJECT_ROOT"* ]]; then
+  echo "⚠️ 路径不安全: $RELATIVE_PATH (解析到项目外)"
+  exit 1
+fi
+```
 
 ## 五、Hooks 机制
 
@@ -270,10 +360,13 @@ todo/
 ## 八、安全考虑
 
 1. **清理操作需确认**：所有 delete 和 git-checkout 操作都需要用户确认
-2. **静默失败**：所有 hook 脚本以 `exit 0` 结束，不影响正常流程
-3. **开关控制**：`.todo-enabled` 文件控制 hooks 是否激活
-4. **防死循环**：Stop hook 使用标记文件机制
-5. **Git 友好**：`.todo.md` 可选择加入 `.gitignore` 或提交到仓库
+2. **路径安全校验**：所有文件操作必须校验路径在项目目录内，防止路径穿越
+3. **静默失败**：所有 hook 脚本以 `exit 0` 结束，不影响正常流程
+4. **开关控制**：`.todo-enabled` 文件控制 hooks 是否激活
+5. **防死循环**：Stop hook 使用标记文件机制
+6. **Git 友好**：`.todo.md` 可选择加入 `.gitignore` 或提交到仓库
+7. **node_modules 保护**：恢复 node_modules 修改需二次确认
+8. **绝对路径拒绝**：不允许操作绝对路径，仅接受相对路径
 
 ## 九、使用场景示例
 
