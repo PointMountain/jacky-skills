@@ -146,6 +146,8 @@ argument-hint: '[add|done|clean|list|setup|save|restore|add-file] [内容]'
 
 ## 五、命令体系
 
+> 详细命令说明见 references/commands.md
+
 ### 命令列表
 
 | 命令 | 用途 | 参数 |
@@ -193,13 +195,13 @@ FILE_PATH="$PROJECT_ROOT/$RELATIVE_PATH"
 RESOLVED="$(realpath "$FILE_PATH" 2>/dev/null || echo '')"
 
 # 检查是否在项目内
-if [[ "$RESOLVED" != "$PROJECT_ROOT"* ]]; then
+if [[ "$RESOLVED" != "$PROJECT_ROOT/"* ]]; then
   echo "⚠️ 路径不安全: $RELATIVE_PATH (解析到项目外)"
   exit 1
 fi
 ```
 
-## 五、Hooks 机制
+## 六、Hooks 机制
 
 ### Hook 注册结构
 
@@ -320,7 +322,7 @@ rm .todo-enabled
 
 Hook 脚本在开头检查 `.todo-enabled` 文件，不存在则 `exit 0` 静默退出。
 
-## 六、Skill 目录结构
+## 七、Skill 目录结构
 
 ```
 todo/
@@ -337,7 +339,7 @@ todo/
     └── setup-guide.md               # Setup 和 hooks 配置指南
 ```
 
-## 七、GSD Workflow 设计
+## 八、GSD Workflow 设计
 
 ### Phase 1：命令解析
 
@@ -357,7 +359,7 @@ todo/
 2. 对于 clean 命令，执行确认流程
 3. 更新 `.todo.md` 中的 checkbox 状态
 
-## 八、安全考虑
+## 九、安全考虑
 
 1. **清理操作需确认**：所有 delete 和 git-checkout 操作都需要用户确认
 2. **路径安全校验**：所有文件操作必须校验路径在项目目录内，防止路径穿越
@@ -368,7 +370,7 @@ todo/
 7. **node_modules 保护**：恢复 node_modules 修改需二次确认
 8. **绝对路径拒绝**：不允许操作绝对路径，仅接受相对路径
 
-## 九、使用场景示例
+## 十、使用场景示例
 
 ### 场景 1：长任务中的临时代码管理
 
