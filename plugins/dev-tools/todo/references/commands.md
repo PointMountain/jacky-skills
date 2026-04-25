@@ -96,9 +96,8 @@
 
 **行为**：
 1. 将 hooks.json 配置合并到 `~/.claude/settings.json`
-2. 创建 `.todo-enabled` 开关文件
-3. 如有必要创建 `.todo.md` 初始文件
-4. 询问是否加入 `.gitignore`
+2. 如有必要创建 `.todo.md` 初始文件
+3. 询问是否加入 `.gitignore`
 
 ### /todo save
 

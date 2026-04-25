@@ -5,13 +5,9 @@
 SESSION_PID="$PPID"
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 TODO_FILE="$PROJECT_ROOT/.todo.md"
-ENABLED_FILE="$PROJECT_ROOT/.todo-enabled"
 MARKER="/tmp/todo-checked-${SESSION_PID}"
 
-# 守卫：检查功能开关
-[ -f "$ENABLED_FILE" ] || exit 0
-
-# 守卫：检查 .todo.md 是否存在
+# 守卫：检查 .todo.md 是否存在（作为功能开关）
 [ -f "$TODO_FILE" ] || exit 0
 
 # 防死循环：如果刚处理过，允许停止

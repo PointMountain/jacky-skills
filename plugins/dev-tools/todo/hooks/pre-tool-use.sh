@@ -5,10 +5,10 @@
 
 INPUT="$1"
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-ENABLED_FILE="$PROJECT_ROOT/.todo-enabled"
+TODO_FILE="$PROJECT_ROOT/.todo.md"
 
-# 守卫：检查功能开关
-[ -f "$ENABLED_FILE" ] || exit 0
+# 守卫：检查 .todo.md 是否存在（作为功能开关）
+[ -f "$TODO_FILE" ] || exit 0
 
 # 从输入中提取文件路径（静默，不在 stdout 打印中间结果）
 FILE_PATH=$(echo "$INPUT" | python3 -c "

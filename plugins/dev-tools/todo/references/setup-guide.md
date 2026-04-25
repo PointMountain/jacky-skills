@@ -24,18 +24,9 @@ j-skills install todo -g
 
 这会：
 - 将 hooks 配置注入 `~/.claude/settings.json`
-- 创建 `.todo-enabled` 开关文件
 - 创建 `.todo.md` 初始文件（如果不存在）
 
-### 3. 手动控制
-
-```bash
-# 启用
-echo "enabled" > .todo-enabled
-
-# 禁用
-rm .todo-enabled
-```
+> hooks 通过检测 `.todo.md` 是否存在来决定是否激活，无需额外开关文件。删除 `.todo.md` 即可禁用。
 
 ## Hooks 配置详情
 
@@ -90,7 +81,6 @@ rm .todo-enabled
 **加入 .gitignore（推荐）**：
 ```
 .todo.md
-.todo-enabled
 ```
 
 适合：个人项目，不想把 TODO 追踪提交到仓库

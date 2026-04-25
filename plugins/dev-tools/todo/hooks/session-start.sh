@@ -4,12 +4,8 @@
 
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 TODO_FILE="$PROJECT_ROOT/.todo.md"
-ENABLED_FILE="$PROJECT_ROOT/.todo-enabled"
 
-# 守卫：检查功能开关
-[ -f "$ENABLED_FILE" ] || exit 0
-
-# 守卫：检查 .todo.md 是否存在
+# 守卫：检查 .todo.md 是否存在（作为功能开关）
 [ -f "$TODO_FILE" ] || exit 0
 
 # 统计分区未完成项数量（以"下一个 ## 标题"为边界）

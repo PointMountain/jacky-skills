@@ -91,9 +91,8 @@ argument-hint: '[add|done|clean|list|setup|save|restore|add-file] [内容]'
 **setup 命令：**
 1. 读取 hooks/hooks.json 配置
 2. 将 hooks 配置合并到 ~/.claude/settings.json 中
-3. 在当前项目根目录创建 .todo-enabled 开关文件
-4. 如果 .todo.md 不存在，创建初始模板
-5. 询问用户是否将 .todo.md 和 .todo-enabled 加入 .gitignore
+3. 如果 .todo.md 不存在，创建初始模板
+4. 询问用户是否将 .todo.md 加入 .gitignore
     </gsd:step>
     <checkpoint>操作完成，反馈结果</checkpoint>
   </gsd:phase>
