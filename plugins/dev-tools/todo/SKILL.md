@@ -29,3 +29,11 @@ argument-hint: '[add|done|clean|list|setup|save|restore|add-file] [内容]'
   </gsd:meta>
 
   <gsd:goal>为项目提供持久化的任务追踪，管理临时代码、待办事项、想法和临时文件</gsd:goal>
+
+  <gsd:phase name="parse" order="1">
+    <gsd:step>读取用户输入的参数，解析子命令</gsd:step>
+    <gsd:step>支持子命令：add, done, clean, list, setup, save, restore, add-file</gsd:step>
+    <gsd:step>解析选项：--cleanup, --idea, @file:, @action:</gsd:step>
+    <gsd:step>如果没有子命令，默认执行 list</gsd:step>
+    <checkpoint>命令解析完成，确认操作意图</checkpoint>
+  </gsd:phase>
