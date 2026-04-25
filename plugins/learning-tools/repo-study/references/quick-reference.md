@@ -55,8 +55,8 @@
 # 获取远程最新 commit
 gh api repos/OWNER/REPO/commits/main --jq '.sha'
 
-# 读取本地记录的 commit
-cat ~/jacky-github/REPO-study/.study-meta.json | jq -r '.repo.commitSha // .commitSha'
+# 读取本地记录的 commit（study 项目路径从 CLAUDE.md 的 GitHub 项目目录配置中读取）
+cat {GitHub项目目录}/{REPO}-study/.study-meta.json | jq -r '.repo.commitSha // .commitSha'
 ```
 
 ## 当前目录状态查询（status）
