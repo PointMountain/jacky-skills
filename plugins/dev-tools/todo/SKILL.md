@@ -97,3 +97,33 @@ argument-hint: '[add|done|clean|list|setup|save|restore|add-file] [内容]'
     </gsd:step>
     <checkpoint>操作完成，反馈结果</checkpoint>
   </gsd:phase>
+
+  <gsd:phase name="cleanup" order="3">
+    <gsd:step>展示操作结果</gsd:step>
+    <gsd:step>对于 clean 操作，标记已清理的项为 [x]</gsd:step>
+    <gsd:step>更新 .todo.md 最后更新时间戳</gsd:step>
+  </gsd:phase>
+</gsd:workflow>
+
+## .todo.md 文件格式
+
+> 详细格式说明见 references/file-format.md
+
+文件存储在项目根目录 `.todo.md`，包含四个分区：
+
+## 🧹 Cleanup（需要清理的临时代码）
+## 📋 Todo（待办事项）
+## 💡 Ideas（想法记录）
+## 📁 Temp Files（需要删除的临时文件）
+
+每条项格式：`- [ ] 描述内容 @file:path @action:type`
+
+## 安全规则
+
+> 详细安全说明见 references/setup-guide.md
+
+1. 所有清理操作必须经用户确认
+2. 路径安全校验：解析后绝对路径必须在项目目录内
+3. 禁止操作绝对路径（以 / 开头）
+4. node_modules 的 git-checkout 需二次确认
+5. 所有 hook 脚本以 exit 0 结束
