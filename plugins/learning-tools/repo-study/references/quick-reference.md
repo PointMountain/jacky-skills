@@ -28,11 +28,23 @@
 
 ## 研究模式选择
 
+### 双模式：Survey + Incremental
+
+项目研究分为两种模式，根据 `surveyState` 自动判断：
+
+| 模式 | 触发条件 | 产出目录 | 说明 |
+|------|----------|----------|------|
+| **Survey** | `surveyState != "completed"` | `explorer/` | 首次系统调研，成体系笔记 |
+| **Incremental** | `surveyState == "completed"` | `notes/` | 增量问答，零散笔记 |
+
+### Survey 模式下的研究风格
+
 **Yolo 模式（快速模式）**：
 - 启动 subagent（蓝色标识）执行代码分析
 - 主会话接收 subagent 研究结果后输出完整报告
 - 包含完整的代码分析和设计亮点
 - 支持并行研究多个独立课题
+- 产出沉淀到 `explorer/`
 - 适合快速了解整体实现
 
 **交互模式（教学模式）**：
@@ -44,8 +56,16 @@
 - **实时更新**：立即更新会话状态和思维导图（使用 Edit 工具）
 - **实时思维导图**：每步展示当前知识树位置和进度
 - 每步后提供选项：继续/暂停/更多解释/提问
+- 产出沉淀到 `explorer/`
 - 支持 `/repo-study continue` 恢复中断的学习
 - 适合深入学习和教学场景
+
+### Incremental 模式
+
+- 直接启动针对性 subagent 分析相关代码区域
+- 产出沉淀到 `notes/`（零散笔记，不成体系）
+- 每个笔记独立，不需要与其他笔记形成链路
+- 完成后更新 `.study-meta.json` 的 topics[]（location: "notes"）
 
 ---
 
@@ -68,3 +88,23 @@ scripts/repo-study-status.sh --check-remote
 # JSON 输出
 scripts/repo-study-status.sh --json --check-remote
 ```
+
+---
+
+## 文档翻译（translate）
+
+```bash
+# 生成翻译任务（默认跳过已存在 *.zh.md）
+scripts/repo-study-translate.sh
+
+# JSON 输出任务清单（给主会话派发 subagent 用）
+scripts/repo-study-translate.sh --json
+
+# 强制重译（已存在 *.zh.md 也加入任务）
+scripts/repo-study-translate.sh --json --force
+```
+
+翻译约束：
+- 源文件 `*.md` 不允许修改
+- 译文只写到 `*.zh.md`
+- 建议按 `group` 字段并行派发 subagent 执行

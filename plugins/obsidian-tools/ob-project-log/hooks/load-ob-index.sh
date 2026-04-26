@@ -2,6 +2,10 @@
 # hooks/load-ob-index.sh
 # SessionStart Hook：会话开始时自动加载当前项目的 Obsidian 知识索引
 # skill: ob-project-log
+#
+# 渐进式加载逻辑：
+# - 如果项目 CLAUDE.md 已有 <!-- ob-index --> 标记 → 只注入简短提示（Level 1 由 CLAUDE.md 承载）
+# - 如果没有标记（向后兼容）→ 注入完整项目索引
 
 # 获取项目名称：优先 git remote basename，其次目录名
 PROJECT_NAME=$(basename "$(git remote get-url origin 2>/dev/null)" .git 2>/dev/null)
@@ -23,6 +27,26 @@ if [ -z "$OB_REPO" ] || [ ! -d "$OB_REPO" ]; then
   fi
 fi
 
+# 检查项目 CLAUDE.md 是否已有 ob-index 标记
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/CLAUDE.md" ]; then
+  if grep -q '<!-- ob-index:start -->' "$GIT_ROOT/CLAUDE.md" 2>/dev/null; then
+    # CLAUDE.md 已有自动索引标记，Level 1 由 CLAUDE.md 承载
+    # 只注入一条简短提示，引导 LLM 使用渐进式加载
+    cat << EOF
+<system-reminder>
+## 项目知识库 (ob-project-log)
+
+当前项目 CLAUDE.md 已包含 Obsidian 知识库索引（Level 1）。
+需要详情时：读取 CLAUDE.md 中 \`<!-- ob-index -->\` 区域指向的索引文件（Level 2），再读取具体文章（Level 3）。
+用户提到文章 ID（如 OBA-xxx）时，直接定位对应文章并读取。
+</system-reminder>
+EOF
+    exit 0
+  fi
+fi
+
+# 向后兼容：CLAUDE.md 没有 ob-index 标记，注入完整项目索引
 PROJECT_INDEX="$OB_REPO/wiki/projects/$PROJECT_NAME/index.md"
 
 if [ ! -f "$PROJECT_INDEX" ]; then

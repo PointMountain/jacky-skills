@@ -6,7 +6,43 @@
 
 根据 Phase 0 问卷的 4 个选项组合选择模板：
 
-| 门禁/YOLO | Resume | LLM | 模板组合 |
+### argument-hint 字段指南
+
+`argument-hint` 是 skill frontmatter 中的可选字段，用于在用户输入 `/skill-name` 时自动展示参数用法提示。
+
+**何时添加**：
+- skill 接受用户参数（通过 `$ARGUMENTS` 变量传递）
+- skill 有子命令或互斥选项
+- 用户调用时需要知道可以传什么参数
+
+**何时省略**：
+- skill 不接受任何参数
+- skill 的触发方式不涉及参数输入
+
+**格式约定**：
+| 符号 | 含义 | 示例 |
+|------|------|------|
+| `[...]` | 可选参数 | `[--verbose]` |
+| `{...}` | 必填参数 | `{file-path}` |
+| `\|` | 互斥选项 | `[--json\|--text]` |
+| `[...]` | 可选位置参数 | `[query ...]` |
+
+**示例**：
+```yaml
+# 无参数（省略 argument-hint）
+argument-hint: 不写此行
+
+# 可选互斥参数
+argument-hint: '[--enable-review-gate|--disable-review-gate]'
+
+# 带必填参数
+argument-hint: '[job-id]'
+
+# 复杂参数
+argument-hint: '[--wait|--background] [--base <ref>] [--scope auto|working-tree|branch]'
+```
+
+---
 |-----------|--------|-----|----------|
 | 门禁 | ✅ | ✅ | 模板 A + Resume 块 + LLM 块 |
 | 门禁 | ✅ | ❌ | 模板 A + Resume 块 |
@@ -27,6 +63,7 @@
 ---
 name: <skill-name>
 description: "<简短描述，说明何时触发此 skill>"
+argument-hint: '<参数提示，如 [--option|--alt] [required-arg]。无参数时省略此行>'
 ---
 
 <role>
@@ -96,6 +133,7 @@ description: "<简短描述，说明何时触发此 skill>"
 ---
 name: <skill-name>
 description: "<简短描述，说明何时触发此 skill>"
+argument-hint: '<参数提示，如 [--option|--alt] [required-arg]。无参数时省略此行>'
 ---
 
 <role>

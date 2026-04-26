@@ -29,7 +29,7 @@ description: "Obsidian 知识库采集助手。从多种来源（网页、微信
   <gsd:goal>将来源采集到 raw/ 编译到 wiki/{theme}/。</gsd:goal>
   <gsd:phase>获取 OBSIDIAN_REPO 路径，识别输入类型和来源平台。</gsd:phase>
   <gsd:phase>平台检测 → 主题分类 → 提取内容 → 预览确认 → 写入 raw/ → 编译到 wiki/{theme}/。</gsd:phase>
-  <gsd:phase>更新索引：wiki/{theme}/index.md、wiki/index.md（新主题时）、wiki/log.md、.kb/manifest.json。</gsd:phase>
+  <gsd:phase>更新索引：wiki/{theme}/index.md、wiki/index.md（新主题时）、wiki/log.md、.kb/manifest.json。如果当前在 git 项目中，同步更新项目 CLAUDE.md 的 Obsidian 索引段。</gsd:phase>
 </gsd:workflow>
 
 # Obsidian 知识库采集 (ob-collect)
@@ -280,6 +280,12 @@ files: {N}
 2. **Wikilink**：扫描所有 `[[xxx]]` 引用，确认目标文件存在于 vault 中
 3. **索引**：确认文章已出现在对应 `wiki/{theme}/index.md` 中
 4. **交叉引用**：在同目录已有文章中查找 tags 重叠的文章，添加反向链接
+
+### 更新项目 CLAUDE.md 索引段
+
+编译完成后，如果当前在 git 项目中，自动更新项目 CLAUDE.md 中的 Obsidian 索引段。流程参考 [ob-project-log/references/claude-index-format.md](../ob-project-log/references/claude-index-format.md) 中的"共享更新流程"。
+
+**注意**：ob-collect 写入的内容通常在主题目录（wiki/{theme}/），不一定有项目级索引。此时更新会静默跳过，不影响主流程。如果用户已为当前项目建立了 Obsidian 项目索引（wiki/projects/{project}/），则同步更新 CLAUDE.md。
 
 ## 异常处理
 

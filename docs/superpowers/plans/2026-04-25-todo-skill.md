@@ -108,7 +108,7 @@ argument-hint: '[add|done|clean|list|setup|save|restore|add-file] [内容]'
     <constraints>
       <constraint>所有清理操作（delete/git-checkout）必须经过用户确认</constraint>
       <constraint>删除操作必须校验路径在项目目录内</constraint>
-      <constraint>不修改 .todo.md 之外的任何项目文件（setup 命令除外）</constraint>
+      <constraint>默认不修改 .todo.md 之外的项目文件；仅 clean/setup 命令可修改，且必须通过用户确认与路径安全校验</constraint>
     </constraints>
   </gsd:meta>
 
@@ -405,8 +405,9 @@ git commit -m "feat(todo): 添加 hooks.json 事件注册配置"
 # session-start.sh — SessionStart Hook：注入 TODO 提醒
 # 功能：会话启动时检查 .todo.md 并注入未完成项统计
 
-TODO_FILE="$(pwd)/.todo.md"
-ENABLED_FILE="$(pwd)/.todo-enabled"
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+TODO_FILE="$PROJECT_ROOT/.todo.md"
+ENABLED_FILE="$PROJECT_ROOT/.todo-enabled"
 
 # 守卫：检查功能开关
 [ -f "$ENABLED_FILE" ] || exit 0
@@ -414,11 +415,21 @@ ENABLED_FILE="$(pwd)/.todo-enabled"
 # 守卫：检查 .todo.md 是否存在
 [ -f "$TODO_FILE" ] || exit 0
 
-# 统计各分区未完成项数量
-cleanup_count=$(awk '/^## 🧹 Cleanup/,/^## [📋💡📁]|^$/' "$TODO_FILE" | grep -c '^- \[ \]' 2>/dev/null || echo 0)
-todo_count=$(awk '/^## 📋 Todo/,/^## [🧹💡📁]|^$/' "$TODO_FILE" | grep -c '^- \[ \]' 2>/dev/null || echo 0)
-ideas_count=$(awk '/^## 💡 Ideas/,/^## [🧹📋📁]|^$/' "$TODO_FILE" | grep -c '^- \[ \]' 2>/dev/null || echo 0)
-temp_count=$(awk '/^## 📁 Temp Files/,/^## [🧹📋💡]|$/' "$TODO_FILE" | grep -c '^- \[ \]' 2>/dev/null || echo 0)
+# 统计分区未完成项数量（以“下一个 ## 标题”为边界）
+count_open_items() {
+  local section="$1"
+  awk -v section="$section" '
+    $0 == "## " section { in_section=1; next }
+    in_section && /^## / { in_section=0 }
+    in_section && /^- \[ \]/ { count++ }
+    END { print count + 0 }
+  ' "$TODO_FILE"
+}
+
+cleanup_count=$(count_open_items "🧹 Cleanup")
+todo_count=$(count_open_items "📋 Todo")
+ideas_count=$(count_open_items "💡 Ideas")
+temp_count=$(count_open_items "📁 Temp Files")
 
 total=$((cleanup_count + todo_count + ideas_count + temp_count))
 
@@ -514,8 +525,9 @@ git commit -m "feat(todo): 添加 SessionStart hook 脚本"
 # 功能：AI 响应结束时检查是否有未清理的 cleanup/temp-file 项
 
 SESSION_PID="$PPID"
-TODO_FILE="$(pwd)/.todo.md"
-ENABLED_FILE="$(pwd)/.todo-enabled"
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+TODO_FILE="$PROJECT_ROOT/.todo.md"
+ENABLED_FILE="$PROJECT_ROOT/.todo-enabled"
 MARKER="/tmp/todo-checked-${SESSION_PID}"
 
 # 守卫：检查功能开关
@@ -531,8 +543,18 @@ if [ -f "$MARKER" ]; then
 fi
 
 # 检查 cleanup 和 temp-files 分区是否有未完成项
-cleanup_pending=$(awk '/^## 🧹 Cleanup/,/^## [📋💡📁]|^$/' "$TODO_FILE" | grep -c '^- \[ \]' 2>/dev/null || echo 0)
-temp_pending=$(awk '/^## 📁 Temp Files/,/^## [🧹📋💡]|$/' "$TODO_FILE" | grep -c '^- \[ \]' 2>/dev/null || echo 0)
+count_open_items() {
+  local section="$1"
+  awk -v section="$section" '
+    $0 == "## " section { in_section=1; next }
+    in_section && /^## / { in_section=0 }
+    in_section && /^- \[ \]/ { count++ }
+    END { print count + 0 }
+  ' "$TODO_FILE"
+}
+
+cleanup_pending=$(count_open_items "🧹 Cleanup")
+temp_pending=$(count_open_items "📁 Temp Files")
 
 pending=$((cleanup_pending + temp_pending))
 
@@ -584,8 +606,9 @@ git commit -m "feat(todo): 添加 Stop hook 脚本（防死循环）"
 # pre-compact.sh — PreCompact Hook：保存进展提醒
 # 功能：上下文压缩前提醒 Claude 将进展写入 .todo.md
 
-TODO_FILE="$(pwd)/.todo.md"
-ENABLED_FILE="$(pwd)/.todo-enabled"
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+TODO_FILE="$PROJECT_ROOT/.todo.md"
+ENABLED_FILE="$PROJECT_ROOT/.todo-enabled"
 
 # 守卫：检查功能开关
 [ -f "$ENABLED_FILE" ] || exit 0
@@ -640,7 +663,8 @@ git commit -m "feat(todo): 添加 PreCompact hook 脚本"
 # Matcher: Write|Bash
 
 INPUT="$1"
-ENABLED_FILE="$(pwd)/.todo-enabled"
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+ENABLED_FILE="$PROJECT_ROOT/.todo-enabled"
 
 # 守卫：检查功能开关
 [ -f "$ENABLED_FILE" ] || exit 0
@@ -663,8 +687,17 @@ except:
 # 如果没有提取到内容，放行
 [ -z "$FILE_PATH" ] && exit 0
 
-# 提取文件名
-FILENAME=$(basename "$FILE_PATH" 2>/dev/null)
+# 规范化为项目相对路径，避免丢失目录信息
+if [[ "$FILE_PATH" == "$PROJECT_ROOT/"* ]]; then
+  TRACK_PATH="${FILE_PATH#"$PROJECT_ROOT"/}"
+elif [[ "$FILE_PATH" == /* ]]; then
+  TRACK_PATH="$FILE_PATH"
+else
+  TRACK_PATH="$FILE_PATH"
+fi
+
+# 提取文件名用于模式匹配
+FILENAME=$(basename "$TRACK_PATH" 2>/dev/null)
 [ -z "$FILENAME" ] && exit 0
 
 # 临时文件匹配模式
@@ -686,8 +719,8 @@ cat <<EOF
 <system-reminder>
 ## TODO 临时文件检测 (todo-skill)
 
-检测到可能创建临时文件: ${FILENAME}
-建议使用 \`/todo add-file ${FILENAME}\` 将此文件加入追踪列表，防止遗忘清理。
+检测到可能创建临时文件: ${TRACK_PATH}
+建议使用 \`/todo add-file ${TRACK_PATH}\` 将此文件加入追踪列表，防止遗忘清理。
 </system-reminder>
 EOF
 

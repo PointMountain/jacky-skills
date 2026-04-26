@@ -261,14 +261,15 @@ gsd skill 创建
 1. `SKILL.md` 顶部包含完整 frontmatter（`---` 包裹）：`name` + `description`
 2. `description` 使用双引号包裹，不以 `TRIGGER:` 开头
 3. `name` 使用小写字母+连字符
-4. YOLO 模式的 skill 包含 `<yolo:config>` 块和安全门定义
-5. Resume 模式的 skill 包含状态文件和 Next Up 契约
-6. LLM 依赖的 skill 包含静默预检查和友好错误处理
-7. `j-skills link --list` / `j-skills list -g` 能看到目标 skill
-8. 变更后已重启会话并用触发词验证
-9. `SKILL.md` 行数 ≤ 500，超出部分抽离到 `references/`
-10. **hooks 目录在 skill 目录内**（不是 plugin 根目录），参考 `references/hooks-creation-guide.md`
-11. **hook 脚本**有标准头部、守卫条件、静默失败、`exit 0`
+4. 若 skill 接受参数，frontmatter 包含 `argument-hint` 字段（用单引号包裹）；无参数时省略
+5. YOLO 模式的 skill 包含 `<yolo:config>` 块和安全门定义
+6. Resume 模式的 skill 包含状态文件和 Next Up 契约
+7. LLM 依赖的 skill 包含静默预检查和友好错误处理
+8. `j-skills link --list` / `j-skills list -g` 能看到目标 skill
+9. 变更后已重启会话并用触发词验证
+10. `SKILL.md` 行数 ≤ 500，超出部分抽离到 `references/`
+11. **hooks 目录在 skill 目录内**（不是 plugin 根目录），参考 `references/hooks-creation-guide.md`
+12. **hook 脚本**有标准头部、守卫条件、静默失败、`exit 0`
 
 ---
 

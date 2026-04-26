@@ -106,7 +106,7 @@ argument-hint: '[add|done|clean|list|setup|save|restore|add-file] [内容]'
     <constraints>
       <constraint>所有清理操作（delete/git-checkout）必须经过用户确认</constraint>
       <constraint>删除操作必须校验路径在项目目录内</constraint>
-      <constraint>不修改 .todo.md 之外的任何项目文件（setup 命令除外）</constraint>
+      <constraint>默认不修改 .todo.md 之外的项目文件；仅 clean/setup 命令可修改，且必须通过用户确认与路径安全校验</constraint>
     </constraints>
   </gsd:meta>
 
@@ -220,7 +220,7 @@ hooks/
 
 **行为**：
 1. 检查 `.todo-enabled` 开关文件是否存在
-2. 检查当前目录是否有 `.todo.md`
+2. 基于项目根目录检查 `.todo.md` 是否存在（不依赖当前工作子目录）
 3. 读取各分区未完成项数量
 4. 注入 system-reminder 到上下文
 

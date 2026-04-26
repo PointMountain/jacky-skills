@@ -2,6 +2,7 @@
 name: cc-history
 description: "查询 Claude Code 会话历史记录。触发词：cc-history、CC 历史、今天做了什么、昨天做了什么、工作记录、会话记录。"
 trigger: cc-history, CC 历史, 今天做了什么, 昨天做了什么, 工作记录, 会话记录, today-history
+argument-hint: '[--all] [--yesterday|--today] [--project <path>] [--ticktick] [--summary] [--no-merge]'
 ---
 
 # cc-history

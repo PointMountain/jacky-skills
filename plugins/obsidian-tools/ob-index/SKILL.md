@@ -117,6 +117,13 @@ description: "Obsidian 知识库索引构建与维护。每篇 wiki 文章拥有
 4. 重新生成 `$OBSIDIAN_REPO/wiki/index.md`：
 
 ```markdown
+---
+tags: [知识库, index]
+type: index
+article_id: OBA-{随机8位}
+updated_at: {日期}
+---
+
 # 知识库索引
 
 > 最后更新：{日期}
@@ -147,6 +154,34 @@ description: "Obsidian 知识库索引构建与维护。每篇 wiki 文章拥有
 - `wiki/entities/index.md` 只含实体条目
 - `wiki/sources/index.md` 只含来源条目
 - 主 `wiki/index.md` 只保留分类标题和子索引链接
+
+### 第三步半：刷新项目 CLAUDE.md 索引段
+
+索引重建后，扫描所有有项目索引的目录，刷新对应项目 CLAUDE.md 中的 Obsidian 索引段。
+
+**流程**：
+
+1. **扫描项目索引目录**：
+   ```bash
+   find "$OBSIDIAN_REPO/wiki/projects/" -name "index.md" -type f
+   find "$OBSIDIAN_REPO/wiki/topics/" -name "index.md" -type f
+   ```
+2. **对每个索引**：
+   - 读取 index.md 的 frontmatter，提取 `project` 字段
+   - 尝试在 `$HOME/jacky-github/` 下找到对应的 git 项目
+   - 如果找到：读取项目 CLAUDE.md，更新 `<!-- ob-index -->` 标记区域
+   - 如果未找到：跳过（项目可能不在本地）
+3. **更新逻辑**（同 ob-project-log 步骤 3.5）：
+   - 读取 Obsidian 索引表格
+   - 生成紧凑的 CLAUDE.md 索引段
+   - 替换或追加标记区域
+4. **报告**：
+   ```
+   CLAUDE.md 索引段已刷新：
+     - {project1}：{N} 篇文章
+     - {project2}：{N} 篇文章
+     - 跳过：{M} 个项目（未找到本地 git 仓库）
+   ```
 
 ### 第四步：运行反思引擎
 
@@ -238,6 +273,7 @@ updated_at: {日期}
 - 新综合文章：{数量} 篇
 - 索引更新：{数量} 条
 - article_id 缺失：{数量} 篇（已自动补分配）
+- CLAUDE.md 索引段刷新：{数量} 个项目
 
 索引总计：{总文章数} 篇文章
 所有 article_id 均为随机唯一 ID

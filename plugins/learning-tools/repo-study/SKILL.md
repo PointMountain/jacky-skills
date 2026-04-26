@@ -22,10 +22,48 @@ argument-hint: '[URL或仓库路径] [研究问题]'
 - 支持同一主题下多问题、多轮产出按需追加
 - 研究过程使用 Agent（subagent）执行，主会话负责项目管理和用户交互
 - subagent 默认使用蓝色标识（研究任务），支持并行研究多个独立课题
-- **写作原则：让完全不懂的人也能看懂**
-  - 假设读者是零基础，不跳过基础概念
-  - 使用步骤化表达，每个步骤只做一件事
-  - 提供完整示例，代码片段要完整可运行
+
+### 双模式：Survey + Incremental
+
+项目研究分为两种模式，产出分别放在不同文件夹：
+
+| 模式 | 触发条件 | 产出目录 | 内容特征 |
+|------|----------|----------|----------|
+| **Survey**（系统调研） | 首次研究，`surveyState != "completed"` | `explorer/` | 成体系、有阅读路径、笔记间有因果链 |
+| **Incremental**（增量问答） | survey 完成后，用户针对特定话题提问 | `notes/` | 零散、不成体系、随问随记 |
+
+- `explorer/` 中的成体系笔记最终目标是打磨成可发布的教程
+- `notes/` 中的零散笔记是知识积累，供参考但不形成叙事链路
+
+### 笔记质量评价体系
+
+**核心原则：价值 = 认知落差**
+
+知识点的价值不取决于技术通用性，而取决于「知道之前」和「知道之后」的理解差距。落差越大，越值得写。
+
+| 层级 | 识别信号 | 典型表现 |
+|------|---------|---------|
+| **认知颠覆** | 范式转变、跨领域迁移 | "我完全没想到还能这样做" |
+| **模式提炼** | 反复出现的结构、通用解法 | "原来这个就是 XXX 模式" |
+| **工具积木** | 具体代码片段、配置模板 | "拿来就能用" |
+
+### 笔记叙事原则
+
+1. **问题驱动螺旋** — 每篇笔记存在是因为上一篇留下了问题，不是"接下来讲 X"
+   ```
+   遗留问题 → 尝试解决 → 新问题浮现 → 下一篇笔记
+   ```
+
+2. **对比驱动** — 痛点展示 → 方案揭示 → 原理解释 → 举一反三。不要先给答案。
+
+3. **实操优先** — 小白如果不知道怎么用，就不会去思考原理。阅读顺序：先用起来 → 再理解为什么 → 最后深入细节
+
+4. **每篇笔记声明定位** — 给谁看？解决什么问题？与相邻笔记的因果关系是什么？
+
+### 写作原则
+- 假设读者是零基础，不跳过基础概念
+- 使用步骤化表达，每个步骤只做一件事
+- 提供完整示例，代码片段要完整可运行
 </philosophy>
 
 <trigger>
@@ -59,6 +97,7 @@ argument-hint: '[URL或仓库路径] [研究问题]'
     <gsd:step>仅在当前目录检测 study 标识（目录名和 .study-meta.json）</gsd:step>
     <gsd:step>判断当前项目是否由 repo-study 创建（v2）</gsd:step>
     <gsd:step>扫描源码中的文档资源：docs/ 目录、README.md、CONTRIBUTING.md、*.md 指南文件</gsd:step>
+    <gsd:step condition="源码中存在 SKILL.md 文件">标记项目为 skill-type（该项目本身是一个 Claude Code Skill），提取 skill 名称和描述</gsd:step>
     <gsd:step>若存在有效项目，强制检查 GitHub 远程版本是否最新</gsd:step>
     <gsd:step condition="本地版本落后">先提示用户是否更新，再决定 update / research 分支</gsd:step>
     <gsd:step>执行 status 脚本汇总课题、进度、skill 封装状态</gsd:step>
@@ -78,39 +117,55 @@ argument-hint: '[URL或仓库路径] [研究问题]'
     <gsd:step>更新源码到最新版本</gsd:step>
   </gsd:phase>
 
-  <gsd:phase name="mode_select" order="4">
+  <gsd:phase name="mode_detect" order="3.5">
+    <gsd:step>读取 .study-meta.json 的 surveyState 字段</gsd:step>
+    <gsd:step condition="surveyState 为 null 或 pending">标记为 Survey 模式，产出目录为 explorer/</gsd:step>
+    <gsd:step condition="surveyState 为 completed">标记为 Incremental 模式，产出目录为 notes/</gsd:step>
+    <gsd:step condition="surveyState 为 in-progress">询问用户：继续 survey / 切到 incremental</gsd:step>
+    <gsd:checkpoint>根据 surveyState 决定进入 Survey 分支或 Incremental 分支</gsd:checkpoint>
+  </gsd:phase>
+
+  <gsd:phase name="mode_select" order="4" condition="Survey 模式">
     <gsd:step>询问用户选择研究模式</gsd:step>
     <gsd:step>yolo 模式：直接输出完整研究发现</gsd:step>
     <gsd:step>交互模式：渐进式教学，分步骤讲解</gsd:step>
     <gsd:checkpoint>根据用户选择进入对应分支</gsd:checkpoint>
   </gsd:phase>
 
-  <gsd:phase name="research_yolo" order="5" condition="选择 yolo 模式">
+  <gsd:phase name="research_yolo" order="5" condition="选择 yolo 模式（Survey）">
     <gsd:step>切换到项目目录</gsd:step>
     <gsd:step>若源码存在文档资源（docs/、README.md 等），先启动文档感知 subagent 扫描并提取产品认知和用户指南信息</gsd:step>
     <gsd:step>启动代码分析 subagent（蓝色标识，Explore 类型）执行代码分析</gsd:step>
+    <gsd:step condition="项目为 skill-type">启动 skill 映射 subagent：分析 SKILL.md 各 section 与脚本的对应关系，验证每个脚本可独立运行</gsd:step>
     <gsd:step condition="多独立课题">并行启动多个 subagent 研究不同课题</gsd:step>
     <gsd:step>主会话合并文档感知 + 代码分析结果，按"产品认知 → 核心概念(含Why) → 代码原理"层次输出完整研究发现</gsd:step>
-    <gsd:step>沉淀笔记到 notes/</gsd:step>
-    <gsd:step condition="首次研究且 notes/ 中不存在 *-guide.md">强制生成仓库导读指南 notes/{repo-name}-guide.md</gsd:step>
+    <gsd:step>沉淀笔记到 explorer/ 并设置 surveyState = "completed"</gsd:step>
+    <gsd:step condition="首次研究且 explorer/ 中不存在 *-guide.md">强制生成仓库导读指南 explorer/{repo-name}-guide.md</gsd:step>
     <gsd:step condition="用户使用中文提问">提示翻译功能</gsd:step>
   </gsd:phase>
 
-  <gsd:phase name="research_interactive" order="5b" condition="选择交互模式">
+  <gsd:phase name="research_interactive" order="5b" condition="选择交互模式（Survey）">
     <gsd:step>调研阶段：若源码存在文档资源，先启动文档感知 subagent 扫描产品认知信息</gsd:step>
     <gsd:step>启动代码分析 subagent（蓝色标识）静默分析代码</gsd:step>
     <gsd:step>主会话合并文档感知 + 代码分析结果，创建会话状态和概念列表</gsd:step>
     <gsd:step>概念列表按"产品认知 → 核心概念(含Why) → 代码原理"层次排列</gsd:step>
     <gsd:step>概念拆解：将研究发现拆分为多个小概念</gsd:step>
     <gsd:step>逐步讲解：每次只讲一个概念</gsd:step>
-    <gsd:step>实时归档：讲解后立即写入文件并更新会话状态</gsd:step>
+    <gsd:step>实时归档：讲解后立即写入 explorer/ 并更新会话状态</gsd:step>
     <gsd:step>理解确认：询问用户下一步选择</gsd:step>
     <gsd:step condition="需要更多解释">补充解释和示例</gsd:step>
     <gsd:step condition="继续">进入下一个概念</gsd:step>
     <gsd:step condition="暂停">保存进度到会话状态文件</gsd:step>
     <gsd:step>总结确认：所有概念讲解完毕后询问是否需要完整笔记</gsd:step>
-    <gsd:step condition="需要">沉淀完整笔记到 notes/</gsd:step>
-    <gsd:step condition="首次研究且 notes/ 中不存在 *-guide.md">强制生成仓库导读指南 notes/{repo-name}-guide.md</gsd:step>
+    <gsd:step condition="需要">沉淀完整笔记到 explorer/ 并设置 surveyState = "completed"</gsd:step>
+    <gsd:step condition="首次研究且 explorer/ 中不存在 *-guide.md">强制生成仓库导读指南 explorer/{repo-name}-guide.md</gsd:step>
+  </gsd:phase>
+
+  <gsd:phase name="research_incremental" order="5c" condition="Incremental 模式">
+    <gsd:step>解析用户的增量问题</gsd:step>
+    <gsd:step>启动针对性 subagent（只分析相关代码区域）</gsd:step>
+    <gsd:step>写入 notes/{topic-slug}.md</gsd:step>
+    <gsd:step>更新 .study-meta.json 的 topics[]（location: "notes"）</gsd:step>
   </gsd:phase>
 
   <gsd:phase name="continue" order="7" condition="用户使用 /repo-study continue">
@@ -121,20 +176,105 @@ argument-hint: '[URL或仓库路径] [研究问题]'
 
   <gsd:phase name="sync" order="8" condition="用户使用 /repo-study sync">
     <gsd:step>读取 CLAUDE.md 中的 GitHub 项目目录和 Obsidian 仓库路径</gsd:step>
-    <gsd:step>扫描所有 *-study 项目的 notes 目录</gsd:step>
+    <gsd:step>扫描所有 *-study 项目的 explorer/ 和 notes/ 目录</gsd:step>
     <gsd:step>为缺少 article_id 的笔记自动分配 OBA-xxx（全局唯一、8位随机小写字母数字）</gsd:step>
-    <gsd:step>为每个有笔记的项目在 OB 的 wiki/open-source/ 下创建 symlink</gsd:step>
+    <gsd:step>为每个有笔记的项目在 OB 的 wiki/open-source/ 下创建 symlink（覆盖 explorer/ 和 notes/）</gsd:step>
     <gsd:step>生成/更新每个项目的 index.md 概述页（含笔记列表和 article_id）</gsd:step>
     <gsd:step>更新 open-source/index.md 总索引</gsd:step>
   </gsd:phase>
 
+  <gsd:phase name="translate" order="8b" condition="用户使用 /repo-study translate">
+    <gsd:step>运行 scripts/repo-study-translate.sh 生成翻译任务清单（source → source.zh.md）</gsd:step>
+    <gsd:step>按 group 字段将任务分组，默认每组 20 个文件</gsd:step>
+    <gsd:step>并行启动 subagent（每组一个）执行翻译，直接写入目标 *.zh.md 文件</gsd:step>
+    <gsd:step>subagent 必须保留 frontmatter、标题层级、代码块、链接与表格结构</gsd:step>
+    <gsd:step>默认跳过已存在的 *.zh.md（可通过 --force 重新翻译）</gsd:step>
+    <gsd:step>严格禁止修改源文件 *.md，仅允许新增/覆盖 *.zh.md</gsd:step>
+    <gsd:step>主会话汇总 subagent 执行结果并输出成功/失败清单</gsd:step>
+  </gsd:phase>
+
+  <gsd:phase name="distill" order="9" condition="user uses /repo-study distill">
+    <gsd:step>Read .study-meta.json backlog[] array</gsd:step>
+    <gsd:step>Prioritize pending items by priority field (high/medium/low)</gsd:step>
+    <gsd:step>For each item, show: id, title, type, priority, sourceNote</gsd:step>
+    <gsd:step>User selects item to distill (or accepts suggestion)</gsd:step>
+    <gsd:step condition="type=demo">Create demo folder under demos/ with package.json, index.mjs, README.md</gsd:step>
+    <gsd:step condition="type=skill-design">Generate skill design note under notes/（增量笔记）</gsd:step>
+    <gsd:step>Update backlog item status to in-progress then done</gsd:step>
+    <gsd:step>Add demo artifact to parent topic's artifacts[]</gsd:step>
+    <gsd:step>Verify demo runs independently (cd demos/xxx && npm install && node index.mjs)</gsd:step>
+  </gsd:phase>
+
   <gsd:phase name="output" order="6">
-    <gsd:step>询问用户下一步：继续研究 / 生成实操指南 / 生成 Skill 模板 / 生成 Cheat Sheet / 生成小白指南 / 全部生成</gsd:step>
-    <gsd:step condition="选择指南或全部">生成 {主题}-guide.md（小白可执行的实操指南）</gsd:step>
-    <gsd:step condition="选择模板或全部">生成 {主题}-skill.md（可复用的 Skill 模板）</gsd:step>
-    <gsd:step condition="选择 Cheat Sheet 或全部">生成 {repo-name}-cheat-sheet.md（速查卡：命令速查 + Before/After 对比 + 决策树）</gsd:step>
-    <gsd:step condition="选择小白指南或全部">生成 {repo-name}-beginner-guide.md（零基础完全指南：通俗类比 + 手把手教程）</gsd:step>
-    <gsd:step>更新研究日志 RESEARCH-LOG.md</gsd:step>
+    <gsd:step>询问用户下一步：继续研究 / 生成实操指南 / 生成教程 / 生成 Skill 模板 / 生成 Cheat Sheet / 生成小白指南 / 生成技术展示文章 / 生成 Skill 映射 / 全部生成</gsd:step>
+    <gsd:step condition="选择指南或全部">生成 explorer/{主题}-guide.md（小白可执行的实操指南，成体系）</gsd:step>
+    <gsd:step condition="选择教程或全部">进入 Phase 6b（教程两阶段工作流，产出到 explorer/）</gsd:step>
+    <gsd:step condition="选择模板或全部">生成 notes/{主题}-skill.md（可复用的 Skill 模板，零散笔记）</gsd:step>
+    <gsd:step condition="选择 Cheat Sheet 或全部">生成 notes/{repo-name}-cheat-sheet.md（速查卡，零散笔记）</gsd:step>
+    <gsd:step condition="选择小白指南或全部">生成 explorer/{repo-name}-beginner-guide.md（零基础完全指南，成体系）</gsd:step>
+    <gsd:step condition="选择 skill 映射或全部">生成 notes/{repo-name}-skill-to-script-mapping.md（skill→script 映射，零散笔记）</gsd:step>
+    <gsd:step>更新研究日志 notes/RESEARCH-LOG.md</gsd:step>
+  </gsd:phase>
+
+  <gsd:phase name="tutorial" order="6b" condition="用户选择生成教程">
+    <gsd:meta>
+      <name>tutorial-two-phase</name>
+      <description>教程两阶段工作流：配置引导（人工）+ 逐章实测（sub-agent 自动化）</description>
+      <requires>Agent (subagent), Bash</requires>
+    </gsd:meta>
+
+    <gsd:phase name="tutorial_phase1" order="1">
+      <gsd:step>生成 Phase 1 环境配置引导：安装、Chrome 扩展、登录、网络确认</gsd:step>
+      <gsd:step>每步包含：操作说明 → 验证命令 → 完成标志 → 常见问题</gsd:step>
+      <gsd:step>需要人工操作的步骤用 ⚠️ 标记</gsd:step>
+      <gsd:step>底部放检查清单，全部通过才能进入 Phase 2</gsd:step>
+      <gsd:step>引导用户逐步完成配置，每步验证后再进入下一步</gsd:step>
+      <gsd:checkpoint>Phase 1 检查清单全部通过后，才能进入 Phase 2</gsd:checkpoint>
+    </gsd:phase>
+
+    <gsd:phase name="tutorial_phase2" order="2" condition="Phase 1 检查清单全部通过">
+      <gsd:step>将教程拆分为独立章节（按认证模式或功能模块划分）</gsd:step>
+      <gsd:step>每章标注：状态（待实测）、认证模式（public/cookie/browser）、前置条件</gsd:step>
+      <gsd:step>所有命令的输出使用占位符标记，不写"预期输出"</gsd:step>
+      <gsd:step>派 sub-agent 逐章测试（每章一个 agent，3 章一组并行）</gsd:step>
+      <gsd:step>每个 sub-agent 返回格式化测试报告：命令 → 实际输出 → 状态</gsd:step>
+      <gsd:step>主 agent 收集报告，替换占位符为实测数据</gsd:step>
+      <gsd:step>标注已知问题和替代方案</gsd:step>
+    </gsd:phase>
+  </gsd:phase>
+
+  <gsd:phase name="article" order="6c" condition="用户选择生成技术展示文章">
+    <gsd:meta>
+      <name>article-showcase</name>
+      <description>生成面向掘金/知乎等技术社区的技术展示文章，以研究者第三人称视角呈现设计洞察</description>
+      <requires>Agent (subagent), Read, Write</requires>
+    </gsd:meta>
+
+    <gsd:phase name="article_collect" order="1">
+      <gsd:step>读取 explorer/ 和 notes/ 下所有已有研究笔记作为素材</gsd:step>
+      <gsd:step>读取源码中的 README、SKILL.md 等项目自述文档</gsd:step>
+      <gsd:step>识别项目的认知颠覆点和设计哲学</gsd:step>
+      <gsd:step>汇总素材清单（研究笔记 + 项目文档 + 核心洞察）</gsd:step>
+    </gsd:phase>
+
+    <gsd:phase name="article_generate" order="2">
+      <gsd:step>启动文章生成 subagent（Explore 类型），使用 article-mode-guide.md 的 prompt 模板</gsd:step>
+      <gsd:step>subagent 输入：研究笔记摘要 + 项目文档 + 文章叙事模板</gsd:step>
+      <gsd:step>subagent 输出：完整技术展示文章（3000-5000 字 Markdown）</gsd:step>
+    </gsd:phase>
+
+    <gsd:phase name="article_check" order="3">
+      <gsd:step>对照 article-mode-guide.md §4 质量检查清单验证文章</gsd:step>
+      <gsd:step>确认叙事弧线完整（6 段式）</gsd:step>
+      <gsd:step>确认技术深度分层（入门 → 进阶 → 深入）</gsd:step>
+      <gsd:step>确认有研究者洞察（非纯客观转述）</gsd:step>
+    </gsd:phase>
+
+    <gsd:phase name="article_save" order="4">
+      <gsd:step>写入 notes/{repo-name}-article.md（文章为非教程性质，放入 notes/）</gsd:step>
+      <gsd:step>更新 .study-meta.json topics[] 进度</gsd:step>
+      <gsd:step>在文章 frontmatter 中标注素材来源笔记</gsd:step>
+    </gsd:phase>
   </gsd:phase>
 </gsd:workflow>
 
@@ -192,37 +332,24 @@ https://github.com/user/repo → 仓库名: repo, owner: user
 
 ### Step 1.2a: 文档资源扫描
 
-在检测项目状态后，**扫描源码中的文档资源**，为后续研究提供上下文：
+在检测项目状态后，**扫描源码中的文档资源**（`docs/`、`README.md`、`CONTRIBUTING.md`、根目录 `*.md`），识别文档站类型（VitePress / Docsify / Docusaurus），并将结果传递给后续 Phase 用于产品认知建立和导读指南生成。
 
-```bash
-# 检测文档目录结构
-ls {repo-name}/docs/ 2>/dev/null
-cat {repo-name}/README.md | head -100
-```
+### Step 1.2b: Skill 项目检测
 
-**扫描范围**：
-| 路径 | 说明 |
-|------|------|
-| `{repo}/docs/` | 官方文档目录（VitePress、Docusaurus 等） |
-| `{repo}/README.md` | 项目自述文件 |
-| `{repo}/CONTRIBUTING.md` | 贡献指南 |
-| `{repo}/*.md` | 根目录下的指南文件 |
-
-**文档分类**：如果发现文档目录，识别其类型和内容组织方式：
-- `docs/.vitepress/config.mts` → VitePress 文档站
-- `docs/sidebar.*` 或 `docs/_sidebar.md` → Docsify 文档站
-- `docs/docusaurus.config.*` → Docusaurus 文档站
-
-**将扫描结果传递给后续 Phase**，用于：
-1. 生成导读指南时引用已有文档
-2. subagent 研究时先读文档建立产品认知
-3. 笔记中标注"项目已有文档可参考"
+在文档资源扫描后，**检测源码中是否包含 SKILL.md 文件**：
+1. 检查 `{源码目录}/SKILL.md` 是否存在
+2. 若存在，标记项目为 `skill-type`
+3. 从 SKILL.md 的 frontmatter 提取 `name` 和 `description`
+4. 列出 SKILL.md 中引用的所有脚本路径（如 `scripts/` 目录下的文件）
+5. 将 skill-type 标记传递给后续 Phase 用于针对性分析
 
 ### Step 1.3: 运行 status 脚本
 
 ```bash
 scripts/repo-study-status.sh --json --check-remote
 ```
+
+> 注意：该脚本现在位于 skill 自身目录中，无需在每个 study 项目中生成副本。
 
 脚本输出包含：项目来源、topics 列表、进度统计、skill 封装状态、远程版本状态。
 
@@ -241,11 +368,11 @@ scripts/repo-study-status.sh --json --check-remote
 1. 在 GitHub 项目目录下创建 `{repo-name}-study` 目录（路径从 CLAUDE.md 读取）
 2. 浅克隆源码：`git clone --single-branch --depth 1 "$REPO_URL" "$REPO_NAME"`
 3. 删除 `.git` 目录
-4. 生成 `CLAUDE.md`、`.study-meta.json`（v2）、`scripts/repo-study-status.sh`
-5. 初始化 Git 仓库并首次提交
+4. 创建 `explorer/` 和 `notes/` 目录
+5. 生成 `CLAUDE.md`、`.study-meta.json`（v2，含 `surveyState: "pending"`）
+6. 初始化 Git 仓库并首次提交
 
 > ⚠️ **Checkpoint - Human-Verify** — 确保文件结构完整后初始化 Git 仓库。
-
 > 📝 **元数据结构** → `references/state-templates.md` §4
 
 ---
@@ -253,15 +380,33 @@ scripts/repo-study-status.sh --json --check-remote
 ## Phase 3: 更新 (update) — 仅当项目不是最新时
 
 1. 临时克隆最新代码到 `temp_clone`
-2. 只更新源码目录，**保留 notes/ 目录**（永不删除）
+2. 只更新源码目录，**保留 explorer/ 和 notes/ 目录**（永不删除）
 3. 更新 `.study-meta.json` 中的 commit SHA
 4. 删除临时目录
 
-> ⚠️ **安全检查**: 更新前确认 notes/ 目录不会被删除。
+> ⚠️ **安全检查**: 更新前确认 explorer/ 和 notes/ 目录不会被删除。
 
 ---
 
-## Phase 4: 模式选择 (mode_select)
+## Phase 3.5: 模式检测 (mode_detect) — 自动判断
+
+读取 `.study-meta.json` 的 `surveyState` 字段，决定进入哪种模式：
+
+| surveyState | 模式 | 产出目录 | 说明 |
+|-------------|------|----------|------|
+| `null` / `pending` | **Survey** | `explorer/` | 首次系统调研，生成成体系笔记 |
+| `completed` | **Incremental** | `notes/` | 已有调研基础，按需回答特定问题 |
+| `in-progress` | **询问用户** | — | 之前的调研未完成，确认是继续还是切换 |
+
+> **向后兼容**：对缺少 `surveyState` 字段的存量项目，如果 `explorer/` 或 `notes/` 中已有笔记，自动补充为 `"completed"`。
+
+**分支逻辑**：
+- Survey 模式 → 继续进入 Phase 4（选择 yolo/交互）
+- Incremental 模式 → 直接进入 Phase 5c（增量问答）
+
+---
+
+## Phase 4: 模式选择 (mode_select) — 仅 Survey 模式
 
 > ⚠️ **Checkpoint - Decision**
 >
@@ -277,24 +422,30 @@ scripts/repo-study-status.sh --json --check-remote
 
 ### Step 5a.1: 文档感知（如果项目有文档）
 
-若 Phase 1 检测到项目有文档资源（docs/、README 等），先启动**文档感知 subagent**：
+若 Phase 1 检测到项目有文档资源（docs/、README 等），先启动**文档感知 subagent**（Explore 类型），提取产品形态、安装方式、核心组件、文档结构和用户指南摘要。
 
-```
-Agent({
-  description: "文档感知分析",
-  subagent_type: "Explore",
-  prompt: "扫描 {repo-name}/docs/ 和 README.md，提取以下信息：
-    1. 产品形态（npm 包？CLI 工具？Web 应用？浏览器插件？）
-    2. 安装方式和基本使用命令
-    3. 核心组件及其作用
-    4. 文档覆盖的主题和结构
-    5. 关键的用户指南内容摘要"
-})
-```
+> 📝 **subagent prompt 模板** → `references/yolo-mode-guide.md` §1
 
 ### Step 5a.2: 代码分析
 
 启动 subagent（蓝色标识，Explore 类型）执行代码分析。
+
+### Step 5a.2b: Skill 映射分析（skill-type 项目）
+
+当 Phase 1 检测到项目为 skill-type 时，启动**skill 映射 subagent**（Explore 类型）：
+
+**分析内容**：
+1. 读取 SKILL.md，提取每个能力 section（如"前置检查""CDP 操作""本地资源"等）
+2. 找出每个 section 引用的脚本文件（`scripts/` 目录下的 .mjs/.sh 等）
+3. 分析每个脚本的核心机制（输入→处理→输出）
+4. 列出完整触发链路：SKILL.md section → 脚本 → 工作流
+
+**验收验证**（如环境允许）：
+1. 逐个运行脚本，记录输出
+2. 对浏览器类脚本，测试完整的 tab 生命周期（创建→操作→关闭）
+3. 汇总验收结果（通过/失败/跳过）
+
+**输出格式**：`explorer/{repo-name}-skill-to-script-mapping.md`
 
 ### Step 5a.3: 结果合并与输出
 
@@ -305,133 +456,16 @@ Agent({
 
 ### Step 5a.4: 沉淀与指南
 
-1. 沉淀笔记到 `notes/` 并更新 `.study-meta.json` 的 `topics[]`
-2. **首次研究强制生成导读指南**：检查 `notes/` 中是否已有 `*-guide.md`，若不存在则生成
-3. **可选 Cheat Sheet 生成**：如果项目是工具/库/CLI（有明确安装和使用命令），在首次研究时提示用户是否生成 Cheat Sheet
-4. 中文提问时提示翻译功能
+1. 沉淀笔记到 `explorer/` 并更新 `.study-meta.json` 的 `topics[]`（location: "tutorials"）
+2. 设置 `surveyState = "completed"`
+3. **首次研究强制生成导读指南**：检查 `explorer/` 中是否已有 `*-guide.md`，若不存在则生成
+4. **可选 Cheat Sheet 生成**：如果项目是工具/库/CLI（有明确安装和使用命令），在首次研究时提示用户是否生成 Cheat Sheet
+5. 中文提问时提示翻译功能
 
-**导读指南模板**（蒸馏自 understand-onboard，1200-2000 字）：
-
-```markdown
-# {工具名} 使用指南
-
-> 一句话说清楚这个工具是什么、解决什么问题
-
-## 📌 项目概览
-**核心价值**：一句话
-**技术特征**：2-3 个关键特征
-**代码规模**：约 X 行，Y 个源文件
-
-## 🎮 产品认知（必读）
-
-### 这是什么？
-用 2-3 句话说清楚这个工具的产物形态：
-- 是一个 npm 包？Chrome 插件？命令行工具？Web 应用？
-- 用户安装后怎么使用？给出最基础的 1-2 个命令示例
-- 它解决什么场景的问题？
-
-### 核心组件
-| 组件 | 形态 | 作用 |
-|------|------|------|
-| 如：CLI 工具 | npm 全局包 `@scope/name` | 命令行入口 |
-| 如：Chrome 插件 | 浏览器扩展 | 提供浏览器控制能力 |
-
-### 基本使用方式
-1. **安装**：`npm install -g @scope/name`
-2. **验证**：`xxx --version`
-3. **第一个命令**：`xxx <site> <command>` + 输出示例
-4. **输出格式**：`xxx <cmd> -f json/table/yaml`
-
-## 📚 文档资源（如果项目有文档）
-> ⚠️ 此项目自带完整的官方文档，以下是资源导航：
-
-| 文档路径 | 内容 | 推荐阅读场景 |
-|---------|------|------------|
-| `docs/guide/getting-started.md` | 快速开始 | 第一次接触时 |
-| `docs/guide/xxx.md` | xxx 指南 | 需要深入了解时 |
-
-**文档站类型**：VitePress / Docusaurus / 纯 Markdown
-**是否有多语言**：英文 / 中文
-
-## 🔍 核心概念（含前因后果）
-
-每个核心概念必须回答三个问题：
-1. **是什么？** — 用简单语言解释
-2. **为什么需要？** — 不用这个技术会怎样？痛点是什么？
-3. **怎么实现的？** — 简要说明实现思路
-
-### 概念：{概念名如 BrowserBridge}
-- **是什么**：一句话解释
-- **为什么需要**：不用它会怎样？对比替代方案的缺陷
-- **实现思路**：核心数据流（3-5 步 ASCII 图）
-
-## 🏗️ 系统架构
-
-### 架构图（ASCII 图）
-用 ASCII 画系统边界、核心组件、数据流向。
-重点：让读者 30 秒建立全局认知。
-
-### 核心数据流
-画出最核心的一条路径（如"用户输入 → 最终输出"），3-7 步。
-
-### 技术栈
-| 层级 | 技术 | 用途 |
-|------|------|------|
-
-## 🗺️ 关键文件地图
-
-| 优先级 | 文件路径 | 行数 | 职责 | 何时阅读 |
-|--------|---------|------|------|---------|
-
-### ⚠️ 高风险文件
-| 文件 | 风险 | 说明 |
-|------|------|------|
-
-## 💡 核心设计决策
-
-| 问题 | 方案 | 原因 | 不这样做的后果 |
-|------|------|------|-------------|
-
-## 🚀 本地搭建（5 步内）
-
-### 前置条件
-| 工具 | 要求 | 说明 |
-|------|------|------|
-
-### 安装步骤
-Step 1 → Step 2 → ... → 验证
-
-## 🐛 调试指南
-
-### 各组件调试入口
-| 组件 | 打开方式 | 说明 |
-|------|---------|------|
-
-### 常见问题排查（2-3 个典型问题）
-问题 → 原因 → 排查步骤
-
-## 🎯 适合谁用
-| 角色 | 场景 |
-|------|------|
-
-## 📖 进阶阅读
-→ 链接到 notes/ 下的具体笔记，按主题分类
-```
-
-> ⚠️ **强制规则**：每个项目首次研究时必须生成导读指南，不可跳过。指南是 notes/ 的入口文档。
->
-> **核心原则**（蒸馏自 understand-onboard）：
-> 1. **产品认知优先** — 先让读者知道"这是什么、怎么用"，再讲原理
-> 2. **前因后果必需** — 每个技术概念必须解释"为什么需要"，对比不使用时的痛点
-> 3. **文档资源感知** — 如果项目自带文档，必须列出并说明内容
-> 4. **可视化优先** — 架构图 + 数据流图让读者快速建立全局认知
-> 5. **实战导向** — 调试指南、高风险文件直接解决开发者痛点
-> 6. **阅读路径清晰** — 关键文件地图标注优先级和阅读时机
-> 7. **设计决策传递** — 问题-方案-原因-不这样做的后果四列表传递项目智慧
-
-**subagent prompt 要点**：源码路径 + 研究问题 + 输出格式（让完全不懂的人也能看懂）
-
+> 📝 **导读指南完整模板** → `references/guide-template.md`
 > 📝 **subagent prompt 模板、输出模板** → `references/yolo-mode-guide.md` §1-3
+>
+> ⚠️ **强制规则**：每个项目首次研究时必须生成导读指南，不可跳过。指南是 explorer/ 的入口文档。
 
 ---
 
@@ -439,18 +473,58 @@ Step 1 → Step 2 → ... → 验证
 
 > 📖 **详细文档** → `references/interactive-mode-guide.md`
 
-1. 启动 subagent（蓝色标识）静默分析代码
-2. 主会话根据 subagent 结果创建 `.study-session.json` 和概念列表
-3. 逐步讲解每个概念（主会话执行）
-4. **实时归档**：讲解后立即使用 Write 写入 `notes/{主题分类}/{概念名称}.md`
-5. **实时更新**：使用 Edit 更新 `.study-session.json` 和思维导图
-6. 每步后提供选项：继续/暂停/更多解释/提问
-7. 支持通过 `/repo-study continue` 恢复中断
-8. **首次研究强制生成导读指南**：所有概念讲解完毕后，检查 `notes/` 中是否已有 `*-guide.md`，若不存在则生成（模板同 Phase 5a）
+核心流程：文档感知 subagent + 代码分析 subagent → 概念拆解 → 逐步讲解 → 实时归档。
+
+- 启动 subagent 静默分析代码，主会话创建 `.study-session.json` 和概念列表
+- 逐步讲解每个概念，每步后提供选项：继续/暂停/更多解释/提问
+- 实时归档到 `explorer/`，支持 `/repo-study continue` 恢复中断
+- 首次研究强制生成导读指南（模板同 Phase 5a）
+- 完成后设置 `surveyState = "completed"`
 
 > ⚠️ **Checkpoint - Human-Verify** — 调研完成后确认概念列表再开始讲解。
 
-> 📝 **实时归档机制、思维导图结构、知识树维护** → `references/interactive-mode-guide.md`
+---
+
+## Phase 5c: 增量问答 (incremental) — Incremental 模式
+
+> 适用场景：survey 完成后，用户针对特定话题/文章提问。
+> 产出目录：`notes/`（零散笔记，不成体系）
+
+### Step 5c.1: 解析增量问题
+
+从用户输入中提取具体的研究问题，确定需要分析的代码区域。
+
+### Step 5c.2: 启动针对性 subagent
+
+启动 subagent（蓝色标识，Explore 类型），**只分析相关代码区域**，不重复 survey 已覆盖的内容。
+
+> 📝 **subagent prompt 模板** → `references/yolo-mode-guide.md` §4
+
+### Step 5c.3: 写入笔记
+
+将研究结果写入 `notes/{topic-slug}.md`，命名简洁直接（如 `skill-prompt-engineering.md`）。
+
+笔记结构：
+```markdown
+# {话题标题}
+
+> 关联教程：explorer/{related-tutorial-note}.md（如有）
+
+## 问题
+// 用户原始问题
+
+## 分析
+// 针对性分析内容
+
+## 关键发现
+// 核心洞察，1-3 点
+```
+
+### Step 5c.4: 更新元数据
+
+更新 `.study-meta.json`：
+- 在 `topics[]` 中新增条目，标记 `location: "notes"`
+- 更新 `lastUpdated` 时间戳
 
 ---
 
@@ -468,13 +542,68 @@ Step 1 → Step 2 → ... → 验证
 >
 > 研究完成后询问用户：
 > 1. 继续深入研究 → 返回 Phase 5
-> 2. 生成实操指南 → `notes/{主题}-guide.md`
-> 3. 生成 Skill 模板 → `notes/{主题}-skill.md`
-> 4. 生成 Cheat Sheet → `notes/{repo-name}-cheat-sheet.md`（速查卡：命令速查 + Before/After 对比 + 决策树）
-> 5. 生成小白指南 → `notes/{repo-name}-beginner-guide.md`（零基础完全指南：通俗类比 + 手把手教程）
-> 6. 全部生成
+> 2. 生成实操指南 → `explorer/{主题}-guide.md`（成体系）
+> 3. **生成教程** → 进入 Phase 6b（教程两阶段工作流，产出到 `explorer/`）
+> 4. 生成 Skill 模板 → `notes/{主题}-skill.md`（零散笔记）
+> 5. 生成 Cheat Sheet → `notes/{repo-name}-cheat-sheet.md`（零散笔记）
+> 6. 生成小白指南 → `explorer/{repo-name}-beginner-guide.md`（成体系）
+> 7. **生成技术展示文章** → 进入 Phase 6c（产出到 `notes/`）
+> 8. **生成 Skill 映射** → `notes/{repo-name}-skill-to-script-mapping.md`（零散笔记）
+> 9. 全部生成
 
-最后更新研究日志 `notes/RESEARCH-LOG.md` 并同步 `topics[].progress`。
+最后更新研究日志 `explorer/RESEARCH-LOG.md` 并同步 `topics[].progress`。
+
+**产出路径规则**：
+- 成体系的内容（指南、教程、小白指南）→ `explorer/`
+- 零散/独立的内容（Cheat Sheet、文章、Skill 映射）→ `notes/`
+
+---
+
+## Phase 6b: 教程两阶段工作流 (tutorial)
+
+> 适用场景：研究的项目是工具/CLI/库，需要可执行教程时使用。
+> 产出文件：`explorer/{repo-name}-how-to-use-guide.md`
+>
+> 📖 **完整教程工作流文档** → `references/tutorial-workflow.md`
+
+---
+
+## Phase 6c: 技术展示文章 (article)
+
+> 适用场景：将研究成果对外分享到掘金/知乎等技术社区。
+> 产出文件：`notes/{repo-name}-article.md`（非教程性质）
+> 前置条件：至少完成过一轮研究（explorer/ 中有研究笔记）
+>
+> 📖 **完整文章模式指南** → `references/article-mode-guide.md`
+
+### Step 6c.1: 研究素材收集
+
+1. 读取 `explorer/` 和 `notes/` 目录下所有已有研究笔记
+2. 读取源码中的 README、SKILL.md 等项目自述文档
+3. 识别项目的「认知颠覆点」和「设计哲学」
+4. 汇总素材清单
+
+### Step 6c.2: 启动文章生成 subagent
+
+使用 `references/article-mode-guide.md` §3 的 subagent prompt 模板，启动 Explore 类型 subagent 生成文章。
+
+**输入**：
+- 已有研究笔记内容摘要
+- 项目自述文档关键内容
+- 文章叙事模板（6 段式）
+
+**输出**：
+- 完整的面向技术社区的展示文章（3000-5000 字 Markdown）
+
+### Step 6c.3: 质量检查
+
+对照 `references/article-mode-guide.md` §4 质量检查清单逐项验证。
+
+### Step 6c.4: 沉淀文章
+
+1. 写入 `notes/{repo-name}-article.md`（文章为非教程性质，放入 notes/）
+2. 更新 `.study-meta.json` 的 `topics[]` 进度
+3. 在文章 frontmatter 中标注素材来源笔记
 
 ---
 
@@ -490,12 +619,83 @@ Step 1 → Step 2 → ... → 验证
    - 全局唯一性校验：在 OB 仓库 wiki/ 下搜索确认无碰撞
    - 生成后写入 frontmatter（无 frontmatter 时自动创建）
 5. 对每个有笔记的项目：
+   - 创建 `wiki/open-source/{project}/tutorials` symlink → `{study项目}/tutorials`
    - 创建 `wiki/open-source/{project}/notes` symlink → `{study项目}/notes`
    - 若 `index.md` 不存在，生成仓库概述页（含笔记列表和 article_id）
 6. 重新生成 `wiki/open-source/index.md` 总索引
 7. 输出同步结果摘要
 
 > 📝 **同步脚本** → `scripts/repo-study-sync-ob.sh`（支持 `--dry-run` 和 `--project` 参数）
+
+---
+
+## Phase 8b: 文档翻译 (translate)
+
+当用户使用 `/repo-study translate` 时：
+
+1. 在 study 项目根目录运行翻译计划脚本：
+
+```bash
+scripts/repo-study-translate.sh --json
+```
+
+2. 读取任务清单中的 `tasks[]`（字段：`source`、`target`、`group`）  
+   约束：`target` 必须是 `source` 对应的 `*.zh.md`
+
+3. 按 `group` 字段并行派发 subagent（每组一个），只读源文件，只写目标 `*.zh.md`，禁止修改源文件
+
+4. 默认跳过已存在的 `*.zh.md`  
+   若用户明确要求全量重译，使用：
+
+```bash
+scripts/repo-study-translate.sh --json --force
+```
+
+6. 主会话收集各 subagent 结果并输出：
+   - 成功翻译数
+   - 失败文件列表（含错误原因）
+   - 跳过文件数（已存在）
+
+> 📝 **翻译计划脚本** → `scripts/repo-study-translate.sh`（支持 `--json`、`--force`、`--group-size`）
+>
+> 📝 **subagent prompt 模板与质量规则** → `references/translate-mode-guide.md`
+
+---
+
+## Phase 9: 蒸馏 (distill)
+
+当用户使用 `/repo-study distill` 时：
+
+### Step 9.1: 读取 Backlog
+
+读取 `.study-meta.json` 的 `backlog[]` 数组，按 `priority` 排序（high > medium > low），过滤 `status: "pending"` 的条目。
+
+### Step 9.2: 展示待蒸馏列表
+
+以表格展示（ID / 标题 / 类型 / 优先级 / 来源笔记），用户选择条目。
+
+### Step 9.3: 创建 Demo 工程（type=demo）
+
+创建 `demos/{demo-name}/`（含 `package.json` + `index.mjs` + `README.md`）。README 需包含：学习目的、验证知识点、功能清单（MUST/SHOULD/COULD）、运行命令、预期输出。
+
+验证独立运行：`cd demos/{name} && npm install && node index.mjs`
+
+### Step 9.4: 创建设计文档（type=skill-design）
+
+为 `skill-design` 类型的条目在 `notes/` 下生成 skill 设计文档。
+
+### Step 9.5: 更新状态
+
+更新 `backlog[]` 状态（`pending` → `in-progress` → `done`），更新 `demoPath`，将 artifact 添加到关联 topic 的 `artifacts[]`。
+
+### 添加条目到 Backlog
+
+在 Phase 5a/5b 研究过程中，当发现**可复用、自包含的模式**时，应自动追加到 `backlog[]`：
+
+- **ID 格式**：`bl-{NNN}`，从当前最大值递增
+- **type**：`demo`（代码模式）/ `skill-design`（设计概念）/ `note`（文档补充）
+- **priority**：根据通用性和复杂度判定 `high` / `medium` / `low`
+- **sourceNote**：指向发现该模式的研究笔记路径
 
 </process>
 
@@ -504,13 +704,14 @@ Step 1 → Step 2 → ... → 验证
 
 | 命令 | 说明 |
 |------|------|
-| `/repo-study <url> <问题>` | 研究 GitHub 仓库的特定问题 |
+| `/repo-study <url> <问题>` | 研究 GitHub 仓库的特定问题（自动判断 Survey/Incremental 模式） |
 | `/repo-study list` | 列出 GitHub 项目目录下所有 xxx-study 项目 |
 | `/repo-study update` | 强制更新源码到最新版本 |
-| `/repo-study status` | 检查当前目录状态（topics、进度、skill 封装状态） |
-| `/repo-study translate` | 翻译所有文档 |
+| `/repo-study status` | 检查当前目录状态（topics、进度、skill 封装状态、当前模式） |
+| `/repo-study translate` | 使用 subagent 并行翻译文档到 `*.zh.md`（不改原文） |
 | `/repo-study continue` | 恢复上次中断的交互学习 |
 | `/repo-study sync` | 同步所有 study 项目到 Obsidian（article_id 分配 + symlink + 索引） |
+| `/repo-study distill` | 将研究发现转化为独立 demo 工程或设计文档 |
 
 </commands>
 
@@ -518,88 +719,45 @@ Step 1 → Step 2 → ... → 验证
 <scenarios>
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                   repo-study 五种场景                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  场景 0: 列表                                                    │
-│  用户输入：/repo-study list                                      │
-│  → 读取 GitHub 项目目录，列出所有 *-study 项目                    │
-│                                                                  │
-│  场景 1-4: 研究流程                                              │
-│  用户输入：调研下 xxx 在某领域是如何实现的                         │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │ Phase 1: 检测                                            │    │
-│  │                                                          │    │
-│  │  项目存在？                                              │    │
-│  │     ├─ 否 → Phase 2: 创建                               │    │
-│  │     └─ 是 → 检查版本                                     │    │
-│  │              ├─ 不是最新 → Phase 3: 更新                 │    │
-│  │              └─ 已是最新 → 跳过更新                      │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │ Phase 4: 模式选择                                        │    │
-│  │                                                          │    │
-│  │  选择研究模式：                                          │    │
-│  │     ├─ Yolo 模式 → Phase 5a: subagent 研究 + 完整报告   │    │
-│  │     └─ 交互模式 → Phase 5b: subagent 调研 + 渐进讲解    │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │ Phase 6: 产出选择 (Yolo 模式后)                          │    │
-│  │                                                          │    │
-│  │  研究完成后询问：                                        │    │
-│  │     ├─ 继续深入研究 → 返回 Phase 5                       │    │
-│  │     ├─ 生成实操指南 → {主题}-guide.md                   │    │
-│  │     ├─ 生成 Skill 模板 → {主题}-skill.md                │    │
-│  │     ├─ 生成 Cheat Sheet → {repo}-cheat-sheet.md         │    │
-│  │     ├─ 生成小白指南 → {repo}-beginner-guide.md          │    │
-│  │     └─ 全部生成 → 同时生成以上所有文档                   │    │
-│  │                                                          │    │
-│  │  最后更新研究日志 RESEARCH-LOG.md                        │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                                                  │
-│  版本检查：使用 gh api 比对 commit SHA                           │
-│  安全保障：notes/ 目录永不删除                                   │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+/repo-study 场景速查：
+
+场景 0: list      → 列出所有 *-study 项目
+场景 1-3: detect  → create / update / skip（自动判断）
+场景 3.5: mode    → Survey（首次，产出→explorer/）/ Incremental（增量，产出→notes/）
+场景 4: style     → yolo（快速研究）/ interactive（交互教学）——仅 Survey 模式
+场景 5: research  → Survey→explorer/ | Incremental→notes/
+场景 5c: 增量问答  → 针对性 subagent → notes/{topic}.md
+场景 6: output    → 指南 / 教程 / 模板 / Cheat Sheet / 小白指南 / 技术展示文章 / Skill 映射 / 全部
+场景 6: distill   → backlog → demo 工程 / skill 设计文档
+场景 7: sync      → 同步到 Obsidian（article_id + symlink + 索引）
+场景 8: translate → 并行 subagent 翻译 *.md → *.zh.md
+
+安全保障：explorer/ 和 notes/ 永不删除 | 版本检查：gh api commit SHA
 ```
 
 </scenarios>
 
 <!-- ========== 成功标准 ========== -->
 <success_criteria>
-- [ ] 正确解析仓库 URL 和研究问题
-- [ ] 项目创建路径从 CLAUDE.md 的 GitHub 项目目录配置中读取（不硬编码）
-- [ ] `/repo-study list` 可列出所有 xxx-study 项目
-- [ ] 仅在当前目录识别 study 状态（不递归）
-- [ ] 标识当前项目是否由 repo-study 创建（v2）
-- [ ] **文档资源扫描**：检测 docs/、README.md 等文档资源，分类文档站类型
-- [ ] 使用 `gh api` 检查远程 commit SHA
-- [ ] 若本地版本落后，提示用户是否更新
-- [ ] 创建项目时生成完整文件结构（含 status 脚本）
-- [ ] 更新时保留 notes/ 目录
-- [ ] 询问用户选择研究模式（Yolo/交互）
-- [ ] Yolo 模式：若项目有文档，先启动文档感知 subagent 提取产品认知
-- [ ] Yolo 模式：启动代码分析 subagent（蓝色标识，Explore 类型）
-- [ ] Yolo 模式（多课题）：并行启动多个 subagent 研究独立课题
-- [ ] **产品认知层次**：输出按"产品认知 → 核心概念(含Why) → 代码原理"排列
-- [ ] **前因后果**：每个核心技术概念解释"为什么需要"和"不使用的后果"
-- [ ] 交互模式：启动文档感知 + 代码分析 subagent 静默调研
-- [ ] 交互模式：创建 .study-session.json，实时归档和思维导图
-- [ ] `/repo-study continue` 可恢复上次中断的交互学习
-- [ ] 沉淀笔记到 notes/ 目录，按主题写入 topics[]
-- [ ] **首次研究强制生成导读指南** notes/{repo-name}-guide.md（含产品认知、文档资源、前因后果）
-- [ ] **文档资源体现**：导读指南中列出项目已有文档资源（如有）
-- [ ] 研究完成后询问用户下一步选择（指南/模板/Cheat Sheet/小白指南/全部）
-- [ ] **Cheat Sheet 生成**：Phase 6 选择"生成 Cheat Sheet"时，生成含命令速查 + Before/After 对比 + 决策树的速查卡
-- [ ] **小白指南生成**：Phase 6 选择"生成小白指南"时，生成含通俗类比 + 手把手教程的零基础完全指南
-- [ ] **工具类项目提示**：Phase 5a 首次研究工具/库/CLI 项目时，提示用户是否生成 Cheat Sheet
-- [ ] 中文提问时提示翻译功能
-- [ ] **sync 时 article_id 分配**：为缺少 article_id 的笔记自动分配 OBA-xxx，全局唯一校验
-- [ ] **sync 时 index.md 含笔记列表**：项目 index.md 列出每个笔记标题和 article_id
+- [ ] 正确解析仓库 URL，项目路径从 CLAUDE.md 读取
+- [ ] 检测 study 标识（目录名 + .study-meta.json），使用 gh api 检查远程版本
+- [ ] 项目创建时包含 explorer/ 和 notes/ 两个目录
+- [ ] 项目创建/更新时，explorer/ 和 notes/ 目录永不删除
+- [ ] 双模式检测：根据 surveyState 自动判断 Survey/Incremental 模式
+- [ ] Survey 模式：产出成体系笔记到 explorer/，完成后设置 surveyState = "completed"
+- [ ] Incremental 模式：产出零散笔记到 notes/，针对用户问题分析
+- [ ] 文档资源扫描：检测 docs/、README.md 等文档并分类
+- [ ] Yolo 模式：文档感知 subagent → 代码分析 subagent → 合并输出到 explorer/
+- [ ] 交互模式：subagent 调研 → 概念拆解 → 逐步讲解 → 实时归档到 explorer/
+- [ ] 首次研究强制生成导读指南 explorer/{repo-name}-guide.md
+- [ ] 产出路径规则：成体系→explorer/，零散→notes/
+- [ ] 教程两阶段分离：T1 配置引导（人工）+ T2 逐章实测（subagent）
+- [ ] 技术展示文章：素材收集 → subagent 生成 → 质量检查 → 沉淀到 notes/
+- [ ] 翻译：*.md → *.zh.md，不修改源文件，按 group 并行
+- [ ] sync：article_id 分配 + symlink（覆盖 explorer/ 和 notes/）+ 索引生成
+- [ ] distill：backlog → 独立可运行的 demo 工程
+- [ ] Skill 项目检测：检测 SKILL.md 存在时标记为 skill-type，提取 skill 名称和脚本列表
+- [ ] skill-type 项目：自动生成 skill→script 映射分析 + 脚本验收测试
 </success_criteria>
 
 <!-- ========== 参考文档 ========== -->
@@ -610,7 +768,11 @@ Step 1 → Step 2 → ... → 验证
 | `references/state-templates.md` | **状态模板与检测逻辑**（.study-meta.json v2、status 脚本、版本检查命令） |
 | `references/interactive-mode-guide.md` | **交互模式详细指南**（实时归档、思维导图、知识树结构、会话追踪） |
 | `references/yolo-mode-guide.md` | **Yolo 模式详细指南**（subagent prompt 模板、输出模板、笔记沉淀、翻译提示） |
+| `references/translate-mode-guide.md` | **翻译模式详细指南**（任务分组、subagent prompt、质量规则、失败重试） |
+| `references/guide-template.md` | **导读指南完整模板**（产品认知、架构图、文件地图、设计决策等完整结构） |
+| `references/tutorial-workflow.md` | **教程两阶段工作流**（T1 配置引导 + T2 逐章实测 + 文件结构模板） |
 | `references/anti-patterns.md` | **反模式清单**（6 个常见错误及正确做法） |
+| `references/article-mode-guide.md` | **技术展示文章指南**（6 段式叙事模板、subagent prompt、质量检查清单、风格要素） |
 | `references/quick-reference.md` | **快速参考**（使用示例、模式说明、常用命令速查） |
 
 </references>
@@ -622,9 +784,13 @@ Step 1 → Step 2 → ... → 验证
 | 阶段 | 交互点 | 类型 | 用户操作 |
 |------|--------|------|----------|
 | Phase 1 | 🛑 版本落后提示 | Decision | 选择是否更新源码 |
-| Phase 2 | ✅ 文件结构验证 | Human-Verify | 确认文件结构完整 |
-| Phase 4 | 🔄 模式选择 | Decision | 选择 Yolo/交互模式 |
+| Phase 3.5 | 🔄 模式检测 | Auto | 根据 surveyState 自动判断 |
+| Phase 3.5 | 🔄 调研中断确认 | Decision | 仅 surveyState="in-progress" 时，继续/切换 |
+| Phase 2 | ✅ 文件结构验证 | Human-Verify | 确认文件结构完整（含 explorer/ 和 notes/） |
+| Phase 4 | 🔄 研究风格选择 | Decision | 选择 Yolo/交互模式（仅 Survey 模式） |
 | Phase 5b | ✅ 调研完成确认 | Human-Verify | 确认概念列表 |
 | Phase 5b | 🔄 理解确认 | Decision | 继续/暂停/更多解释/提问 |
-| Phase 6 | 🔄 产出选择 | Decision | 继续研究/指南/模板/Cheat Sheet/小白指南/全部 |
+| Phase 6 | 🔄 产出选择 | Decision | 继续研究/指南/教程/模板/Cheat Sheet/小白指南/技术展示文章/Skill 映射/全部 |
+| Phase 6b-T1 | ✅ 配置完成确认 | Human-Verify | 用户完成所有配置步骤，检查清单全通过 |
+| Phase 6b-T2 | 🔄 实测结果审核 | Human-Verify | 确认实测数据，处理失败的命令 |
 | Phase 7 | 🔄 恢复确认 | Decision | 继续/重新开始 |

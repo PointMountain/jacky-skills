@@ -67,11 +67,12 @@ fi
 
 ---
 
-## 4. 状态文件模板（.study-meta.json v2）
+## 4. 状态文件模板（.study-meta.json v2.1）
 
 ```json
 {
-  "schemaVersion": "2.0",
+  "schemaVersion": "2.2",
+  "surveyState": "pending",
   "managedBy": {
     "skill": "repo-study",
     "createdBySkill": true,
@@ -88,7 +89,9 @@ fi
   "topics": [
     {
       "id": "github-actions-auto-skill-generation",
+      "parentId": null,
       "name": "GitHub Actions 自动生成 Agent Skills",
+      "location": "tutorials",
       "category": "architecture",
       "tags": ["github-actions", "automation", "skills"],
       "state": "active",
@@ -110,14 +113,37 @@ fi
       "artifacts": [
         {
           "type": "note",
-          "path": "notes/architecture/github-actions-auto-skill-generation.md",
+          "path": "explorer/architecture/github-actions-auto-skill-generation.md",
           "createdAt": "2026-03-22T15:26:00+08:00"
+        },
+        {
+          "type": "demo",
+          "path": "demos/example-pattern/",
+          "createdAt": "2026-04-26T10:00:00+08:00",
+          "features": [
+            { "name": "核心功能", "necessity": "must" },
+            { "name": "错误处理", "necessity": "should" },
+            { "name": "额外优化", "necessity": "could" }
+          ]
         }
       ],
       "skillPackaging": {
         "hasSkillTemplate": false,
         "hasRunnableSkill": false
       }
+    }
+  ],
+  "backlog": [
+    {
+      "id": "bl-001",
+      "title": "示例可蒸馏模式",
+      "type": "demo",
+      "priority": "high",
+      "status": "pending",
+      "description": "一句话描述这个 demo 验证什么",
+      "sourceNote": "explorer/example-note.md",
+      "relatedTopic": "github-actions-auto-skill-generation",
+      "demoPath": null
     }
   ],
   "timestamps": {
@@ -180,12 +206,17 @@ Topics: 2
     "prompt": "检测到远程仓库有更新，是否更新源码？"
   },
   "summary": {
+    "surveyState": "completed",
     "topicCount": 2,
+    "tutorialCount": 3,
+    "noteCount": 2,
     "questionCount": 5,
-    "noteCount": 3,
     "guideCount": 1,
     "skillTemplateCount": 1,
-    "runnableSkillCount": 0
+    "runnableSkillCount": 0,
+    "demoCount": 1,
+    "backlogPendingCount": 7,
+    "backlogDoneCount": 1
   },
   "topics": []
 }
@@ -235,3 +266,64 @@ scripts/repo-study-status.sh --json --check-remote
 # 仅读取创建来源标记
 jq -r '.managedBy.skill // "unknown"' .study-meta.json
 ```
+
+---
+
+## 8. Backlog Item Schema
+
+每个 backlog 条目代表一个可蒸馏的知识点。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | string | 是 | 唯一标识：`bl-{NNN}`，从当前最大值递增 |
+| `title` | string | 是 | 简短标题 |
+| `type` | enum | 是 | `demo`（代码模式）/ `skill-design`（设计概念）/ `note`（文档补充） |
+| `priority` | enum | 是 | `high` / `medium` / `low` |
+| `status` | enum | 是 | `pending` / `in-progress` / `done` |
+| `description` | string | 是 | 一句话描述验证什么 |
+| `sourceNote` | string | 否 | 来源笔记路径 |
+| `relatedTopic` | string | 否 | 关联的 topic ID |
+| `demoPath` | string | null | demo 目录路径（创建后更新） |
+
+### Backlog 自动填充时机
+
+研究阶段（Phase 5a/5b）完成后，扫描发现中的**自包含、可独立运行**的模式，追加到 `backlog[]`。
+
+---
+
+## 9. Demo Artifact Schema
+
+Demo 是独立可运行的项目工程，存放在 `demos/` 目录下。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `type` | `"demo"` | 是 | artifact 类型标识 |
+| `path` | string | 是 | demo 目录路径（如 `demos/sqlite-crud/`） |
+| `createdAt` | string | 是 | ISO 时间戳 |
+| `features` | array | 否 | 功能清单 + 必要性标记 |
+
+### Feature 对象
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | 是 | 功能名称 |
+| `necessity` | enum | 是 | `must` / `should` / `could` |
+
+### Demo 目录结构
+
+```
+demos/{demo-name}/
+├── package.json    # 独立依赖，name: "demo-{feature}"
+├── index.mjs       # 入口脚本（或 src/ 目录）
+└── README.md       # 说明书（学习目的 + 验证知识点 + 功能清单）
+```
+
+### Demo README.md 必须包含
+
+1. **关联 Topic** — 指向 .study-meta.json 中的 topic ID
+2. **学习目的** — 1-2 句话，关联到研究笔记中的具体知识点
+3. **验证的知识点** — 列表形式，说明这个 demo 证实了哪些技术事实
+4. **功能清单** — 表格，含必要性标记（MUST/SHOULD/COULD）
+5. **运行方式** — 精确命令：`cd demos/{name} && npm install && node index.mjs`
+6. **预期输出** — 实测后填入
+7. **来源** — 链接到研究笔记和源码参考

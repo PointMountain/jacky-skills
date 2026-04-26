@@ -70,10 +70,20 @@ updated_at: {日期}
 在 `wiki/{theme}/index.md` 追加：
 
 ```markdown
+---
+tags: [{主题}, index]
+type: index
+article_id: OBA-{随机8位}
+updated_at: {日期}
+---
+
 ## {类型分类}
 
 - [[{slug}]] — {一句话描述}
 ```
+
+- index.md 创建时分配 article_id，后续更新不修改
+- article_id 使用与其他文章相同的生成和验证规则
 
 类型分类示例：
 - `## 概念` — 概念文章

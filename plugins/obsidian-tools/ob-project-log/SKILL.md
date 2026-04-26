@@ -4,7 +4,7 @@ description: "项目知识沉淀到 Obsidian。三种模式：自动沉淀（Hoo
 ---
 
 <role>Obsidian 项目知识沉淀助手。从 AI 对话中提取项目知识，支持自动沉淀、手动沉淀和浏览追问三种模式。</role>
-<purpose>将对话中的项目知识写入 wiki/projects/{project}/，按主题组织为活文档。支持浏览已有文章并追问优化。</purpose>
+<purpose>将对话中的项目知识写入 Obsidian wiki 对应目录，按主题组织为活文档。支持浏览已有文章并追问优化。</purpose>
 <trigger>
 
 ```text
@@ -24,10 +24,10 @@ description: "项目知识沉淀到 Obsidian。三种模式：自动沉淀（Hoo
 </trigger>
 <gsd:workflow xmlns:gsd="urn:gsd:workflow">
   <gsd:meta>requires=OBSIDIAN_REPO</gsd:meta>
-  <gsd:goal>三种模式：自动沉淀、手动沉淀、浏览追问，将项目知识写入 Obsidian。</gsd:goal>
+  <gsd:goal>三种模式：自动沉淀、手动沉淀、浏览追问，将项目知识写入 Obsidian。写入后自动更新项目 CLAUDE.md 的 Obsidian 索引段。</gsd:goal>
   <gsd:phase>模式判断：Hook 触发 → 自动沉淀；用户说"追问/优化/继续讨论" → 浏览追问；其他 → 手动沉淀。</gsd:phase>
-  <gsd:phase>自动/手动沉淀：识别项目 → 分析对话 → 提取知识 → 匹配/创建文件 → 写入更新。</gsd:phase>
-  <gsd:phase>浏览追问：列出文章 → 用户选择 → 读取全文 → 进入追问循环 → 更新文章。</gsd:phase>
+  <gsd:phase>自动/手动沉淀：识别项目 → 分析对话 → 提取知识 → 匹配/创建文件 → 写入更新 → 更新项目 CLAUDE.md 索引段。</gsd:phase>
+  <gsd:phase>浏览追问：列出文章 → 用户选择 → 读取全文 → 进入追问循环 → 更新文章 → 更新项目 CLAUDE.md 索引段。</gsd:phase>
 </gsd:workflow>
 
 # Obsidian 项目知识沉淀 (ob-project-log / 项目沉淀)
@@ -41,6 +41,34 @@ description: "项目知识沉淀到 Obsidian。三种模式：自动沉淀（Hoo
 1. 检查全局 CLAUDE.md 中 `OBSIDIAN_REPO` 配置变量
 2. 如果未定义，使用 AskUserQuestion 询问用户
 3. 将路径保存为 `$OBSIDIAN_REPO` 变量供后续使用
+
+## 项目路径解析
+
+**核心问题**：不同类型的项目，Obsidian wiki 目录不同。必须先检测项目类型，再确定写入路径。
+
+### 检测流程（按优先级）
+
+1. **检查 CLAUDE.md 已有索引路径**：如果 `<!-- ob-index:start -->` 区域内已有 `> 索引路径：` 行，直接使用该路径
+2. **检查 `.study-meta.json`**：如果项目根目录存在此文件且包含 `"managedBy": "repo-study"`，判定为 repo-study 项目
+3. **检查目录名后缀**：如果项目目录名以 `-study` 结尾，且 `$OBSIDIAN_REPO/wiki/open-source/{project-name}/` 存在，判定为 repo-study 项目
+4. **模糊搜索已有目录**：在 `$OBSIDIAN_REPO/wiki/` 下搜索与项目名匹配的目录
+5. **以上都不匹配**：默认为开发项目
+
+### 路径规则
+
+| 项目类型 | 检测条件 | Wiki 路径 | 示例 |
+|----------|---------|-----------|------|
+| **repo-study 项目** | `.study-meta.json` 存在，或目录名以 `-study` 结尾且在 `open-source/` 下有对应目录 | `$OBSIDIAN_REPO/wiki/open-source/{project-name}/` | `wiki/open-source/codex-plugin-cc-study/` |
+| **开发项目** | 其他 | `$OBSIDIAN_REPO/wiki/projects/{project-name}/` | `wiki/projects/CodeIsland/` |
+
+### 使用约定
+
+文档中所有 `$WIKI_PATH` 指代根据上述规则解析后的项目 wiki 目录路径。路径末尾无 `/`。
+
+```
+$WIKI_PATH = $OBSIDIAN_REPO/wiki/open-source/{project}    # repo-study
+$WIKI_PATH = $OBSIDIAN_REPO/wiki/projects/{project}        # 开发项目
+```
 
 ## 模式判断
 
@@ -101,7 +129,7 @@ Stop Hook 在每次对话结束时自动触发，Claude 执行以下流程：
 - 提取 git remote URL 生成 GitHub 链接（`git remote get-url origin` → 提取 `owner/repo`）
 
 **索引加速匹配**：在匹配已有文件前，先检查 `index.md`：
-1. 读取 `$OBSIDIAN_REPO/wiki/projects/{project}/index.md`
+1. 读取 `$WIKI_PATH/index.md`
 2. 如果存在：从索引表格中查找主题匹配的文件，无需全量读取所有文件
 3. 如果不存在：fallback 到原有逻辑（ls 目录 + 逐个读取文件），并在写入完成后创建索引
 
@@ -135,6 +163,33 @@ source: conversation
 
 **更新索引**：写入完成后，同步更新 `index.md`（格式见下方"索引机制"章节）
 
+### 3.5 更新项目 CLAUDE.md 索引段
+
+写入文章后，自动更新项目 CLAUDE.md 中的 Obsidian 索引段（格式参考 [references/claude-index-format.md](references/claude-index-format.md)）。
+
+**流程**：
+
+1. **获取项目 git 根目录**：`git rev-parse --show-toplevel`
+2. **查找 CLAUDE.md**：`{git_root}/CLAUDE.md`
+3. **发现 Obsidian 索引路径**（按优先级）：
+   - 读取 CLAUDE.md 中已有的 `<!-- ob-index:start -->` 标记内的路径
+   - 精确匹配：`$WIKI_PATH/index.md`
+   - 模糊搜索：在 `$OBSIDIAN_REPO/wiki/` 下搜索 frontmatter 含 `project: {project_name}` 的 index.md
+   - 目录名匹配：`find "$OBSIDIAN_REPO/wiki/" -type d -name "*{project}*"`
+4. **读取 Obsidian 索引**：解析 index.md 表格中的文件名和主题
+5. **生成 CLAUDE.md 索引段**：
+   - 表格列：文件 | 主题 | 何时读取
+   - "何时读取" 基于主题和涵盖维度自动推导
+6. **写入 CLAUDE.md**：
+   - 已有 `<!-- ob-index:start -->` 标记 → 替换标记区域内容
+   - 已有旧的手动 "Obsidian 知识库" 部分（无标记）→ 替换为标记区域
+   - 都没有 → 在 CLAUDE.md 末尾追加标记区域
+
+**跳过条件**：
+- 项目不在 git 仓库中
+- CLAUDE.md 不可写
+- 未找到对应的 Obsidian 索引文件
+
 ### 4. 创建标记文件
 
 无论是否有内容沉淀，都创建标记文件防止 Hook 死循环：
@@ -146,7 +201,7 @@ echo $(date +%s) > /tmp/ob-project-log-synced-$PPID
 ### 5. 简短告知
 
 ```
-📝 已自动沉淀到 wiki/projects/{project}/（{N} 条更新）
+📝 已自动沉淀到 {wiki_relative_path}（{N} 条更新）
 ```
 
 **无有价值内容时**：
@@ -178,10 +233,10 @@ echo $(date +%s) > /tmp/ob-project-log-synced-$PPID
 ### 1. 识别项目
 
 ```
-git remote origin → basename → 当前目录名 → 询问用户
+CLAUDE.md 已有索引路径 → .study-meta.json → 目录名 -study 后缀 → 模糊搜索 → 询问用户
 ```
 
-目录：`$OBSIDIAN_REPO/wiki/projects/{project}/`
+按"项目路径解析"章节确定 `$WIKI_PATH`。
 
 ### 2. 提取内容
 
@@ -205,7 +260,7 @@ git remote origin → basename → 当前目录名 → 询问用户
 
 ### 3. 匹配或创建文件
 
-**索引加速匹配**：先读取 `$OBSIDIAN_REPO/wiki/projects/{project}/index.md`：
+**索引加速匹配**：先读取 `$WIKI_PATH/index.md`：
 1. 如果索引存在：从索引表格中查找主题匹配的文件，无需全量读取
 2. 如果索引不存在：fallback 到原有逻辑（ls 目录 + 逐个读取文件内容），并在写入完成后创建索引
 
@@ -217,6 +272,8 @@ git remote origin → basename → 当前目录名 → 询问用户
 **不预设固定文件名**，完全根据对话内容动态决定。
 
 **更新索引**：写入完成后，同步更新 `index.md`（格式见下方"索引机制"章节）
+
+**更新项目 CLAUDE.md 索引段**：与自动沉淀模式 3.5 相同，写入后自动更新项目 CLAUDE.md 中的 Obsidian 索引段（参考 [references/claude-index-format.md](references/claude-index-format.md)）。
 
 ### 4. 写入规则
 
@@ -254,7 +311,7 @@ git remote origin → basename → 当前目录名 → 询问用户
 ### 5. 输出摘要
 
 ```
-📝 已沉淀到 wiki/projects/{project}/
+📝 已沉淀到 {wiki_relative_path}
 
 更新：
   - {filename}.md  → {做了什么}
@@ -277,23 +334,23 @@ git remote origin → basename → 当前目录名 → 询问用户
 ### 1. 识别项目
 
 ```
-git remote origin → basename → 当前目录名 → 询问用户
+CLAUDE.md 已有索引路径 → .study-meta.json → 目录名 -study 后缀 → 模糊搜索 → 询问用户
 ```
 
-目录：`$OBSIDIAN_REPO/wiki/projects/{project}/`
+按"项目路径解析"章节确定 `$WIKI_PATH`。
 
 ### 2. 列出文章
 
-**索引加速展示**：先读取 `$OBSIDIAN_REPO/wiki/projects/{project}/index.md`：
+**索引加速展示**：先读取 `$WIKI_PATH/index.md`：
 1. 如果索引存在：直接从索引表格生成文章列表，无需逐个读取文件
 2. 如果索引不存在：fallback 到原有逻辑（ls 目录 + 逐个读取文件首部提取主题），并在展示完成后创建索引
 
 注意：`index.md` 是元数据文件，不出现在文章列表中。子目录中的文件以 `decisions/xxx.md` 格式列出。
 
-列出 `$OBSIDIAN_REPO/wiki/projects/{project}/` 下所有文件：
+列出 `$WIKI_PATH/` 下所有文件：
 
 ```
-📂 wiki/projects/{project}/
+📂 {wiki_relative_path}
 
   1. [OBA-k7jm2p9q] architecture.md — 架构设计
      更新于 2024-01-15 | 涵盖：目录结构、模块职责、数据流
@@ -353,6 +410,8 @@ git remote origin → basename → 当前目录名 → 询问用户
   ~ 修改：{调整了什么}
 ```
 
+更新后同步更新项目 CLAUDE.md 索引段（与自动沉淀模式 3.5 相同）。
+
 ### 6. 退出
 
 用户说"退出"、"完成"或"好了"时：
@@ -364,7 +423,7 @@ git remote origin → basename → 当前目录名 → 询问用户
 
 ## 索引机制：index.md
 
-每个项目目录 `$OBSIDIAN_REPO/wiki/projects/{project}/` 下维护 `index.md`，用于加速文件匹配和列表展示，避免全量读取。
+每个项目目录 `$WIKI_PATH/` 下维护 `index.md`，用于加速文件匹配和列表展示，避免全量读取。
 
 ### 索引文件格式
 
@@ -372,6 +431,7 @@ git remote origin → basename → 当前目录名 → 询问用户
 ---
 type: project-index
 project: {project-name}
+article_id: OBA-{随机8位}
 updated_at: {date}
 ---
 
@@ -381,6 +441,11 @@ updated_at: {date}
 |----|------|------|----------|----------|
 | OBA-k7jm2p9q | terminal-jump-debug.md | 终端跳转实现指南 | 架构设计、踩坑记录、可复用方案 | 2026-04-15 |
 ```
+
+**index.md 的 article_id**：
+- index.md 本身也需要 article_id（与其他文章同等对待）
+- 新建 index.md 时分配，后续更新不修改
+- 使用与文章相同的生成和验证规则
 
 ### 全局 article_id 机制
 
@@ -401,6 +466,42 @@ updated_at: {date}
 
 - 如果 `index.md` 不存在，skill 仍能正常工作（fallback 到 ls + 逐个读取文件）
 - fallback 完成后自动创建索引，后续操作即可加速
+
+---
+
+## CLAUDE.md 索引联动
+
+项目 CLAUDE.md 中的 Obsidian 索引段实现了渐进式知识加载（详见 [references/claude-index-format.md](references/claude-index-format.md)）：
+
+```
+Level 1: CLAUDE.md `<!-- ob-index -->` 区域（自动加载，紧凑概览）
+  → Level 2: Obsidian index.md（按需加载，完整表格含 ID 和维度）
+    → Level 3: 具体文章（按需加载，完整内容）
+```
+
+### 自动维护触发时机
+
+| 触发来源 | 时机 |
+|----------|------|
+| 自动沉淀（模式一） | 写入文章 + 更新 index.md 后 |
+| 手动沉淀（模式二） | 写入文章 + 更新 index.md 后 |
+| 浏览追问（模式三） | 更新文章后 |
+| ob-index | 重建索引后（由 ob-index skill 负责） |
+
+### 索引段格式
+
+```markdown
+<!-- ob-index:start -->
+## Obsidian 知识库
+
+> 索引路径：`{OBSIDIAN_REPO}/wiki/{section}/{project}/index.md`
+> 渐进式加载：先读本概览，需要详情时读取索引文件，再读取具体文章。
+
+| 文件 | 主题 | 何时读取 |
+|------|------|----------|
+| file.md | 一句话主题描述 | 需要了解{主题}时 |
+<!-- ob-index:end -->
+```
 
 ---
 
