@@ -552,9 +552,15 @@ tags: ["技术展示", "{项目领域}"]
 ### Survey 模式：沉淀到 explorer/
 
 将研究发现写入 `explorer/` 目录，格式同输出模板。
+
+**编号规则**：
+- `00-` 固定给环境准备章节（安装、配置、前置依赖），工具/CLI/库项目必须生成
+- `01-` 起为正式内容（快速上手、导读、架构深入等）
+- 新增文件时：扫描已有编号取最大值 +1
+
 同步更新 `.study-meta.json` 的 `topics[]`：
 
-- 若 topic 不存在：创建新 topic（`location: "tutorials"`）
+- 若 topic 不存在：创建新 topic（`location: "explorer"`）
 - 若 topic 已存在：在该 topic 下追加 `questions[]` 与 `artifacts[]`
 - `progress` 采用持续态统计（问题数/笔记数/指南数/skill 模板数/可运行 skill 数）
 - 不维护"完成态"，默认 `state: "active"`

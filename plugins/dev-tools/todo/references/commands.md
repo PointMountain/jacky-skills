@@ -4,157 +4,110 @@
 
 | 命令 | 用途 | 参数 |
 |------|------|------|
-| `/todo add <内容>` | 添加 TODO 项（默认 Todo 区） | `--cleanup` `--idea` 指定分类 |
-| `/todo add --cleanup <内容>` | 添加清理项 | 支持 `@file:` 和 `@action:` |
-| `/todo add --idea <内容>` | 添加想法 | 纯文本 |
-| `/todo add-file <path>` | 添加临时文件追踪 | 自动添加 `@action:delete` |
-| `/todo done <编号或关键词>` | 标记完成 | 支持编号或关键词匹配 |
-| `/todo clean` | 执行清理（列出 + 确认） | 交互式选择 |
-| `/todo list` | 显示当前所有项 | 按分类展示 |
-| `/todo setup` | 安装 hooks | 注入到 settings.json |
-| `/todo save [进展描述]` | 保存当前进展 | 写入上下文信息 |
-| `/todo restore` | 从 .todo.md 恢复上下文 | 读取并展示 |
+| `/todo add <内容>` | 添加 Todo 条目（自动生成 checkpoint） | `--idea` 添加到 Ideas 区 |
+| `/todo resolve` | 提取批次 → 读取 checkpoint → 执行任务 | 交互式选择 |
 
-## 详细说明
+## /todo add
 
-### /todo add
+添加新的待办条目，**同时自动生成 checkpoint 文件**。
 
-添加新的 TODO 项。
-
-**默认行为**：添加到 `## 📋 Todo` 分区
+**默认行为**：添加到 `## 📋 Todo` 分区，并生成 `cp-{timestamp}.md`
 
 **选项**：
-- `--cleanup`：添加到 `## 🧹 Cleanup` 分区
-- `--idea`：添加到 `## 💡 Ideas` 分区
+- `--idea`：添加到 `## 💡 Ideas` 分区（不生成 checkpoint）
 
-**内联标记**：
-- `@file:<path>`：关联文件路径
-- `@action:<type>`：指定清理动作
+**checkpoint 自动生成的内容**：
+- 当前任务描述
+- 做到哪了（进度）
+- 为什么选 A 不选 B（关键决策）
+- 下一步具体操作
+- 正在编辑的文件列表
 
 **示例**：
 ```
-/todo add 完成单元测试
-/todo add --cleanup 移除 console.log @file:src/app.tsx
-/todo add --cleanup 恢复 node_modules 修改 @file:node_modules/lodash/index.js @action:git-checkout
+/todo add 完成 CDP Proxy 笔记的 WebSocket 管理部分
+  → 自动生成 cp-20260427-143000.md（当前会话快照）
+  → todo.md 新增：- [ ] 完成 CDP Proxy 笔记... @context:cp-20260427-143000.md
+
 /todo add --idea 用 WebSocket 实现实时通知
+  → 只添加 Ideas 条目，不生成 checkpoint
 ```
 
-### /todo add-file
+## /todo resolve
 
-将文件添加到临时文件追踪列表。
-
-**行为**：
-1. 验证文件路径在项目内
-2. 自动添加 `@action:delete` 标记
-3. 添加到 `## 📁 Temp Files` 分区
-
-**示例**：
-```
-/todo add-file test-debug.tsx
-/todo add-file tmp/output.json
-```
-
-### /todo done
-
-标记 TODO 项为已完成。
-
-**匹配方式**：
-- 编号：按分区内的顺序编号
-- 关键词：模糊匹配描述文字
-
-**示例**：
-```
-/todo done 3
-/todo done 单元测试
-```
-
-### /todo clean
-
-执行清理操作。
+提取待办条目到批次文件，读取 checkpoint 上下文，执行任务。
 
 **流程**：
-1. 读取 🧹 Cleanup 和 📁 Temp Files 的未完成项
-2. 路径安全校验
-3. 展示列表并等待用户选择
-4. 执行清理并标记为已完成
-
-**路径安全校验**：
-- 必须在项目目录内
-- 禁止路径穿越（..）
-- 禁止绝对路径
-- node_modules 操作需二次确认
-
-### /todo list
-
-展示当前所有 TODO 项。
-
-**输出格式**：按分区展示，统计各分区数量。
-
-### /todo setup
-
-安装 hooks 到 Claude Code。
-
-**行为**：
-1. 将 hooks.json 配置合并到 `~/.claude/settings.json`
-2. 如有必要创建 `.todo.md` 初始文件
-3. 询问是否加入 `.gitignore`
-
-### /todo save
-
-保存当前进展到 .todo.md。
-
-**用途**：上下文压缩前保存关键信息。
+1. 读取 `todo.md`，展示所有待处理条目
+2. 用户确认要处理的条目（全部或选择部分）
+3. 扫描已有 `todo-N.md`，取最大 N+1 作为新批次号
+4. 将选中条目写入 `todo-{N}.md`（status: pending）
+5. 清空 `todo.md` 已提取的条目（用户可继续新增）
+6. 逐条读取 `@context` 指向的 checkpoint 文件
+7. 带着完整上下文执行任务
+8. 完成后：
+   - 标记 `todo-{N}.md` 中已完成条目，status → done
+   - 删除对应的 `cp-xxx.md` 文件
 
 **示例**：
 ```
-/todo save 完成了 API 集成，还有错误处理未完成
+用户: /todo resolve
+Claude:
+  📋 待处理条目：
+    [1] 完成 CDP Proxy 笔记 @context:cp-20260427-143000.md
+    [2] 重构 API 错误处理 @context:cp-20260427-150000.md
+
+  确认处理哪些？[全部/编号/取消]
+用户: 全部
+Claude:
+  ✅ 提取到 todo-1.md，清空 todo.md
+  📖 读取 cp-20260427-143000.md → 恢复上下文
+  🔧 开始处理任务...
 ```
-
-### /todo restore
-
-从 .todo.md 恢复上下文。
-
-**行为**：展示各分区的未完成项，建议下一步操作。
 
 ## 使用场景示例
 
-### 场景 1：长任务中的临时代码管理
+### 场景 1：上下文快满了，保存状态
 
 ```
-用户: /todo add --cleanup 添加了 console.log 调试 @file:src/app.tsx
-Claude: ✅ 已添加清理项
+用户: /todo add 完成笔记的 WebSocket 管理部分，还差超时处理和重连逻辑
+Claude:
+  📸 生成 checkpoint: cp-20260427-143000.md
+  ✅ 添加到 todo.md: - [ ] 完成笔记... @context:cp-20260427-143000.md
 
-...（长时间工作）...
-
-用户: /todo clean
-Claude: 🔍 待清理项：
-  [1] 移除 src/app.tsx 的 console.log @file:src/app.tsx
-确认清理？[全部/选择编号/取消]
-用户: 1
-Claude: ✅ 已清理 src/app.tsx 的 console.log
+  checkpoint 记录了：
+  - 当前任务：写 06-cdp-proxy-code-walkthrough.md
+  - 进度：已完成 HTTP API 部分，正在写 WebSocket
+  - 决策：选择逐行精读而非概览方式
+  - 下一步：补充超时处理、重连逻辑、错误码对照表
 ```
 
-### 场景 2：上下文恢复
+### 场景 2：新会话恢复上下文并处理
 
 ```
-# 新会话启动，SessionStart hook 注入提醒
-用户: /todo restore
-Claude: 📋 从 .todo.md 恢复上下文：
-  - 🧹 1 个清理项
-  - 📋 2 个待办项
-  建议先 /todo clean 清理临时项
+# 新会话启动，SessionStart hook 显示有 2 个待办
+
+用户: /todo resolve
+Claude:
+  📋 待处理条目：
+    [1] 完成笔记 WebSocket 部分 @context:cp-20260427-143000.md
+
+  确认处理？[全部/编号/取消]
+用户: 全部
+Claude:
+  ✅ 提取到 todo-1.md
+  📖 读取 checkpoint → 恢复上下文：
+    - 任务：写 06-cdp-proxy-code-walkthrough.md
+    - 进度：WebSocket 管理部分写到一半
+    - 下一步：补充超时处理和重连逻辑
+
+  🔧 开始处理...
+  （带着完整上下文继续工作）
 ```
 
-### 场景 3：想法记录
+### 场景 3：记录想法
 
 ```
-用户: /todo add --idea 可以用 WebSocket 实现实时通知
-Claude: ✅ 已记录想法
-```
-
-### 场景 4：上下文压缩前保存
-
-```
-用户: /todo save 完成了用户认证模块的 API 集成，还有错误处理未完成
-Claude: ✅ 进展已保存到 .todo.md
+用户: /todo add --idea 考虑给 demo 加 fallback 处理
+Claude: ✅ 已记录到 Ideas（不生成 checkpoint）
 ```

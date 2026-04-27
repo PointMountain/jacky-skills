@@ -252,17 +252,55 @@ for dir in "$STUDY_BASE"/*-study; do
     # symlink 已存在，检查是否指向正确
     current_target=$(readlink "$OB_OPEN_SOURCE/$name/notes")
     if [ "$current_target" = "$dir/notes" ]; then
-      ok "$name — symlink 已正确"
+      ok "$name — notes symlink 已正确"
     else
       run_cmd rm "$OB_OPEN_SOURCE/$name/notes"
       run_cmd ln -s "$dir/notes" "$OB_OPEN_SOURCE/$name/notes"
-      ok "$name — symlink 已更新 → $dir/notes"
+      ok "$name — notes symlink 已更新 → $dir/notes"
     fi
   elif [ -e "$OB_OPEN_SOURCE/$name/notes" ]; then
     info "$name — notes 不是 symlink，跳过"
   else
     run_cmd ln -s "$dir/notes" "$OB_OPEN_SOURCE/$name/notes"
-    ok "$name — symlink 已创建 → $dir/notes"
+    ok "$name — notes symlink 已创建 → $dir/notes"
+  fi
+
+  # 创建 explorer symlink（如果存在）
+  if [ -d "$dir/explorer" ]; then
+    if [ -L "$OB_OPEN_SOURCE/$name/explorer" ]; then
+      current_target=$(readlink "$OB_OPEN_SOURCE/$name/explorer")
+      if [ "$current_target" = "$dir/explorer" ]; then
+        ok "$name — explorer symlink 已正确"
+      else
+        run_cmd rm "$OB_OPEN_SOURCE/$name/explorer"
+        run_cmd ln -s "$dir/explorer" "$OB_OPEN_SOURCE/$name/explorer"
+        ok "$name — explorer symlink 已更新 → $dir/explorer"
+      fi
+    elif [ -e "$OB_OPEN_SOURCE/$name/explorer" ]; then
+      info "$name — explorer 不是 symlink，跳过"
+    else
+      run_cmd ln -s "$dir/explorer" "$OB_OPEN_SOURCE/$name/explorer"
+      ok "$name — explorer symlink 已创建 → $dir/explorer"
+    fi
+  fi
+
+  # 创建 Question.md symlink（如果存在）
+  if [ -f "$dir/Question.md" ]; then
+    if [ -L "$OB_OPEN_SOURCE/$name/Question.md" ]; then
+      current_target=$(readlink "$OB_OPEN_SOURCE/$name/Question.md")
+      if [ "$current_target" = "$dir/Question.md" ]; then
+        ok "$name — Question.md symlink 已正确"
+      else
+        run_cmd rm "$OB_OPEN_SOURCE/$name/Question.md"
+        run_cmd ln -s "$dir/Question.md" "$OB_OPEN_SOURCE/$name/Question.md"
+        ok "$name — Question.md symlink 已更新 → $dir/Question.md"
+      fi
+    elif [ -e "$OB_OPEN_SOURCE/$name/Question.md" ]; then
+      info "$name — Question.md 不是 symlink，跳过"
+    else
+      run_cmd ln -s "$dir/Question.md" "$OB_OPEN_SOURCE/$name/Question.md"
+      ok "$name — Question.md symlink 已创建 → $dir/Question.md"
+    fi
   fi
 done
 

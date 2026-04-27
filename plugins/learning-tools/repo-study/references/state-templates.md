@@ -91,7 +91,7 @@ fi
       "id": "github-actions-auto-skill-generation",
       "parentId": null,
       "name": "GitHub Actions 自动生成 Agent Skills",
-      "location": "tutorials",
+      "location": "explorer",
       "category": "architecture",
       "tags": ["github-actions", "automation", "skills"],
       "state": "active",

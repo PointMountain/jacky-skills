@@ -196,6 +196,26 @@ guide_count="$(jq '[.[].progress.guideCount] | add // 0' <<<"$topics_json")"
 skill_template_count="$(jq '[.[].progress.skillTemplateCount] | add // 0' <<<"$topics_json")"
 runnable_skill_count="$(jq '[.[].progress.runnableSkillCount] | add // 0' <<<"$topics_json")"
 
+# 读取 surveyState（向后兼容：缺失时根据已有笔记推断）
+survey_state="$(jq -r '.surveyState // empty' "$meta_file" 2>/dev/null || true)"
+if [[ -z "$survey_state" ]]; then
+  if [[ "$note_count" -gt 0 ]] || [[ "$guide_count" -gt 0 ]]; then
+    survey_state="completed"
+  else
+    survey_state="pending"
+  fi
+fi
+
+# 统计 explorer/ 和 notes/ 下的 md 文件数
+tutorial_file_count=0
+note_file_count=0
+if [[ -d "explorer" ]]; then
+  tutorial_file_count="$(find explorer -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')"
+fi
+if [[ -d "notes" ]]; then
+  note_file_count="$(find notes -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')"
+fi
+
 json_output="$(
   jq -cn \
     --arg currentDir "$PWD" \
@@ -220,6 +240,9 @@ json_output="$(
     --argjson topicCount "$topic_count" \
     --argjson questionCount "$question_count" \
     --argjson noteCount "$note_count" \
+    --arg surveyState "$survey_state" \
+    --argjson tutorialFileCount "$tutorial_file_count" \
+    --argjson noteFileCount "$note_file_count" \
     --argjson guideCount "$guide_count" \
     --argjson skillTemplateCount "$skill_template_count" \
     --argjson runnableSkillCount "$runnable_skill_count" \
@@ -241,9 +264,12 @@ json_output="$(
         commitSha: (if $repoCommitSha == "" then null else $repoCommitSha end)
       },
       summary: {
+        surveyState: $surveyState,
         topicCount: $topicCount,
         questionCount: $questionCount,
         noteCount: $noteCount,
+        tutorialFileCount: $tutorialFileCount,
+        noteFileCount: $noteFileCount,
         guideCount: $guideCount,
         skillTemplateCount: $skillTemplateCount,
         runnableSkillCount: $runnableSkillCount
@@ -276,6 +302,8 @@ echo "Directory Suffix (*-study): $name_ends_with_study"
 echo "Study Meta (.study-meta.json): $has_study_meta"
 echo "Project Origin: $project_origin"
 echo "Created By repo-study: $created_by_repo_study"
+echo "Survey State: $survey_state"
+echo "Tutorials: $tutorial_file_count files | Notes: $note_file_count files"
 echo
 
 if [[ "$check_remote" == true ]]; then

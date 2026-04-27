@@ -1,11 +1,11 @@
 #!/bin/bash
 # session-start.sh — SessionStart Hook：注入 TODO 提醒
-# 功能：会话启动时检查 .todo.md 并注入未完成项统计
+# 功能：会话启动时检查 todo.md 并注入未处理项统计
 
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-TODO_FILE="$PROJECT_ROOT/.todo.md"
+TODO_FILE="$PROJECT_ROOT/todo.md"
 
-# 守卫：检查 .todo.md 是否存在（作为功能开关）
+# 守卫：检查 todo.md 是否存在（作为功能开关）
 [ -f "$TODO_FILE" ] || exit 0
 
 # 统计分区未完成项数量（以"下一个 ## 标题"为边界）
@@ -19,12 +19,10 @@ count_open_items() {
   ' "$TODO_FILE"
 }
 
-cleanup_count=$(count_open_items "🧹 Cleanup")
 todo_count=$(count_open_items "📋 Todo")
 ideas_count=$(count_open_items "💡 Ideas")
-temp_count=$(count_open_items "📁 Temp Files")
 
-total=$((cleanup_count + todo_count + ideas_count + temp_count))
+total=$((todo_count + ideas_count))
 
 # 如果没有未完成项，不注入
 [ "$total" -eq 0 ] && exit 0
@@ -35,12 +33,10 @@ cat <<EOF
 ## TODO 提醒 (todo-skill)
 
 当前项目有 ${total} 个待处理项：
-  - 🧹 ${cleanup_count} 个清理项
   - 📋 ${todo_count} 个待办项
   - 💡 ${ideas_count} 个想法
-  - 📁 ${temp_count} 个临时文件
 
-使用 \`/todo list\` 查看详情，\`/todo restore\` 恢复上下文，\`/todo clean\` 执行清理
+使用 \`/todo resolve\` 处理待办，\`/todo add\` 新增条目
 </system-reminder>
 EOF
 

@@ -17,16 +17,21 @@ j-skills install todo -g
 
 ### 2. 在项目中启用
 
-```bash
-# 在项目根目录执行
-/todo setup
+在项目根目录创建 `todo.md` 文件即可：
+
+```markdown
+# TODO
+
+最后更新: 2026-04-27
+
+## 📋 Todo
+（无）
+
+## 💡 Ideas
+（无）
 ```
 
-这会：
-- 将 hooks 配置注入 `~/.claude/settings.json`
-- 创建 `.todo.md` 初始文件（如果不存在）
-
-> hooks 通过检测 `.todo.md` 是否存在来决定是否激活，无需额外开关文件。删除 `.todo.md` 即可禁用。
+> hooks 通过检测 `todo.md` 是否存在来决定是否激活。删除 `todo.md` 即可禁用。
 
 ## Hooks 配置详情
 
@@ -35,11 +40,10 @@ j-skills install todo -g
 | 事件 | 脚本 | 触发时机 | 用途 |
 |------|------|----------|------|
 | SessionStart | session-start.sh | 会话启动 | 注入 TODO 统计提醒 |
-| Stop | stop-check.sh | AI 响应结束 | 检查未清理项 |
-| PreCompact | pre-compact.sh | 上下文压缩前 | 提醒保存进展 |
-| PreToolUse | pre-tool-use.sh | Write/Bash 调用前 | 检测临时文件 |
+| Stop | stop-check.sh | AI 响应结束 | 检查未处理条目 |
+| PreCompact | pre-compact.sh | 上下文压缩前 | 提醒执行 resolve 或 add |
 
-### 手动配置 hooks（不使用 setup）
+### 手动配置 hooks
 
 如果需要手动配置，在 `~/.claude/settings.json` 的 `hooks` 中添加：
 
@@ -57,22 +61,9 @@ j-skills install todo -g
 
 ## 安全规则
 
-### 路径安全校验
-
-所有文件操作（delete/git-checkout）都经过以下安全检查：
-
-| 检查项 | 规则 | 不通过时 |
-|--------|------|---------|
-| 项目内路径 | 绝对路径必须在项目目录下 | 跳过，标注 ⚠️ |
-| 路径穿越 | 禁止 .. 和符号链接指向项目外 | 跳过，标注 ⚠️ |
-| 文件存在性 | @file: 标记的文件必须存在 | 跳过 |
-| 绝对路径 | 禁止以 / 开头 | 拒绝执行 |
-
-### 操作确认
-
-- delete 操作：列出 + 用户选择确认
-- git-checkout 操作：列出 + 用户选择确认
-- node_modules 中的 git-checkout：二次确认
+1. resolve 前必须经用户确认
+2. checkpoint 文件路径必须在项目目录内
+3. 清理 checkpoint 前确认任务已完成
 
 ## .gitignore 建议
 
@@ -80,7 +71,9 @@ j-skills install todo -g
 
 **加入 .gitignore（推荐）**：
 ```
-.todo.md
+todo.md
+todo-*.md
+cp-*.md
 ```
 
 适合：个人项目，不想把 TODO 追踪提交到仓库
