@@ -345,8 +345,8 @@ explorer/
   <gsd:phase name="answer" order="10" condition="用户使用 /repo-study answer">
     <gsd:meta>
       <name>question-answer</name>
-      <description>读取 Question.md 中用户记录的看不懂的地方，启动 subagent 拆解并补充对应笔记内容</description>
-      <requires>Agent (subagent), Read, Edit, Write</requires>
+      <description>读取 Question.md 中用户记录的看不懂的地方，使用 Multi Teams 并行拆解并补充对应笔记内容（每个 section 一个 teammate）</description>
+      <requires>TeamCreate, Agent (teammate), TaskCreate, TaskUpdate, TaskList, SendMessage, TeamDelete, Read, Edit, Write</requires>
     </gsd:meta>
     <gsd:step>读取项目根目录的 Question.md</gsd:step>
     <gsd:step>提取一级标题以下的所有内容，分为两部分：(A) 顶部自由内容（非 article_id section）(B) ## {article_id} section 及其下用户内容</gsd:step>
@@ -354,9 +354,11 @@ explorer/
     <gsd:step condition="A 不为空">将顶部自由内容作为整体建议/反馈处理（可能是文件移动、流程优化、结构调整等）</gsd:step>
     <gsd:step>展示 section 概况表格（序号 / article_id / 对应笔记 / 内容摘要）</gsd:step>
     <gsd:step>用户选择：全部处理 / 选择部分处理 / 取消</gsd:step>
-    <gsd:step condition="选择了 section">启动 Explore 类型 subagent，传入 Question.md 全文 + 笔记路径 + 源码路径，让 AI 拆解并生成补充内容</gsd:step>
-    <gsd:step>将补充内容插入到对应研究笔记的指定位置</gsd:step>
-    <gsd:step>用户确认后清理 Question.md：删除已处理的 section</gsd:step>
+    <gsd:step condition="选择了 section">立即拆分到临时批次文件 Question-{N}.md，清理 Question.md</gsd:step>
+    <gsd:step condition="有 article_id sections">TeamCreate 创建团队 answer-{N}，为每个 section 调用 TaskCreate 创建独立任务</gsd:step>
+    <gsd:step condition="有 article_id sections">并行派发 general-purpose 类型 teammates（每个 section 一个），各自读取批次文件 + 对应笔记 + 源码，独立分析并生成补充内容</gsd:step>
+    <gsd:step>主会话收集各 teammate 结果，将补充内容插入到对应研究笔记的指定位置</gsd:step>
+    <gsd:step>用户确认后清理批次文件，SendMessage shutdown 所有 teammates，TeamDelete 清理团队</gsd:step>
     <gsd:step>输出摘要：处理了 N 个 section，补充了 M 篇笔记</gsd:step>
   </gsd:phase>
 </gsd:workflow>
@@ -1004,51 +1006,78 @@ sections:
 
 **3. 输出提示**：告知用户 `已从 Question.md 中提取 {N} 个 section 到 Question-{M}.md，原文件已清理，可继续编辑`
 
-### Step 10.4: AI 拆解（subagent）
+### Step 10.4: AI 拆解（Multi Teams 并行）
 
 > **注意**：此步骤基于 Step 10.3b 生成的临时批次文件（`Question-{N}.md`），不再直接读取 Question.md。
 
-**对于 (A) 顶部自由内容**：直接在主会话中分析处理（从临时批次文件读取），不启动 subagent。根据内容类型决定处理方式：
+**对于 (A) 顶部自由内容**：直接在主会话中分析处理（从临时批次文件读取），不启动 teammate。根据内容类型决定处理方式：
 - 文件移动/重命名 → 直接执行
 - 目录结构调整 → 直接执行
 - repo-study skill 改进建议 → 记录到 jacky-skills 项目的改进 backlog 或直接修改 skill
 - 其他反馈 → 讨论后执行
 
-**对于 (B) article_id sections**：启动一个 Explore 类型 subagent，传入临时批次文件内容 + 对应笔记路径 + 源码路径：
+**对于 (B) article_id sections**：使用 **Multi Teams 模式并行处理**，每个 section 分配一个独立 teammate：
+
+#### Step 10.4a: 创建团队和任务
+
+1. **TeamCreate**：创建团队 `answer-{N}`（N 为批次编号）
+2. **TaskCreate**：为每个待处理的 article_id section 创建独立任务，描述中包含：
+   - section 的 article_id
+   - 临时批次文件路径（`Question-{N}.md`）
+   - 对应笔记的查找方式（通过 article_id 在 explorer/ 和 notes/ 中搜索 frontmatter）
+   - 源码路径
+   - 期望输出格式
+
+#### Step 10.4b: 并行派发 teammates
+
+为每个 section spawn 一个 **general-purpose** 类型 teammate（带 `team_name` 和唯一 `name`，如 `answer-1-OBA-xxx`）：
+
+**teammate prompt 模板**：
 
 ```
 你是代码分析和知识补充专家。
 
-用户在阅读研究笔记时，遇到看不懂的地方，写在了批次文件里。请：
+你被分配了一个具体的研究问题，请完成以下任务：
 
-1. 读取以下批次文件中每个 article_id section 的内容
-2. 找到对应的研究笔记（通过 article_id 在 explorer/ 和 notes/ 中搜索 frontmatter）
-3. 理解用户写的内容（可能是问题、困惑、"看不懂"、需要补充示例等）
-4. 分析源码，找到答案或补充材料
-5. 提出具体补充方案：在原笔记的哪个位置补充什么内容
+1. 读取批次文件 {Question-{N}.md} 中你负责的 section: {article_id}
+2. 通过 article_id 在 explorer/ 和 notes/ 中搜索 frontmatter，找到对应的研究笔记
+3. 读取该笔记全文，理解现有内容结构
+4. 理解用户写的内容（可能是问题、困惑、"看不懂"、需要补充示例等）
+5. 分析源码 {源码路径}，找到答案或补充材料
+6. 提出具体补充方案
 
 **源码路径**: {项目目录}/{repo-name}/
 **研究笔记路径**: {项目目录}/explorer/ 和 {项目目录}/notes/
-**批次文件内容**:
-{Question-{N}.md 全文}
+**批次文件路径**: {Question-{N}.md}
+**你的 section**: {article_id}
 
-**输出格式**（每个 section 一组）：
-
-### section: {article_id}
+**输出格式**：
 - **对应笔记**: {找到的笔记路径}
-- **用户诉求**: {AI 对用户内容的理解，1-2 句}
+- **用户诉求**: {对用户内容的理解，1-2 句}
 - **补充内容**: {可直接写入笔记的 Markdown 内容}
 - **插入位置**: {在笔记中的哪个 section 之后插入，如"## 三、xxx 之后"}
 ```
 
+每个 teammate：
+- 通过 TaskUpdate 将任务标记为 `in_progress`
+- 独立读取批次文件、研究笔记、源码
+- 生成补充方案并通过 SendMessage 返回给 team lead
+- 通过 TaskUpdate 将任务标记为 `completed`
+
+#### Step 10.4c: 收集结果
+
+主会话（team lead）通过 TaskList 监控进度，收集各 teammate 返回的补充方案。
+
 ### Step 10.5: 执行补充
 
-主会话收到 subagent 分析结果后，对每个 section：
+主会话（team lead）收到所有 teammate 的分析结果后：
 
-1. 找到对应的研究笔记文件
-2. 将补充内容插入到指定位置
-3. 保留原有内容，只做追加/补充
-4. 展示补充摘要给用户确认
+1. **关闭团队**：`SendMessage` shutdown 所有 teammates，然后 `TeamDelete` 清理团队资源
+2. 对每个 section 的结果：
+   - 找到对应的研究笔记文件
+   - 将补充内容插入到指定位置
+   - 保留原有内容，只做追加/补充
+3. 展示补充摘要给用户确认
 
 ### Step 10.6: 标记批次完成
 
@@ -1114,7 +1143,7 @@ sections:
 场景 8: sync      → 同步到 Obsidian（article_id + symlink + 索引）
 场景 8b: translate → 并行 subagent 翻译 *.md → *.zh.md
 场景 9: distill   → backlog → demo 工程 / skill 设计文档
-场景 10: answer   → 读取 Question.md → subagent 回答 → notes/question-{NN}.md → 归档已解决
+场景 10: answer   → 读取 Question.md → Multi Teams 并行回答（每个 section 一个 teammate）→ 补充笔记 → 归档已解决 + TeamDelete
 
 安全保障：explorer/ 和 notes/ 永不删除 | 版本检查：gh api commit SHA
 ```
@@ -1143,7 +1172,7 @@ sections:
 - [ ] sync：article_id 分配 + symlink（覆盖 explorer/、notes/ 和 Question.md）+ 索引生成
 - [ ] distill：backlog → 独立可运行的 demo 工程
 - [ ] Question.md：项目创建时自动生成（含 AI 预设问题），sync 时通过 symlink 同步到 Obsidian
-- [ ] answer：读取 Question.md 的顶部自由内容（整体建议）和 article_id section → 顶部内容主会话直接处理 / article_id subagent 拆解补充 → 清理已处理内容
+- [ ] answer：读取 Question.md 的顶部自由内容（整体建议）和 article_id section → 顶部内容主会话直接处理 / article_id Multi Teams 并行拆解补充（每个 section 一个 teammate）→ 清理已处理内容 + shutdown teammates + TeamDelete
 - [ ] Skill 项目检测：检测 SKILL.md 存在时标记为 skill-type，提取 skill 名称和脚本列表
 - [ ] skill-type 项目：自动生成 skill→script 映射分析 + 脚本验收测试
 - [ ] 自动同步检测（Phase 5.5）：研究完成后检测 OBSIDIAN_REPO 配置，路径有效时自动询问是否同步到 Obsidian（仅当前项目），支持跳过和本次会话不再询问
