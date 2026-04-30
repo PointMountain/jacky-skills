@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "audio-to-subtitle": {
+      "source": "local",
+      "installMode": "offline",
+      "localPath": "../../video-processing/skills/audio-to-subtitle/"
+    }
+  }
+}

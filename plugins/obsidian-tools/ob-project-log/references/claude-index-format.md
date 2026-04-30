@@ -68,7 +68,7 @@ CLAUDE.md 中使用 HTML 注释标记自动生成区域：
 
 ## 多位置合并
 
-如果一个项目在 Obsidian 中有多个位置的索引（如 `projects/` + `topics/`），合并到同一个标记区域内，用三级标题分组：
+如果一个项目在 Obsidian 中有多个位置的索引（如 `projects/` + 主题目录），合并到同一个标记区域内，用三级标题分组：
 
 ```markdown
 <!-- ob-index:start -->
@@ -86,7 +86,7 @@ CLAUDE.md 中使用 HTML 注释标记自动生成区域：
 
 ### 主题研究
 
-> 索引路径：`{OBSIDIAN_REPO}/wiki/topics/{topic}/{project}/index.md`
+> 索引路径：`{OBSIDIAN_REPO}/wiki/{theme}/{project}/index.md`
 
 | 文件 | 主题 | 何时读取 |
 |------|------|----------|

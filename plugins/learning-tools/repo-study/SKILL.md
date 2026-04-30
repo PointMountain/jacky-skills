@@ -35,6 +35,20 @@ argument-hint: '[子命令 | URL [问题]]  子命令: list|status|update|sync|t
 - `explorer/` 中的成体系笔记最终目标是打磨成可发布的教程
 - `notes/` 中的零散笔记是知识积累，供参考但不形成叙事链路
 
+### 四类产出目录
+
+| 目录 | 命名规则 | 内容定位 | 何时生成 |
+|------|---------|---------|---------|
+| `explorer/` | `NN-xxx.md`（带 2 位编号） | 成体系教程、导读指南、架构分析 | Survey 模式 |
+| `notes/` | `xxx.md`（不带编号） | 零散研究笔记、增量问答 | Incremental 模式 |
+| `practices/` | `xxx-practice.md`（按主题命名） | **实操手册**：每步验证通过、输入输出完整可复现 | 增量问答中用户要求实操验证时 |
+| `demos/` | `{demo-name}/`（目录工程） | 独立可运行的代码 demo | Phase 9 distill |
+
+**practices/ 与其他目录的区别**：
+- 不同于 `explorer/`（概念理解为主）— practices 重在**跑通命令**，每个步骤都有真实输出
+- 不同于 `notes/`（知识积累）— practices 是**操作手册**，面向"拿来就能用"
+- 不同于 `demos/`（代码工程）— practices 是**文档**，不是独立代码项目
+
 ### explorer 文件编号规则
 
 **`explorer/` 目录下的笔记文件必须带 2 位索引前缀**，按阅读顺序编号：
@@ -175,6 +189,7 @@ explorer/
     <gsd:step>沉淀笔记到 explorer/（文件名必须带 2 位索引前缀，如 01-xxx.md）并设置 surveyState = "completed"</gsd:step>
     <gsd:step condition="项目需要环境准备且 explorer/ 中不存在 00-*">强制生成环境准备章节 explorer/00-{repo-name}-environment-setup.md（安装、配置、前置依赖）</gsd:step>
     <gsd:step condition="首次研究且 explorer/ 中不存在 *-guide.md">强制生成仓库导读指南 explorer/NN-{repo-name}-guide.md（带编号）</gsd:step>
+    <gsd:step>启动 Capability Discovery subagent：穷举项目所有可操作能力（命令/API/配置/端点），自动生成 Cheat Sheet 到 explorer/cheatsheet/（详见 references/yolo-mode-guide.md §6）</gsd:step>
     <gsd:step condition="用户使用中文提问">提示翻译功能</gsd:step>
     <gsd:step>执行 Phase 5.5 自动同步检测</gsd:step>
   </gsd:phase>
@@ -201,8 +216,18 @@ explorer/
   <gsd:phase name="research_incremental" order="5c" condition="Incremental 模式">
     <gsd:step>解析用户的增量问题</gsd:step>
     <gsd:step>启动针对性 subagent（只分析相关代码区域）</gsd:step>
-    <gsd:step>写入 notes/{topic-slug}.md</gsd:step>
-    <gsd:step>更新 .study-meta.json 的 topics[]（location: "notes"）</gsd:step>
+    <gsd:step condition="用户要求实操验证">进入 Phase 5d（实操手册生成，产出 practices/）</gsd:step>
+    <gsd:step condition="普通增量问答">写入 notes/{topic-slug}.md</gsd:step>
+    <gsd:step condition="普通增量问答">更新 .study-meta.json 的 topics[]（location: "notes"）</gsd:step>
+    <gsd:step>执行 Phase 5.5 自动同步检测</gsd:step>
+  </gsd:phase>
+
+  <gsd:phase name="research_practice" order="5d" condition="用户要求实操验证（Incremental 模式下）">
+    <gsd:step>识别需要验证的命令/操作范围（如某个站点的所有命令、某个功能的操作流程）</gsd:step>
+    <gsd:step>逐个执行命令，记录真实输入和输出（每步必须跑通，失败则标注原因和替代方案）</gsd:step>
+    <gsd:step>写入 practices/{topic}-practice.md（每个实操文件包含：前置条件 → 命令全景表 → 分章节实操 → 已知问题 → 速查表）</gsd:step>
+    <gsd:step>写入时立即生成 article_id 并写入 frontmatter</gsd:step>
+    <gsd:step>更新 .study-meta.json 的 topics[]（location: "practices"）</gsd:step>
     <gsd:step>执行 Phase 5.5 自动同步检测</gsd:step>
   </gsd:phase>
 
@@ -244,13 +269,14 @@ explorer/
   </gsd:phase>
 
   <gsd:phase name="output" order="6">
-    <gsd:step>询问用户下一步：继续研究 / 生成实操指南 / 生成教程 / 生成 Skill 模板 / 生成 Cheat Sheet / 生成小白指南 / 生成技术展示文章 / 生成 Skill 映射 / 全部生成</gsd:step>
+    <gsd:step>询问用户下一步：继续研究 / 生成实操指南 / 生成教程 / 生成 Skill 模板 / 生成 Cheat Sheet / 生成小白指南 / 生成技术展示文章 / 生成 Skill 映射 / 生成实操手册 / 全部生成</gsd:step>
     <gsd:step condition="选择指南或全部">生成 explorer/NN-{主题}-guide.md（小白可执行的实操指南，成体系，带编号）</gsd:step>
     <gsd:step condition="选择教程或全部">进入 Phase 6b（教程两阶段工作流，产出到 explorer/）</gsd:step>
     <gsd:step condition="选择模板或全部">生成 notes/{主题}-skill.md（可复用的 Skill 模板，零散笔记）</gsd:step>
     <gsd:step condition="选择 Cheat Sheet 或全部">进入 Phase 6d（Cheat Sheet 专属 subagent，产出到 explorer/cheatsheet/）</gsd:step>
     <gsd:step condition="选择小白指南或全部">生成 explorer/NN-{repo-name}-beginner-guide.md（零基础完全指南，成体系，带编号）</gsd:step>
     <gsd:step condition="选择 skill 映射或全部">生成 notes/{repo-name}-skill-to-script-mapping.md（skill→script 映射，零散笔记）</gsd:step>
+    <gsd:step condition="选择实操手册或全部">进入 Phase 6e（实操手册生成，产出到 practices/）</gsd:step>
     <gsd:step>更新研究日志 notes/RESEARCH-LOG.md</gsd:step>
   </gsd:phase>
 
@@ -318,7 +344,7 @@ explorer/
   <gsd:phase name="cheatsheet" order="6d" condition="用户选择生成 Cheat Sheet">
     <gsd:meta>
       <name>cheatsheet-generation</name>
-      <description>Cheat Sheet 专属 subagent：从研究笔记中提炼速查卡片，产出到 explorer/cheatsheet/</description>
+      <description>Cheat Sheet 专属 subagent：从研究笔记和源码中提炼速查卡片，产出到 explorer/cheatsheet/</description>
       <requires>Agent (subagent), Read, Write</requires>
     </gsd:meta>
 
@@ -326,12 +352,14 @@ explorer/
       <gsd:step>扫描 explorer/ 和 notes/ 下所有研究笔记，识别可提炼为速查卡的知识维度</gsd:step>
       <gsd:step>常见维度：命令/API 速查、配置模板、触发词/关键词、数据结构、操作流程</gsd:step>
       <gsd:step>为每个维度生成一份 Cheat Sheet（如项目有多个维度则生成多份）</gsd:step>
+      <gsd:step condition="YOLO 模式已完成 Capability Discovery">跳过本步骤，直接使用 Step 5a.3b 已生成的 Cheat Sheet，仅补充用户要求的额外维度</gsd:step>
     </gsd:phase>
 
     <gsd:phase name="cheatsheet_generate" order="2">
       <gsd:step>启动 Cheat Sheet 专属 subagent（Explore 类型）</gsd:step>
-      <gsd:step>subagent 读取所有研究笔记，按维度提炼速查内容</gsd:step>
-      <gsd:step>每份 Cheat Sheet 格式：标题 + 一句话说明 + 分维度表格 + 示例</gsd:step>
+      <gsd:step>subagent 读取所有研究笔记 AND 源码中的命令/API 定义，按维度提炼速查内容</gsd:step>
+      <gsd:step>每份 Cheat Sheet 格式：标题 + 一句话说明 + 分维度表格 + 示例 + article_id</gsd:step>
+      <gsd:step condition="命令/API 数量 > 50">额外生成一份总览 Cheat Sheet（all-{dimension}-cheat-sheet.md），按分类组织</gsd:step>
     </gsd:phase>
 
     <gsd:phase name="cheatsheet_save" order="3">
@@ -339,6 +367,33 @@ explorer/
       <gsd:step>写入 explorer/cheatsheet/{topic}-cheat-sheet.md（每维度一份）</gsd:step>
       <gsd:step>更新 .study-meta.json 的 topics[]（location: "explorer"，子目录 "cheatsheet"）</gsd:step>
       <gsd:step>更新 CLAUDE.md 笔记索引和 explorer/README.md 阅读路径</gsd:step>
+    </gsd:phase>
+  </gsd:phase>
+
+  <gsd:phase name="practice" order="6e" condition="用户选择生成实操手册">
+    <gsd:meta>
+      <name>practice-generation</name>
+      <description>实操手册生成：逐个命令验证，记录真实输入输出，产出到 practices/</description>
+      <requires>Agent (subagent), Bash, Read, Write</requires>
+    </gsd:meta>
+
+    <gsd:phase name="practice_identify" order="1">
+      <gsd:step>识别实操范围：确定要验证的命令/操作集合（如某个站点的所有命令、某个功能的完整流程）</gsd:step>
+      <gsd:step>从 explorer/ 和 notes/ 中提取已有研究素材，识别相关命令和 API</gsd:step>
+    </gsd:phase>
+
+    <gsd:phase name="practice_verify" order="2">
+      <gsd:step>逐个执行命令，记录真实输入和输出</gsd:step>
+      <gsd:step>失败的命令标注原因和替代方案</gsd:step>
+      <gsd:step>验证输出格式（yaml/table/json/csv/md）</gsd:step>
+    </gsd:phase>
+
+    <gsd:phase name="practice_save" order="3">
+      <gsd:step>创建 practices/ 目录（如不存在）</gsd:step>
+      <gsd:step>写入 practices/{topic}-practice.md（结构：前置条件 → 命令全景表 → 分章节实操 → 已知问题 → 速查表）</gsd:step>
+      <gsd:step>写入时立即生成 article_id 并写入 frontmatter</gsd:step>
+      <gsd:step>更新 .study-meta.json 的 topics[]（location: "practices"）</gsd:step>
+      <gsd:step>更新 CLAUDE.md 笔记索引</gsd:step>
     </gsd:phase>
   </gsd:phase>
 
@@ -593,6 +648,41 @@ scripts/repo-study-status.sh --json --check-remote
 2. **核心概念 + 前因后果**（来自文档 + 代码综合分析）
 3. **代码原理**（来自代码分析 subagent）
 
+### Step 5a.3b: Capability Discovery（能力发现） — YOLO 模式强制步骤
+
+> 🎯 **目标**：穷举项目所有可操作能力，生成对应的 Cheat Sheet。此步骤确保研究不仅覆盖架构理解，还覆盖全部可实操的内容。
+
+**触发条件**：YOLO 模式下的所有项目（不可跳过）。
+
+**启动 Capability Discovery subagent**（Explore 类型）：
+
+**扫描范围**（根据项目类型自适应）：
+
+| 项目类型 | 扫描目标 | 示例 |
+|----------|----------|------|
+| CLI 工具 | 所有命令、子命令、参数、选项 | `clis/` 目录、`cli()` 注册、`commander/yargs` 定义 |
+| REST API | 所有端点、方法、参数、响应 | `routes/`、`@Controller`、OpenAPI spec |
+| 库/SDK | 所有公开 API、类、函数、配置项 | `export` 列表、`index.ts`、类型定义 |
+| 插件系统 | 所有插件钩子、扩展点、生命周期 | `plugin/`、`hook`、`middleware` |
+| 框架 | 所有配置项、中间件、组件、指令 | `config/`、`directive/`、`component/` |
+| 浏览器扩展 | 所有浏览器 API 调用、content script、popup | `manifest.json`、`background.ts`、`content.ts` |
+| 配置驱动 | 所有配置项、环境变量、选项 | `.env.example`、`config/`、`settings/` |
+
+**扫描方法**：
+1. **文件结构扫描**：Glob 搜索注册文件、路由文件、命令定义文件
+2. **模式匹配**：Grep 搜索常见的注册模式（`cli(`、`command(`、`router.`、`app.get`、`export`、`register`）
+3. **Manifest/Config 读取**：读取 `package.json`（bin 字段）、`manifest.json`、CLI manifest 等
+4. **文档交叉验证**：对比 `docs/` 和 `README.md` 中列出的功能与源码中的实际实现
+
+**Cheat Sheet 生成规则**：
+1. **按维度分文件**：每个有意义的维度生成一份独立 Cheat Sheet（如"命令速查"、"API 速查"、"配置速查"）
+2. **文件命名**：`explorer/cheatsheet/{topic}-cheat-sheet.md`（不带编号）
+3. **每份 Cheat Sheet 必须包含**：标题 + 一句话说明 + 分维度表格 + 使用示例 + article_id
+4. **表格格式**：命令/操作 | 干什么 | 关键参数 | 示例
+5. **对于大型项目**（命令/API 数量 > 50），额外生成一份**总览 Cheat Sheet**（`explorer/cheatsheet/all-{dimension}-cheat-sheet.md`），按分类组织所有内容
+
+> 📝 **详细 subagent prompt 模板** → `references/yolo-mode-guide.md` §6
+
 ### Step 5a.4: 沉淀与指南
 
 1. 沉淀笔记到 `explorer/`（**文件名必须带 2 位索引前缀**，如 `01-xxx.md`、`02-xxx.md`）并更新 `.study-meta.json` 的 `topics[]`（location: "explorer"）
@@ -601,7 +691,7 @@ scripts/repo-study-status.sh --json --check-remote
 2. **环境准备章节（可选）**：如果项目需要安装、配置等前置步骤，生成 `explorer/00-{repo-name}-environment-setup.md`（纯代码分析项目可跳过）
 3. 设置 `surveyState = "completed"`
 4. **首次研究强制生成导读指南**：检查 `explorer/` 中是否已有 `*-guide.md`，若不存在则生成（带编号前缀）
-5. **可选 Cheat Sheet 生成**：如果项目是工具/库/CLI（有明确安装和使用命令），在首次研究时提示用户是否生成 Cheat Sheet
+5. **自动 Capability Discovery + Cheat Sheet 生成**：启动 Capability Discovery subagent，扫描项目所有可操作能力（命令/API/配置/端点/插件钩子等），自动生成对应 Cheat Sheet 到 `explorer/cheatsheet/`。此项为 YOLO 模式强制步骤，不可跳过（详见 references/yolo-mode-guide.md §6）
 6. 中文提问时提示翻译功能
 
 > 📝 **导读指南完整模板** → `references/guide-template.md`
@@ -729,6 +819,7 @@ test -d "$OBSIDIAN_REPO" && echo "ob_available" || echo "ob_unavailable"
 2. 在 Obsidian 仓库创建 symlink：
    - `wiki/open-source/{project}/explorer` → `{study项目}/explorer`
    - `wiki/open-source/{project}/notes` → `{study项目}/notes`
+   - `wiki/open-source/{project}/practices` → `{study项目}/practices`（如存在）
    - `wiki/open-source/{project}/Question.md` → `{study项目}/Question.md`（如存在）
 3. 生成/更新 `wiki/open-source/{project}/index.md` 概述页
 4. 更新 `wiki/open-source/index.md` 总索引
@@ -763,7 +854,8 @@ test -d "$OBSIDIAN_REPO" && echo "ob_available" || echo "ob_unavailable"
 > 6. 生成小白指南 → `explorer/NN-{repo-name}-beginner-guide.md`（成体系，带编号）
 > 7. **生成技术展示文章** → 进入 Phase 6c（产出到 `notes/`）
 > 8. **生成 Skill 映射** → `notes/{repo-name}-skill-to-script-mapping.md`（零散笔记）
-> 9. 全部生成
+> 9. **生成实操手册** → 进入 Phase 6e（产出到 `practices/`，每步实测验证）
+> 10. 全部生成
 
 最后更新研究日志 `explorer/RESEARCH-LOG.md` 并同步 `topics[].progress`。
 
@@ -772,6 +864,7 @@ test -d "$OBSIDIAN_REPO" && echo "ob_available" || echo "ob_unavailable"
 - 成体系的内容（指南、教程、小白指南）→ `explorer/`（**文件名带 2 位索引前缀，从 01- 起**）
 - 速查卡片（Cheat Sheet）→ `explorer/cheatsheet/`（**不带编号**，每维度一份）
 - 零散/独立的内容（文章、Skill 映射）→ `notes/`（不带编号）
+- 实操手册（每步验证通过的操作指南）→ `practices/`（**不带编号**，按主题命名，如 `{topic}-practice.md`）
 
 ---
 
@@ -823,6 +916,72 @@ test -d "$OBSIDIAN_REPO" && echo "ob_available" || echo "ob_unavailable"
 
 ---
 
+## Phase 6e: 实操手册生成 (practice)
+
+> 适用场景：用户要求对工具/CLI 的命令进行逐个实测验证，生成可复现的操作手册。
+> 产出文件：`practices/{topic}-practice.md`（不带编号，按主题命名）
+> 前置条件：项目已完成 survey（surveyState = "completed"）+ 环境已配置（Phase 1 通过）
+
+### Step 6e.1: 识别实操范围
+
+1. 从用户请求中提取要验证的范围（如"B 站的所有命令"、"browser 命令"）
+2. 从 explorer/ 和 notes/ 中提取已有研究素材，列出待验证的命令清单
+3. 展示命令清单（命令 → 说明 → 认证模式），用户确认范围
+
+### Step 6e.2: 逐个验证
+
+1. 按分组逐个执行命令（如按功能模块、认证模式分组）
+2. 每个命令记录：输入命令 → 真实输出 → 状态（✅/❌/⚠️）
+3. 失败的命令：标注错误原因和替代方案
+4. 可并行的命令使用 Bash 工具并行执行
+
+### Step 6e.3: 写入实操手册
+
+1. 创建 `practices/` 目录（如不存在）
+2. 写入 `practices/{topic}-practice.md`，结构如下：
+
+```markdown
+---
+article_id: OBA-xxx
+title: {标题}
+description: {一句话说明}
+date: YYYY-MM-DD
+status: verified
+environment:
+  opencli: x.x.x
+  ...
+---
+
+# {标题}
+
+> 所有命令均已在 YYYY-MM-DD 实测通过。
+
+## 前置条件
+（环境检查命令和期望输出）
+
+## 命令全景
+（表格：命令 / 功能 / 认证模式 / 实测状态）
+
+## 第 1 章：xxx
+（分章节，每章包含：命令 → 真实输出 → 说明）
+
+## 已知问题
+（表格：问题 / 影响 / 解决方案）
+
+## 命令速查表
+（紧凑的命令列表）
+```
+
+3. 写入时立即生成 `article_id` 并写入 frontmatter
+4. 更新 `.study-meta.json` 的 `topics[]`（location: "practices"）
+5. 更新 CLAUDE.md 笔记索引
+
+### Step 6e.4: 同步到 Obsidian
+
+执行 Phase 5.5 自动同步检测（包括 practices/ symlink）。
+
+---
+
 ## Phase 8: 同步到 Obsidian (sync)
 
 当用户使用 `/repo-study sync` 时：
@@ -837,6 +996,7 @@ test -d "$OBSIDIAN_REPO" && echo "ob_available" || echo "ob_unavailable"
 5. 对每个有笔记的项目：
    - 创建 `wiki/open-source/{project}/explorer` symlink → `{study项目}/explorer`
    - 创建 `wiki/open-source/{project}/notes` symlink → `{study项目}/notes`
+   - 创建 `wiki/open-source/{project}/practices` symlink → `{study项目}/practices`（如存在）
    - 创建 `wiki/open-source/{project}/Question.md` symlink → `{study项目}/Question.md`（如存在）
    - 若 `index.md` 不存在，生成仓库概述页（含笔记列表和 article_id）
 6. 重新生成 `wiki/open-source/index.md` 总索引
@@ -1138,14 +1298,15 @@ sections:
 场景 5: research  → Survey→explorer/ | Incremental→notes/
 场景 5.5: auto-sync → 研究完成后自动检测 Obsidian → 询问是否同步（仅当前项目）
 场景 5c: 增量问答  → 针对性 subagent → notes/{topic}.md → auto-sync
-场景 6: output    → 指南 / 教程 / 模板 / Cheat Sheet / 小白指南 / 技术展示文章 / Skill 映射 / 全部
+场景 5d: 实操验证  → 逐个命令验证 → practices/{topic}-practice.md → auto-sync
+场景 6: output    → 指南 / 教程 / 模板 / Cheat Sheet / 小白指南 / 技术展示文章 / Skill 映射 / 实操手册 / 全部
 场景 7: continue  → 恢复交互学习
 场景 8: sync      → 同步到 Obsidian（article_id + symlink + 索引）
 场景 8b: translate → 并行 subagent 翻译 *.md → *.zh.md
 场景 9: distill   → backlog → demo 工程 / skill 设计文档
 场景 10: answer   → 读取 Question.md → Multi Teams 并行回答（每个 section 一个 teammate）→ 补充笔记 → 归档已解决 + TeamDelete
 
-安全保障：explorer/ 和 notes/ 永不删除 | 版本检查：gh api commit SHA
+安全保障：explorer/、notes/ 和 practices/ 永不删除 | 版本检查：gh api commit SHA
 ```
 
 </scenarios>
@@ -1154,28 +1315,30 @@ sections:
 <success_criteria>
 - [ ] 正确解析仓库 URL，项目路径从 CLAUDE.md 读取
 - [ ] 检测 study 标识（目录名 + .study-meta.json），使用 gh api 检查远程版本
-- [ ] 项目创建时包含 explorer/ 和 notes/ 两个目录
-- [ ] 项目创建/更新时，explorer/ 和 notes/ 目录永不删除
+- [ ] 项目创建时包含 explorer/、notes/ 和 practices/ 三个目录
+- [ ] 项目创建/更新时，explorer/、notes/ 和 practices/ 目录永不删除
 - [ ] 双模式检测：根据 surveyState 自动判断 Survey/Incremental 模式
 - [ ] Survey 模式：产出成体系笔记到 explorer/，文件名带 2 位索引前缀（00- 环境准备 + 01- 正式内容），完成后设置 surveyState = "completed"
 - [ ] Incremental 模式：产出零散笔记到 notes/，针对用户问题分析
 - [ ] 文档资源扫描：检测 docs/、README.md 等文档并分类
-- [ ] Yolo 模式：文档感知 subagent → 代码分析 subagent → 合并输出到 explorer/（带编号）
+- [ ] Yolo 模式：文档感知 subagent → 代码分析 subagent → Capability Discovery subagent（穷举可操作能力）→ 合并输出到 explorer/（带编号）+ 自动生成 Cheat Sheet
 - [ ] 交互模式：subagent 调研 → 概念拆解 → 逐步讲解 → 实时归档到 explorer/（带编号）
 - [ ] 首次研究强制生成导读指南 explorer/NN-{repo-name}-guide.md（带编号）
 - [ ] 工具/CLI/库项目首次研究时生成环境准备章节 explorer/00-{repo-name}-environment-setup.md
-- [ ] 产出路径规则：环境准备→explorer/00-（固定），成体系→explorer/01+（带编号），速查卡片→explorer/cheatsheet/（不带编号），零散→notes/（不带编号）
+- [ ] 产出路径规则：环境准备→explorer/00-（固定），成体系→explorer/01+（带编号），速查卡片→explorer/cheatsheet/（不带编号），零散→notes/（不带编号），实操手册→practices/（不带编号，按主题命名）
 - [ ] 教程两阶段分离：T1 配置引导（人工）+ T2 逐章实测（subagent）
 - [ ] 技术展示文章：素材收集 → subagent 生成 → 质量检查 → 沉淀到 notes/
-- [ ] Cheat Sheet 专属 subagent（Phase 6d）：识别维度 → subagent 提炼 → 沉淀到 explorer/cheatsheet/ → 更新索引
+- [ ] Cheat Sheet 专属 subagent（Phase 6d）：识别维度 → subagent 提炼 → 沉淀到 explorer/cheatsheet/ → 更新索引（YOLO 模式下与 Capability Discovery 合并执行）
 - [ ] 翻译：*.md → *.zh.md，不修改源文件，按 group 并行
-- [ ] sync：article_id 分配 + symlink（覆盖 explorer/、notes/ 和 Question.md）+ 索引生成
+- [ ] sync：article_id 分配 + symlink（覆盖 explorer/、notes/、practices/ 和 Question.md）+ 索引生成
 - [ ] distill：backlog → 独立可运行的 demo 工程
 - [ ] Question.md：项目创建时自动生成（含 AI 预设问题），sync 时通过 symlink 同步到 Obsidian
 - [ ] answer：读取 Question.md 的顶部自由内容（整体建议）和 article_id section → 顶部内容主会话直接处理 / article_id Multi Teams 并行拆解补充（每个 section 一个 teammate）→ 清理已处理内容 + shutdown teammates + TeamDelete
 - [ ] Skill 项目检测：检测 SKILL.md 存在时标记为 skill-type，提取 skill 名称和脚本列表
 - [ ] skill-type 项目：自动生成 skill→script 映射分析 + 脚本验收测试
 - [ ] 自动同步检测（Phase 5.5）：研究完成后检测 OBSIDIAN_REPO 配置，路径有效时自动询问是否同步到 Obsidian（仅当前项目），支持跳过和本次会话不再询问
+- [ ] 实操手册（Phase 6e）：识别命令范围 → 逐个实测验证 → 写入 practices/{topic}-practice.md（含 article_id）→ 更新索引 → 同步到 Obsidian
+- [ ] practices/ 目录：不在 explorer/ 和 notes/ 中，按主题命名（{topic}-practice.md），每步必须有真实输入输出
 </success_criteria>
 
 <!-- ========== 参考文档 ========== -->
@@ -1210,7 +1373,8 @@ sections:
 | Phase 5b | ✅ 调研完成确认 | Human-Verify | 确认概念列表 |
 | Phase 5b | 🔄 理解确认 | Decision | 继续/暂停/更多解释/提问 |
 | Phase 5.5 | 🔄 自动同步提示 | Decision | 检测到 Obsidian 时自动询问是否同步（仅当前项目）/跳过/不再询问 |
-| Phase 6 | 🔄 产出选择 | Decision | 继续研究/指南/教程/模板/Cheat Sheet/小白指南/技术展示文章/Skill 映射/全部 |
+| Phase 5d | 🔄 实操验证 | Decision | 用户要求实操验证时进入 Phase 5d/6e |
+| Phase 6 | 🔄 产出选择 | Decision | 继续研究/指南/教程/模板/Cheat Sheet/小白指南/技术展示文章/Skill 映射/实操手册/全部 |
 | Phase 6b-T1 | ✅ 配置完成确认 | Human-Verify | 用户完成所有配置步骤，检查清单全通过 |
 | Phase 6b-T2 | 🔄 实测结果审核 | Human-Verify | 确认实测数据，处理失败的命令 |
 | Phase 7 | 🔄 恢复确认 | Decision | 继续/重新开始 |

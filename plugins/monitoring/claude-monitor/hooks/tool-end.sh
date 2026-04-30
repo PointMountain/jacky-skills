@@ -1,27 +1,31 @@
 #!/bin/bash
 # hooks/tool-end.sh
-# 工具调用结束：更新守护进程状态 + 可选弹窗
+# 工具调用结束时调用 (PostToolUse Hook)
+# stdin 包含: {"tool": "Read", "success": true, "error": "..."}
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/common/config.sh"
 
+SOCKET_PATH="$HOME/.claude-monitor/monitor.sock"
 SESSION_PID=$PPID
 PROJECT_NAME=$(basename "$PWD")
 TERMINAL="${TERM_PROGRAM:-vscode}"
 
+# 标记文件目录
 MARKER_DIR="/tmp/claude-monitor"
+MARKER_FILE="$MARKER_DIR/tool_active_$SESSION_PID"
 
 # 从 stdin 读取 JSON 数据
 INPUT=$(cat)
 
 # 提取字段
 if command -v jq &> /dev/null; then
-  TOOL=$(echo "$INPUT" | jq -r '.tool // empty')
+  TOOL=$(echo "$INPUT" | jq -r '.tool_name // .tool // empty')
   SUCCESS=$(echo "$INPUT" | jq -r '.success // true')
   ERROR=$(echo "$INPUT" | jq -r '.error // empty')
-  TOOL_CALL_ID=$(echo "$INPUT" | jq -r '.toolCallId // empty')
+  TOOL_CALL_ID=$(echo "$INPUT" | jq -r '.toolCallId // .tool_use_id // empty')
 else
-  TOOL=$(echo "$INPUT" | sed 's/.*"tool"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+  TOOL=$(echo "$INPUT" | sed 's/.*"tool_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
   SUCCESS="true"
   ERROR=""
   TOOL_CALL_ID=""
@@ -36,7 +40,7 @@ if [ -z "$TOOL_CALL_ID" ] && [ -n "$TOOL" ]; then
   fi
 fi
 
-# 1. 始终向守护进程更新工具状态
+# 如果有 tool_call_id，更新状态（守护进程会自动更新会话状态）
 if [ -n "$TOOL_CALL_ID" ]; then
   ERROR_PART=""
   if [ -n "$ERROR" ]; then
@@ -44,22 +48,24 @@ if [ -n "$TOOL_CALL_ID" ]; then
     ERROR_PART=",\"error\":\"$ESCAPED_ERROR\""
   fi
 
-  curl --noproxy "*" -s -X PATCH "$DAEMON_URL/api/sessions/$SESSION_PID/tools/$TOOL_CALL_ID" \
+  RESPONSE=$(curl -s --unix-socket "$SOCKET_PATH" -X PATCH "http://localhost/api/sessions/$SESSION_PID/tools/$TOOL_CALL_ID" \
     -H "Content-Type: application/json" \
-    -d "{\"success\":$SUCCESS$ERROR_PART}" > /dev/null 2>&1
+    -d "{\"success\":$SUCCESS$ERROR_PART}" 2>/dev/null)
 
-  # 2. 悬浮弹窗（受开关控制）
-  if is_floating_window_enabled; then
-    SESSION_STATUS=$(curl --noproxy "*" -s "$DAEMON_URL/api/sessions/$SESSION_PID" 2>/dev/null | jq -r '.data.status // empty')
+  # 检查会话状态，如果所有工具完成则显示弹窗
+  SESSION_STATUS=$(curl -s --unix-socket "$SOCKET_PATH" "http://localhost/api/sessions/$SESSION_PID" 2>/dev/null | jq -r '.data.status // empty')
 
-    FLOAT_BIN=$(get_float_binary)
-    if [[ -n "$FLOAT_BIN" ]]; then
-      if [ "$SESSION_STATUS" = "tool_done" ]; then
-        "$FLOAT_BIN" tool_done "$PROJECT_NAME" "✓ $TOOL 完成" "$TERMINAL" 1 &
-      elif [ "$SESSION_STATUS" = "error" ]; then
-        "$FLOAT_BIN" error "$PROJECT_NAME" "✗ $TOOL 失败" "$TERMINAL" 2 &
-      fi
-      disown 2>/dev/null || true
+  if [ "$SESSION_STATUS" = "tool_done" ]; then
+    # 所有工具完成，显示工具完成弹窗（但不显示任务完成）
+    if is_scenario_enabled "executing"; then
+      DURATION=1  # 短暂显示
+      ~/.claude-monitor/claude-float-window tool_done "$PROJECT_NAME" "✓ $TOOL 完成" "$TERMINAL" "$DURATION" &
+    fi
+  elif [ "$SESSION_STATUS" = "error" ]; then
+    # 出错
+    if is_scenario_enabled "executing"; then
+      DURATION=2
+      ~/.claude-monitor/claude-float-window error "$PROJECT_NAME" "✗ $TOOL 失败" "$TERMINAL" "$DURATION" &
     fi
   fi
 fi

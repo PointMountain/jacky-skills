@@ -12,6 +12,7 @@
 6. [技术展示文章输出模板](#3c-技术展示文章输出模板)
 7. [笔记沉淀](#4-笔记沉淀)
 8. [翻译功能提示](#5-翻译功能提示)
+9. [Capability Discovery（能力发现）](#6-capability-discovery能力发现)
 
 ---
 
@@ -636,3 +637,136 @@ tags: ["技术展示", "{项目领域}"]
 - 仅在用户使用中文提问时提示
 - 如果用户使用英文提问，跳过此步骤
 - 保持提示简洁，不干扰主要研究流程
+
+---
+
+## 6. Capability Discovery（能力发现）
+
+**触发条件**：YOLO 模式下，Step 5a.3b 强制执行。不可跳过。
+
+**目标**：穷举项目所有可操作能力（命令、API、配置项、端点、插件钩子等），自动生成 Cheat Sheet。
+
+### 6.1 判断项目类型
+
+在启动 subagent 前，主会话根据以下信号判断项目类型：
+
+| 信号 | 判断为 | 说明 |
+|------|--------|------|
+| 存在 `clis/` 或 `commands/` 或 `cmd/` 目录 | CLI 工具 | 扫描所有命令注册 |
+| 存在 `routes/` 或 `@Controller` 或 `app.get` | REST API | 扫描所有端点 |
+| 存在 `index.ts` + 大量 `export` | 库/SDK | 扫描公开 API |
+| 存在 `SKILL.md` | Skill 项目 | 扫描所有能力 section |
+| 存在 `manifest.json` + `background.ts` | 浏览器扩展 | 扫描所有浏览器 API |
+| 存在 `plugin/` 或 `hook` 或 `middleware` | 插件系统 | 扫描所有扩展点 |
+| 存在 `config/` 或 `.env.example` | 配置驱动 | 扫描所有配置项 |
+
+可以同时属于多种类型（如一个 CLI 工具同时也是库）。
+
+### 6.2 Capability Discovery Subagent Prompt
+
+```
+你是能力发现专家。请穷举以下项目的所有可操作能力，生成完整的速查卡片。
+
+**源码路径**: {项目目录}/{repo-name}/
+**项目类型**: {主会话判断的项目类型，可能有多种}
+**已有研究笔记**: {explorer/ 和 notes/ 下的笔记摘要列表}
+
+### 第一步：穷举扫描
+
+根据项目类型，使用对应策略扫描：
+
+**CLI 工具扫描策略**：
+1. 搜索命令注册文件：`clis/`、`commands/`、`cmd/` 目录下的所有文件
+2. 读取 manifest 文件（如 `cli-manifest.json`、`package.json` 的 `bin` 字段）
+3. 搜索注册模式：`cli(`、`command(`、`.command(`、`yargs`、`commander`
+4. 对每个命令，提取：名称、描述、参数列表、认证要求、输出格式
+5. 读取官方文档（`docs/`、`README.md`）交叉验证命令列表完整性
+
+**REST API 扫描策略**：
+1. 搜索路由定义文件：`routes/`、`controllers/`、`api/` 目录
+2. 搜索注册模式：`router.get`、`app.post`、`@Get`、`@Post`、`@Controller`
+3. 对每个端点，提取：路径、方法、参数、响应格式、认证要求
+4. 读取 OpenAPI spec（如存在）
+
+**库/SDK 扫描策略**：
+1. 读取 `index.ts`/`index.js` 获取所有导出
+2. 搜索 `export`、`module.exports` 列出所有公开 API
+3. 对每个 API，提取：函数签名、参数类型、返回值、使用示例
+4. 读取 TypeScript 类型定义（如存在）
+
+**浏览器扩展扫描策略**：
+1. 读取 `manifest.json` 获取权限和入口文件
+2. 扫描 `background.ts`、`content.ts`、`popup.ts`
+3. 搜索所有 `chrome.*` API 调用
+4. 提取消息通信协议（`sendMessage`、`onMessage`）
+
+**插件系统扫描策略**：
+1. 搜索插件注册/发现机制
+2. 列出所有钩子（hook）名称和触发时机
+3. 列出所有中间件和执行顺序
+4. 提取插件 API 和生命周期
+
+**配置驱动扫描策略**：
+1. 读取 `.env.example`、`config/` 目录
+2. 搜索配置项定义：`config.`、`settings.`、`ENV`
+3. 对每个配置项，提取：名称、类型、默认值、说明
+
+### 第二步：分类整理
+
+将发现的能力按以下维度分类：
+1. 按功能域（如：社交、电商、AI、金融等）
+2. 按认证要求（公开/需登录/需 API Key）
+3. 按使用频率（核心命令/高级功能/内部 API）
+
+### 第三步：生成 Cheat Sheet
+
+按维度生成 Cheat Sheet 文件。格式要求：
+
+1. **frontmatter**：包含 `article_id`（格式：`OBA-{8位随机小写字母数字}`）、`tags`、`type: cheatsheet`、`created_at`
+2. **标题**：`# {项目名} {维度名} 速查卡`
+3. **一句话说明**：用 `>` 引用块
+4. **通用用法**：安装、基本格式、全局选项
+5. **分维度表格**：命令/操作 | 干什么 | 关键参数 | 示例
+6. **常用工作流**：典型使用场景的命令组合
+7. **输出格式说明**（如适用）
+
+### 文件命名规则
+
+- 每个维度一份：`{topic}-cheat-sheet.md`
+- 如果项目只有一个维度或命令数 < 30：生成 `all-commands-cheat-sheet.md`
+- 如果项目命令数 > 50：额外生成 `all-commands-cheat-sheet.md`（总览）+ 多个分类文件
+
+### 输出要求
+
+- 完整穷举，不要遗漏任何可操作能力
+- 每个命令/API 必须有示例
+- 按认证要求标注（🌐 Public / 🔐 Browser / 🔑 API）
+- 包含常用工作流（搜索→详情→下载 等典型链路）
+- 如果是中文提问，使用中文输出
+- 穷举但不啰嗦：表格为主，减少大段文字
+```
+
+### 6.3 Cheat Sheet 质量检查
+
+生成后，对照以下清单验证：
+
+- [ ] **穷举性**：是否覆盖了 `docs/adapters/index.md` 或 `README.md` 中列出的所有功能？
+- [ ] **准确性**：命令名、参数名是否与源码一致？（而非凭记忆）
+- [ ] **分类合理性**：维度划分是否清晰、覆盖主要使用场景？
+- [ ] **示例可用性**：示例命令是否完整可执行？
+- [ ] **总览文件**：命令/API 数量 > 50 时，是否有总览文件按分类组织？
+- [ ] **frontmatter**：每份 Cheat Sheet 是否包含 `article_id`、`tags`、`type`？
+
+### 6.4 产出路径
+
+```
+explorer/cheatsheet/
+├── all-commands-cheat-sheet.md          # 总览（大项目必须有）
+├── {category1}-cheat-sheet.md           # 分类速查
+├── {category2}-cheat-sheet.md
+└── ...
+```
+
+同步更新：
+- `CLAUDE.md` 笔记索引（添加 Cheat Sheet 条目）
+- `.study-meta.json` 的 `topics[]`（location: "explorer"，子目录 "cheatsheet"）

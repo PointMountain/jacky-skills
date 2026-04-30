@@ -1,10 +1,10 @@
 ---
 name: ob-index
-description: "Obsidian 知识库索引构建与维护。每篇 wiki 文章拥有全局唯一 article_id（格式 OBA-{8位随机ID}），索引时随机生成分配。当用户想要编译未处理资料、更新索引、整理知识库、发现笔记关联时触发此 skill。"
+description: "Obsidian 知识库索引构建与维护。编译环节委托给 ob-compile 执行。当用户想要更新索引、整理知识库、发现笔记关联时触发此 skill。"
 ---
 
-<role>Obsidian 知识库索引引擎，负责编译原始资料、构建/更新索引、发现知识关联、生成综合文章。</role>
-<purpose>维护 wiki/index.md 作为知识库的导航核心，确保所有内容可被发现和关联。运行反思引擎发现二阶知识。</purpose>
+<role>Obsidian 知识库索引引擎，负责构建/更新索引、发现知识关联、生成综合文章。编译环节委托给 ob-compile。</role>
+<purpose>维护 wiki/index.md 作为知识库的导航核心，确保所有内容可被发现和关联。运行反思引擎发现二阶知识。编译未处理内容时调用 ob-compile。</purpose>
 <trigger>
 
 ```text
@@ -25,12 +25,12 @@ description: "Obsidian 知识库索引构建与维护。每篇 wiki 文章拥有
 
 </trigger>
 <gsd:workflow xmlns:gsd="urn:gsd:workflow">
-  <gsd:meta>requires=OBSIDIAN_REPO; focus=compile,index,reflect</gsd:meta>
-  <gsd:goal>处理所有未编译内容，维护索引完整性，发现知识间关联并生成综合文章。</gsd:goal>
-  <gsd:phase>获取 OBSIDIAN_REPO，检查 .kb/manifest.json 中未编译的条目。</gsd:phase>
-  <gsd:phase>对每个未编译条目执行编译流程（同 ob-learn 的第五步）。</gsd:phase>
+  <gsd:meta>requires=OBSIDIAN_REPO; focus=index,reflect</gsd:meta>
+  <gsd:goal>维护索引完整性，发现知识间关联并生成综合文章。编译环节委托给 ob-compile。</gsd:goal>
+  <gsd:phase>获取 OBSIDIAN_REPO，扫描 raw/ 下 status: uncompiled 的文件。</gsd:phase>
+  <gsd:phase>调用 ob-compile --mode incremental 编译未处理内容。</gsd:phase>
   <gsd:phase>编译完成后运行反思引擎：从索引摘要中发现跨领域主题、隐含关系、矛盾和空白。</gsd:phase>
-  <gsd:phase>对证据充分的关联生成 synthesis 综合文章，更新索引。</gsd:phase>
+  <gsd:phase>对证据充分的关联生成综合文章，写入对应主题目录，更新索引。</gsd:phase>
 </gsd:workflow>
 
 # Obsidian 知识库索引 (ob-index)
@@ -46,7 +46,11 @@ description: "Obsidian 知识库索引构建与维护。每篇 wiki 文章拥有
 
 ### 第一步：检查未编译内容
 
-读取 `$OBSIDIAN_REPO/.kb/manifest.json`，筛选 `status: uncompiled` 的条目。
+扫描 `$OBSIDIAN_REPO/raw/` 下所有 `.md` 文件，筛选 frontmatter 中 `status: uncompiled` 的文件。
+
+```bash
+grep -rl "status: uncompiled" "$OBSIDIAN_REPO/raw/" --include="*.md"
+```
 
 如果没有未编译内容：
 
@@ -59,46 +63,15 @@ description: "Obsidian 知识库索引构建与维护。每篇 wiki 文章拥有
 
 使用 AskUserQuestion 让用户选择。
 
-### 第二步：编译未处理资料
+### 第二步：调用 ob-compile 编译未处理资料
 
-对每个 `status: uncompiled` 的条目：
+将扫描到的未编译文件列表交给 ob-compile 处理：
 
-1. 读取 `$OBSIDIAN_REPO/raw/{type}/{slug}.md`
-2. 执行编译流程（与 ob-learn 第五步相同）：
-   - 生成 wiki/sources/{slug}.md
-   - 创建/更新 wiki/concepts/{concept}.md
-   - 为每个新建的 wiki 文章分配 article_id（见下方 article_id 规则）
-   - 更新 wiki/index.md
-   - 追加 wiki/log.md
-3. 更新 manifest.json 中该条目 status 为 `compiled`
+1. 调用 `ob-compile --mode incremental` 编译所有未编译内容
+2. ob-compile 负责完整的编译流程（主题匹配、生成 wiki、分配 article_id、更新索引、标记 raw status → compiled）
+3. ob-compile 完成后，继续执行后续步骤（反思引擎等）
 
-**article_id 分配规则**：
-
-每篇 wiki 文章必须有 article_id，格式为 `OBA-{8位随机小写字母数字}`（如 `OBA-k7jm2p9q`）。
-
-分配流程：
-1. 生成 8 位随机 ID：
-   ```bash
-   python3 -c "import random,string; print(''.join(random.choices(string.ascii_lowercase+string.digits,k=8)))"
-   ```
-2. 验证唯一性（无输出则唯一）：
-   ```bash
-   grep -rh "OBA-{生成的ID}" "$OBSIDIAN_REPO/wiki/" --include="*.md"
-   ```
-3. 如果碰撞则重新生成，直到唯一
-4. 将 article_id 写入文章 YAML frontmatter 的 `article_id` 字段：
-   ```yaml
-   ---
-   article_id: OBA-k7jm2p9q
-   ---
-   ```
-
-**概念去重**（关键步骤）：
-
-编译时如果发现 `wiki/concepts/` 中已有相似概念文章：
-1. 读取现有文章
-2. 用新信息更新，不创建重复文件
-3. 如果新旧信息矛盾，在文章中用 `> [!warning] 矛盾标注` callout 标注
+> **编译逻辑全部在 ob-compile 中实现**，ob-index 不重复实现编译步骤。
 
 ### 第三步：重建索引（可选）
 
@@ -135,11 +108,8 @@ updated_at: {日期}
 ## 实体
 {按字母排序的实体条目}
 
-## 来源
-{按日期倒序排列的来源条目}
-
-## 综合
-{按日期倒序排列的综合条目}
+## 提炼知识
+{按日期倒序排列的 distill 条目}
 ```
 
 **索引条目格式**（每行一个）：
@@ -150,10 +120,8 @@ updated_at: {日期}
 **渐进式索引**：
 
 当文章总数超过 200 篇时，拆分为子索引：
-- `wiki/concepts/index.md` 只含概念条目
-- `wiki/entities/index.md` 只含实体条目
-- `wiki/sources/index.md` 只含来源条目
-- 主 `wiki/index.md` 只保留分类标题和子索引链接
+- 每个主题目录的 `wiki/{theme}/index.md` 管理自己的条目
+- 主 `wiki/index.md` 只保留主题标题和子索引链接
 
 ### 第三步半：刷新项目 CLAUDE.md 索引段
 
@@ -164,7 +132,6 @@ updated_at: {日期}
 1. **扫描项目索引目录**：
    ```bash
    find "$OBSIDIAN_REPO/wiki/projects/" -name "index.md" -type f
-   find "$OBSIDIAN_REPO/wiki/topics/" -name "index.md" -type f
    ```
 2. **对每个索引**：
    - 读取 index.md 的 frontmatter，提取 `project` 字段
@@ -202,8 +169,8 @@ updated_at: {日期}
 
 ```
 发现以下潜在关联：
-1. [[concepts/attention]] 和 [[concepts/rlhf]] — 都涉及"为相关性分配标量分数"
-2. [[concepts/transformer]] 和 [[concepts/rlhf]] — transformer 是 RLHF 的基础架构
+1. [[ai/attention]] 和 [[ai/rlhf]] — 都涉及"为相关性分配标量分数"
+2. [[ai/transformer]] 和 [[ai/rlhf]] — transformer 是 RLHF 的基础架构
 3. 空白：缺少 "scaling laws" 概念文章（3 个来源引用但无独立文章）
 
 是否生成综合文章？（可选择感兴趣的关联）
@@ -213,12 +180,12 @@ updated_at: {日期}
 
 对用户确认的候选：
 1. 读取相关文章全文
-2. 如果证据充分，生成 `$OBSIDIAN_REPO/wiki/synthesis/{slug}.md`
+2. 如果证据充分，根据内容匹配主题目录，生成 `$OBSIDIAN_REPO/wiki/{theme}/{slug}.md`
 
 ```markdown
 ---
-tags: [synthesis, {相关标签}]
-type: synthesis
+tags: [{相关标签}]
+type: topic
 created_by: ob-index-reflect
 updated_at: {日期}
 ---
@@ -236,28 +203,28 @@ updated_at: {日期}
 {综合分析，建议 ≤ 500 字，超出部分通过 [[reference]] 链接补充}
 
 ## 证据
-- [[sources/{来源 1}]] — {贡献}
-- [[sources/{来源 2}]] — {贡献}
+- [[{来源 1}]] — {贡献}
+- [[{来源 2}]] — {贡献}
 
-## 相关概念
-- [[concepts/{概念 1}]]
-- [[concepts/{概念 2}]]
+## 相关文章
+- [[{文章 1}]]
+- [[{文章 2}]]
 ```
 
-3. 更新 index.md 在"综合"分类下追加条目
+3. 更新 index.md 在对应主题分类下追加条目
 4. 追加 log.md
 
 ### 第五步：首次初始化
 
 如果检测到 `$OBSIDIAN_REPO/raw/` 和 `$OBSIDIAN_REPO/wiki/` 不存在，执行首次初始化：
 
-1. 创建完整目录结构（raw/、wiki/ 及子目录、outputs/、.kb/）
-2. 扫描 `$OBSIDIAN_REPO/` 中所有 `.md` 文件（排除 `.obsidian/`、`.kb/`、`raw/`、`wiki/`、`outputs/`）
+1. 创建完整目录结构（raw/、wiki/ 及子目录、outputs/）
+2. 扫描 `$OBSIDIAN_REPO/` 中所有 `.md` 文件（排除 `.obsidian/`、`raw/`、`wiki/`、`outputs/`）
 3. 分类现有笔记：
-   - **结构化笔记**（有标题、有内容、> 100 字）→ 复制到 `wiki/concepts/` 或 `wiki/sources/`，并分配 article_id
+   - **结构化笔记**（有标题、有内容、> 100 字）→ 根据关键词匹配主题目录，复制到对应 `wiki/{theme}/`，并分配 article_id
    - **碎片笔记**（短文本、速记、< 100 字）→ 复制到 `raw/notes/`
-4. 生成初始 `wiki/index.md`
-5. 创建 `.kb/manifest.json`
+4. 为 raw 中的文件标记 frontmatter `status: uncompiled`
+5. 生成初始 `wiki/index.md`
 6. 生成初始 `wiki/log.md`
 
 **注意**：不删除或移动原始文件，只读取和复制到新目录。
@@ -267,10 +234,9 @@ updated_at: {日期}
 执行完成后展示：
 
 ```
-编译完成：
-- 新编译：{数量} 篇
-- 新概念：{数量} 个
-- 新综合文章：{数量} 篇
+处理完成：
+- 新编译（由 ob-compile 处理）：{数量} 篇
+- 新文章：{数量} 篇（写入对应主题目录）
 - 索引更新：{数量} 条
 - article_id 缺失：{数量} 篇（已自动补分配）
 - CLAUDE.md 索引段刷新：{数量} 个项目

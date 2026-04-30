@@ -14,7 +14,7 @@
 
 | Plugin | 图标 | 版本 | 说明 | 包含 Skills |
 |--------|------|------|------|-------------|
-| [video-processing](./plugins/video-processing) | 🎬 | 1.7.1 | 视频与音频处理 | audio-to-obsidian, audio-to-subtitle, bilibili-video-list, extract-url-media, write-obsidian-note, youtube-video-list |
+| [video-processing](./plugins/video-processing) | 🎬 | 3.0.0 | 音视频 ASR 转录 | audio-to-subtitle |
 | [dev-tools](./plugins/dev-tools) | 🛠️ | 2.0.0 | 开发工具 | github-repo-publish, feature-tracker, task-harness, task-memory, task-workflow, efficiency-audit |
 | [knowledge-base](./plugins/knowledge-base) | 💡 | 1.0.0 | 知识库与工具集 | chrome-ext-ai-script, gh-workflow-generator, github-profile-coolify, harness-benchmark, npm-publish, vscode-extension-dev, web-to-tauri-migration-loop |
 | [skill-tooling](./plugins/skill-tooling) | 🔧 | 1.0.0 | Skill 开发工具 | gsd-creator-skills, skill-optimizer, skill-researcher |
@@ -192,16 +192,11 @@ j-skills install video-processing -g
 
 ### 🎬 Video Processing
 
-> 视频与音频处理工作流，支持 B站/YouTube 视频列表获取、字幕提取、Obsidian 笔记生成等。
+> 音视频 ASR 转录工具，支持多种格式和引擎。
 
 | Skill | 触发词 | 说明 |
 |-------|--------|------|
-| audio-to-obsidian | 视频转笔记、提取字幕到obsidian | 渐进式音视频处理编排器：URL/本地视频/本地音频 → 提取字幕 → 同步到 Obsidian，支持断点续传和 Sub Agent 并行 |
 | audio-to-subtitle | 音频转字幕、转录字幕 | 音视频转字幕工具，支持 mp3/wav/m4a/mp4 转录为 SRT/VTT/TXT/MD 格式，支持本地 MLX-Whisper 和豆包云端两种引擎 |
-| bilibili-video-list | B站视频列表、UP主视频 | 获取 B 站 UP 主完整视频列表，支持 API（Cookie）和浏览器双模式，输出 JSON |
-| extract-url-media | 提取视频信息、获取音频 | 从 URL 提取媒体元信息和音频文件，封装 yt-dlp 的元信息获取 + 音频提取为标准化接口 |
-| write-obsidian-note | 写入obsidian笔记、生成笔记 | 生成统一格式的 Obsidian 笔记（原文 + 归纳），写入指定目录，支持 category 和 extraContent 参数适配不同来源 |
-| youtube-video-list | YouTube频道视频、YouTube视频列表 | 获取 YouTube 频道完整视频列表，基于 yt-dlp，无需 API Key，支持频道 ID、handle、URL 和名字搜索 |
 
 ### 🛠️ Dev Tools
 

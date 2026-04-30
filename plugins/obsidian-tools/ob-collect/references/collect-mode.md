@@ -4,23 +4,23 @@
 
 | 输入特征 | 类型 | 处理方式 |
 |----------|------|----------|
-| 以 `http://` 或 `https://` 开头 | URL | WebFetch 或 mcp__web_reader__webReader 抓取正文 |
+| 以 `http://` 或 `https://` 开头 | URL | OpenCLI 路由（优先）→ WebFetch 回退 |
 | 以 `.pdf` 结尾的本地路径 | PDF | Read 工具读取 |
-| 以视频平台域名开头（youtube/bilibili/douyin/xiaohongshu 等） | 视频 | 直接调用 `audio-to-obsidian` skill |
+| 以视频平台域名开头（youtube/bilibili/xiaoyuzhou 等） | 视频 | OpenCLI subtitle/transcript → ASR 回退 |
 | 纯文本内容 | 笔记 | 直接使用 |
 
-**视频注意**：使用 `audio-to-obsidian`（路径：`/Users/jiashengwang/jacky-github/jacky-skills/plugins/video-processing/skills/audio-to-obsidian`），不要使用已废弃的 `video-to-text`。如果不可用，提示用户提供文字稿。
+**路由逻辑**：见 SKILL.md 中的「OpenCLI 路由层」章节。OpenCLI 为主引擎，WebFetch 为回退。
 
 ## 平台检测
 
-根据 URL 域名自动识别来源平台，决定 raw/ 写入目录：
+根据 URL 域名自动识别来源平台，决定 raw/ 写入目录和 OpenCLI 命令。
 
 ### 检测规则
 
 1. 从 URL 提取域名
-2. 与平台域名表匹配（见 SKILL.md 来源平台检测表）
-3. 匹配成功 → 写入对应 raw/ 子目录
-4. 匹配失败 → 默认写入 `raw/web/`
+2. 与平台域名表匹配（见 SKILL.md 来源平台检测 + 命令映射表）
+3. 匹配成功 → 使用对应 OpenCLI 命令获取内容，写入对应 raw/ 子目录
+4. 匹配失败 → `opencli web read` 通用读取，写入 `raw/web/`
 
 ### raw/ 子目录映射
 
@@ -28,7 +28,7 @@
 |----------|------|----------|
 | `raw/web/` | 通用网页采集 | 博客文章、技术文档、个人网站 |
 | `raw/wechat/` | 微信公众号 | 公众号文章（mp.weixin.qq.com） |
-| `raw/videos/` | 视频平台 | B站字幕、抖音短视频、小红书、YouTube |
+| `raw/videos/` | 视频平台 | B站字幕、YouTube、小宇宙播客 |
 | `raw/news/` | 资讯聚合 | Hacker News、Reddit、技术资讯 |
 | `raw/official/` | 官方文档 | Claude Code 博客、OpenAI 文档、框架 Release Notes |
 | `raw/notes/` | 自由笔记 | 用户手动输入的文本内容 |
@@ -38,7 +38,7 @@
 每个采集的文件在 frontmatter 中自动添加 `platform` 标签：
 
 ```yaml
-platform: {wechat|bilibili|douyin|xiaohongshu|youtube|hackernews|reddit|claude-code|openai|web}
+platform: {wechat|bilibili|youtube|hackernews|reddit|zhihu|twitter|douban|web}
 ```
 
 ## 主题分类
@@ -86,7 +86,7 @@ Frontmatter：
 source: {原始 URL 或文件路径}
 platform: {平台标识}
 ingested_at: {ISO 时间戳}
-type: {web|pdf|video|note|wechat|news|official}
+type: {web|pdf|video|note|wechat|news|official|transcript}
 status: uncompiled
 ---
 ```
