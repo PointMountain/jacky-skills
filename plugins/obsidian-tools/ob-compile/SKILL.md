@@ -9,7 +9,7 @@ Obsidian raw→wiki 编译器。将 raw/ 层已有的资料按主题归纳编译
 </role>
 
 <purpose>
-当用户需要将已采集到 raw/ 的资料编译归纳到 wiki 层时使用。支持单篇编译、按主题合并编译、增量更新已有 wiki 三种模式。
+当用户需要将已采集到 raw/ 的资料编译归纳到 wiki 层时使用。支持单篇编译、按主题合并编译、增量更新已有 wiki 三种模式。同时也是 ob-index 的编译引擎——ob-index 检测到未编译内容时，调用 ob-compile 执行编译。
 </purpose>
 
 <trigger>
@@ -48,6 +48,7 @@ Obsidian raw→wiki 编译器。将 raw/ 层已有的资料按主题归纳编译
       <constraint>增量更新时不覆盖已有 wiki 的结构，追加新内容</constraint>
       <constraint>全量重编译时覆盖已有 wiki 文件</constraint>
       <constraint>每个 wiki 文件必须有唯一 article_id</constraint>
+      <constraint>编译完成后将 raw 文件 frontmatter status 改为 compiled（这是 ob-index 判断是否已编译的依据）</constraint>
     </constraints>
   </gsd:meta>
 
@@ -104,12 +105,16 @@ Obsidian raw→wiki 编译器。将 raw/ 层已有的资料按主题归纳编译
 
 ### 1.2 扫描 raw 层
 
+通过 raw 文件的 frontmatter `status` 字段判断编译状态（`uncompiled` / `compiled`）。
+
 ```bash
 # 统计目标目录下文件数量和编译状态
 grep -l "status: uncompiled" raw/{author}/*.md | wc -l   # 未编译
 grep -l "status: compiled" raw/{author}/*.md | wc -l     # 已编译
 ls raw/{author}/*.md | wc -l                               # 总数
 ```
+
+> **状态追踪约定**：不使用 `.kb/manifest.json`，统一通过 raw 文件的 `status` frontmatter 字段追踪编译状态。ob-index 也依赖此字段判断未编译内容。
 
 ### 1.3 确认编译模式
 

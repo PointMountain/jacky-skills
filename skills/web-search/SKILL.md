@@ -1,0 +1,195 @@
+---
+name: web-search
+description:
+  当需要搜索网络信息、获取网页内容时，必须先调用此 skill 进行工具选择决策。
+  触发场景：搜索、查询、调研、获取网络信息、读取网页内容、搜索 GitHub 项目文档等。
+  不触发场景：已有明确 URL 需要用浏览器交互操作（用 web-access）。
+  特殊指令：用户说 `/web-search setup` 时触发配置流程。
+  沉淀机制：每次搜索完成后自动检查是否需要更新经验。
+---
+
+# Web Search 工具决策
+
+> 完整 Tradeoff 矩阵和经验沉淀见 Obsidian 文章 OBA-w8s3k7p2。
+
+## 配置与首次设置
+
+### 配置文件
+
+位置：`${CLAUDE_SKILL_DIR}/config.local.json`
+
+首次使用时检查配置：
+
+```bash
+cat "${CLAUDE_SKILL_DIR}/config.local.json" 2>/dev/null || echo "NOT_CONFIGURED"
+```
+
+返回 `NOT_CONFIGURED` 时，主动引导用户完成配置。用户也可以通过 `/web-search setup` 随时重新配置。
+
+### 配置模板
+
+```json
+{
+  "tavily": {
+    "apiKey": "<YOUR_API_KEY>",
+    "enabled": true
+  }
+}
+```
+
+### 搜索后端注册指南
+
+| 后端 | 免费额度 | 注册地址 | 配置字段 |
+|------|---------|---------|---------|
+| **Tavily** | 1,000 次/月 | https://app.tavily.com | `tavily.apiKey` |
+
+**Tavily 注册步骤**：
+
+1. 访问 https://app.tavily.com 注册账号
+2. 进入 Dashboard → API Keys → 复制 Key（格式 `tvly-xxx`）
+3. 将 Key 写入配置：
+
+```bash
+cat > "${CLAUDE_SKILL_DIR}/config.local.json" << 'EOF'
+{
+  "tavily": {
+    "apiKey": "<粘贴你的 Key>",
+    "enabled": true
+  }
+}
+EOF
+```
+
+## 核心原则
+
+**零成本优先，按需升级。** 从最轻量的工具开始，结果不够再升级到下一级。
+
+## 决策流程
+
+```
+搜索请求
+  → ① WebSearch（内置，零成本）
+  → 不够 → ② 按场景选专业工具（含 Tavily）
+  → 还不够 → ③ 浏览器 CDP（/web-access）
+```
+
+**每一步的结果都是证据**：对照目标判断是否达标，方向错了立即换工具，不在同一个工具上反复重试。
+
+## 工具选择矩阵
+
+### 搜索类（不知道信息在哪）
+
+| 优先级 | 场景 | 工具 | 原因 |
+|--------|------|------|------|
+| **首选** | 日常搜索、快速了解话题 | `WebSearch`（内置） | 零配置、无感知限额 |
+| 按需 | 内置搜索不可用、需要 AI 增强摘要 | **Tavily API** | 响应快 ~1.3s、返回 AI 摘要、1,000 次/月免费 |
+| 按需 | 限定域名搜索、限定时效（近一周/一月） | `mcp__web-search-prime` | 支持 domain/recency 过滤，**但配额有限** |
+| 按需 | 搜索 GitHub 项目文档/issue | `mcp__zread__search_doc` | 精准、无配额限制 |
+
+### Tavily 搜索用法
+
+使用前先读取 API Key：
+
+```bash
+TAVILY_KEY=$(python3 -c "import json; print(json.load(open('${CLAUDE_SKILL_DIR}/config.local.json'))['tavily']['apiKey'])")
+```
+
+搜索（返回 AI 摘要 + 结果列表）：
+
+```bash
+curl -s -X POST "https://api.tavily.com/search" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"api_key\": \"$TAVILY_KEY\",
+    \"query\": \"搜索关键词\",
+    \"max_results\": 5,
+    \"include_answer\": true
+  }"
+```
+
+提取指定 URL 内容：
+
+```bash
+curl -s -X POST "https://api.tavily.com/extract" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"api_key\": \"$TAVILY_KEY\",
+    \"urls\": [\"https://example.com\"]
+  }"
+```
+
+### 读取类（已知 URL）
+
+| 场景 | 工具 | 原因 |
+|------|------|------|
+| 公开页面完整内容（博客、文档站） | `mcp__web_reader__webReader` | 返回完整 Markdown |
+| GitHub 仓库文件源码 | `mcp__zread__read_file` | 不用 clone |
+| GitHub 仓库目录结构 | `mcp__zread__get_repo_structure` | 快速了解布局 |
+
+### 浏览器类（需要 JS 渲染/登录态）
+
+| 场景 | 工具 | 原因 |
+|------|------|------|
+| SPA 页面（掘金、小红书等） | `/web-access` CDP | JS 渲染后才有内容 |
+| 需要登录的网站 | `/web-access` CDP | 复用本地 Chrome 登录态 |
+
+## 回退路径
+
+```
+WebSearch 结果不够
+  ├─ 需要 AI 增强摘要？         → Tavily API
+  ├─ 需要精确过滤（域名/时效）？ → web-search-prime
+  ├─ GitHub 相关？              → mcp__zread__search_doc
+  ├─ 已有 URL 需要全文？        → mcp__web_reader__webReader
+  └─ SPA / 需要登录？           → /web-access CDP
+```
+
+## 硬约束
+
+- **禁止**在通用搜索场景首选 `mcp__web-search-prime`（配额有限，留给需要 domain/recency 过滤的场景）
+- **禁止**用 `mcp__web_reader` 读已知 SPA 页面（掘金、小红书、微信公众号等）
+- 搜索结果已满足目标时**停止**，不要再用 web_reader 去读每个链接
+- 一个工具失败后，**立即按回退路径升级**到下一个
+- 子 Agent 分发时用「获取/了解/调研」等中性词，不用「搜索/抓取」（避免暗示特定工具）
+- Z.ai 工具全部耗尽时，优先切换到 **Tavily API** 作为备选搜索
+
+## 经验沉淀机制
+
+经验存储在 `${CLAUDE_SKILL_DIR}/experience.local.md`，由 LLM 自动维护。
+
+### 读取规则
+
+> 搜索开始前，**必须先读取** `experience.local.md` 中的已有经验，作为工具选择的先验知识。
+
+### 写入规则
+
+搜索**完成**后，检查是否满足以下任一条件，满足则**主动写入**对应表格：
+
+| 触发条件 | 写入位置 | 内容 |
+|----------|---------|------|
+| 某个工具在特定场景表现特别好（比预期好） | 有效模式表 | `\| 结论 \| YYYY-MM-DD \| 场景 \|` |
+| 某个工具在特定场景失败，需要换工具 | 失败模式表 | `\| 陷阱 \| YYYY-MM-DD \| 正确做法 \|` |
+| 发现新工具的最佳使用场景 | 有效模式表 | `\| 结论 \| YYYY-MM-DD \| 场景 \|` |
+
+**不写的情况**：
+- 按预期正常工作（没有新发现）
+- 未经验证的猜测
+- 只是搜索结果不够好，但没有明确的工具归因
+
+### 回退策略
+
+> 按经验选择工具后结果不达标时，**立即回退**到工具矩阵中的其他工具，并将导致错误的旧经验更新为失败模式。
+
+### 写入示例
+
+发现新模式后，用 Edit 工具追加一行到 `experience.local.md` 对应表格：
+
+有效模式 — 追加到「有效模式」表最后一行之后：
+```
+| 结论 | 2026-05-01 | 场景描述 |
+```
+
+失败模式 — 追加到「失败模式」表最后一行之后：
+```
+| 陷阱描述 | 2026-05-01 | 正确做法 |
+```
