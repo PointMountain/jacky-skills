@@ -68,9 +68,10 @@ EOF
 
 ```
 搜索请求
-  → ① WebSearch（内置，零成本）
-  → 不够 → ② 按场景选专业工具（含 Tavily）
-  → 还不够 → ③ 浏览器 CDP（/web-access）
+  → 涉及视频/社交/社区平台？ → ① OpenCLI（依赖检查通过后）
+  → 否则 → ② WebSearch（内置，零成本）
+  → 不够 → ③ 按场景选专业工具（含 Tavily）
+  → 还不够 → ④ 浏览器 CDP（/web-access）
 ```
 
 **每一步的结果都是证据**：对照目标判断是否达标，方向错了立即换工具，不在同一个工具上反复重试。
@@ -141,7 +142,96 @@ WebSearch 结果不够
   ├─ 需要精确过滤（域名/时效）？ → web-search-prime
   ├─ GitHub 相关？              → mcp__zread__search_doc
   ├─ 已有 URL 需要全文？        → mcp__web_reader__webReader
+  ├─ 视频/社交/社区平台？       → OpenCLI（依赖检查通过后）
   └─ SPA / 需要登录？           → /web-access CDP
+```
+
+## OpenCLI 平台搜索
+
+> OpenCLI 将 100+ 网站（YouTube、B 站、Twitter、Reddit 等）统一为 CLI 命令，适合调研视频内容、社交媒体讨论、技术社区问答等场景。
+> 完整命令速查见 Obsidian 文章 OBA-cmd4l1st。
+
+### 依赖检查
+
+使用前**必须**验证 opencli 可用：
+
+```bash
+which opencli 2>/dev/null && opencli doctor 2>&1 | head -5
+```
+
+期望输出三项全绿：
+```
+[OK] Daemon: running
+[OK] Extension: connected
+[OK] Connectivity: connected
+```
+
+**未安装时**：跳过 OpenCLI，退回其他搜索工具。不引导安装。
+
+### 适用场景 vs 其他工具
+
+| 场景 | 用 OpenCLI | 用其他工具 |
+|------|-----------|-----------|
+| 搜索 YouTube/B站视频并提取字幕 | ✅ `opencli youtube/bilibili` | ❌ 其他工具做不到 |
+| 搜索 Reddit/Twitter 社交媒体讨论 | ✅ `opencli reddit/twitter` | `WebSearch` 也能搜但信息少 |
+| 搜索技术社区（HN/StackOverflow） | ✅ `opencli hackernews/stackoverflow` | `mcp__zread__search_doc` 仅限 GitHub |
+| 通用网页搜索 | ❌ 杀鸡用牛刀 | ✅ `WebSearch` / Tavily |
+| 需要限定域名/时效 | ❌ 不支持 | ✅ `web-search-prime` |
+
+### 搜索流程
+
+```
+用户需求涉及视频/社交/社区平台
+  → ① 依赖检查（opencli doctor）
+  → ② opencli <site> search "关键词"
+  → 结果不够？→ 换其他工具
+  → 需要深入了解某个结果？→ 提取字幕/详情（见下方重操作确认）
+```
+
+### 常用平台速查
+
+| 平台 | 搜索命令 | 详情命令 | 认证 |
+|------|---------|---------|------|
+| **YouTube** | `opencli youtube search "AI Agent" --limit 5` | `opencli youtube video <url>` | 🔐 |
+| **B 站** | `opencli bilibili search "关键词" --type video` | `opencli bilibili video BV1xxx` | 🔐 |
+| **Reddit** | `opencli reddit search "keyword"` | `opencli reddit read <post_id>` | 🔐 |
+| **Twitter** | `opencli twitter search "keyword" --limit 10` | — | 🔐 |
+| **小红书** | `opencli xiaohongshu search "关键词" --limit 10` | `opencli xiaohongshu note <url>` | 🔐 |
+| **HN** | `opencli hackernews search "关键词"` | — | 🌐 |
+| **StackOverflow** | `opencli stackoverflow search "react hooks"` | — | 🌐 |
+| **Google** | `opencli google search "关键词"` | — | 🌐/🔐 |
+| **arXiv** | `opencli arxiv search "transformer" --limit 10` | `opencli arxiv paper <id>` | 🌐 |
+
+### 重操作确认
+
+以下操作较重（耗时长、消耗资源），**执行前必须询问用户**：
+
+| 操作 | 命令 | 为什么是重操作 | 确认话术 |
+|------|------|---------------|---------|
+| 提取字幕 | `opencli youtube transcript <url>` / `opencli bilibili subtitle BV1xxx` | 需要浏览器交互、耗时长 | "是否需要提取视频字幕？这可能需要一些时间。" |
+| 下载媒体 | `opencli <site> download ...` | 占用带宽和磁盘 | "是否需要下载该资源？" |
+| 批量搜索 | 多个 `opencli` 命令组合 | 多次浏览器操作 | "需要在多个平台搜索，是否继续？" |
+
+**不需要确认**的操作：
+- 单次搜索（`search`）
+- 获取详情（`video`/`read`/`note`）
+- 热门/趋势（`hot`/`trending`）
+
+### 字幕提取工作流
+
+调研视频内容时的推荐流程：
+
+```
+1. opencli youtube/bilibili search "关键词" --limit 5
+   → 找到相关视频列表
+
+2. 询问用户："找到 X 个相关视频，是否需要提取字幕？"
+
+3. 用户确认后：
+   opencli youtube transcript <url>
+   或 opencli bilibili subtitle BV1xxx --lang zh-CN
+
+4. 返回字幕文本给用户
 ```
 
 ## 硬约束
