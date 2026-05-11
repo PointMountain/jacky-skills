@@ -1,10 +1,10 @@
 ---
 name: ob-project-log
-description: "项目知识沉淀到 Obsidian。三种模式：自动沉淀（Hook）、手动沉淀、浏览追问。触发词：ob-project-log、项目沉淀、追问文章、继续讨论。"
+description: "项目知识沉淀到 Obsidian。四种模式：自动沉淀（Hook）、手动沉淀、浏览追问、架构回顾（生成档案+批注+resolve 改代码）。触发词：ob-project-log、项目沉淀、追问文章、架构回顾、review init/resolve。"
 ---
 
-<role>Obsidian 项目知识沉淀助手。从 AI 对话中提取项目知识，支持自动沉淀、手动沉淀和浏览追问三种模式。</role>
-<purpose>将对话中的项目知识写入 Obsidian wiki 对应目录，按主题组织为活文档。支持浏览已有文章并追问优化。</purpose>
+<role>Obsidian 项目知识沉淀助手。从 AI 对话或代码库提取项目知识，支持自动沉淀、手动沉淀、浏览追问、架构回顾四种模式。</role>
+<purpose>将项目知识写入 Obsidian wiki，按主题组织为活文档。支持从对话提取、从代码扫描提取、就地批注后 resolve 改代码的闭环工作流。</purpose>
 <trigger>
 
 ```text
@@ -12,29 +12,40 @@ description: "项目知识沉淀到 Obsidian。三种模式：自动沉淀（Hoo
 模式一（自动沉淀）：由 Stop Hook 自动触发，无需手动调用
 模式二（手动沉淀）：ob-project-log / 项目沉淀 / 记录到项目 / 沉淀对话
 模式三（浏览追问）：追问文章 / 继续讨论 / 优化笔记 / 项目追问 / 追问
+模式四（架构回顾）：架构回顾 / 项目回顾 / review init / review resolve / 生成架构档案
 
 示例：
 - "ob-project-log"
 - "把这次对话沉淀到项目"
-- "项目沉淀"（手动沉淀模式）
 - "追问文章" → 列出文章 → 选择 → 追问优化
-- "继续讨论 架构设计" → 直接打开匹配文章
+- "架构回顾" / "review init" → 扫描代码 → 生成 architecture-flow.md + decisions.md
+- "review resolve" → 扫描批注 → 列出 → 确认 → 批量改代码 + 更新档案
 ```
 
 </trigger>
 <gsd:workflow xmlns:gsd="urn:gsd:workflow">
   <gsd:meta>requires=OBSIDIAN_REPO</gsd:meta>
-  <gsd:goal>三种模式：自动沉淀、手动沉淀、浏览追问，将项目知识写入 Obsidian。写入后自动更新项目 CLAUDE.md 的 Obsidian 索引段。</gsd:goal>
-  <gsd:phase>模式判断：Hook 触发 → 自动沉淀；用户说"追问/优化/继续讨论" → 浏览追问；其他 → 手动沉淀。</gsd:phase>
-  <gsd:phase>自动/手动沉淀：识别项目 → 分析对话 → 提取知识 → 匹配/创建文件 → 写入更新 → 更新项目 CLAUDE.md 索引段。</gsd:phase>
-  <gsd:phase>浏览追问：列出文章 → 用户选择 → 读取全文 → 进入追问循环 → 更新文章 → 更新项目 CLAUDE.md 索引段。</gsd:phase>
+  <gsd:goal>四种模式：自动沉淀、手动沉淀、浏览追问、架构回顾，将项目知识写入 Obsidian 并支持就地批注后 resolve 闭环。写入后自动更新项目 CLAUDE.md 索引段。</gsd:goal>
+  <gsd:phase>模式判断：Hook → 自动沉淀；"追问/继续讨论" → 浏览追问；"架构回顾/review init/resolve" → 架构回顾；其他 → 手动沉淀。</gsd:phase>
+  <gsd:phase>自动/手动沉淀：识别项目 → 分析对话 → 提取知识 → 匹配/创建文件 → 写入更新 → 更新 CLAUDE.md 索引段。</gsd:phase>
+  <gsd:phase>浏览追问：列出文章 → 用户选择 → 读取全文 → 追问循环 → 更新文章 → 更新 CLAUDE.md 索引段。</gsd:phase>
+  <gsd:phase>架构回顾：init 派 Explore 扫码生成档案+建软链；用户在 Obsidian 用 [!review] 批注；resolve 列出批注+确认+派 sub-agent 批量处理（改文档/改代码/给推理）。</gsd:phase>
 </gsd:workflow>
 
 # Obsidian 项目知识沉淀 (ob-project-log / 项目沉淀)
 
 ## 做什么
 
-从 AI 对话中提取项目知识，按**主题**写入项目目录。支持三种模式。
+把项目知识写入 Obsidian wiki，按主题组织为活文档。支持四种模式：
+
+| 模式 | 知识来源 | 主要动作 |
+|------|---------|----------|
+| 一·自动沉淀 | 对话 | Hook 触发，静默写入 |
+| 二·手动沉淀 | 对话 | 用户触发，输出摘要 |
+| 三·浏览追问 | 对话 + 已有文章 | 选文章 → 追问 → 更新 |
+| 四·架构回顾 | **代码库** | 扫码生成档案 → 用户批注 → resolve 改代码 |
+
+模式四是闭环工作流（详见 [references/architecture-review-guide.md](references/architecture-review-guide.md)），其他三种是单向沉淀。
 
 ## 配置检查
 
@@ -79,6 +90,8 @@ $WIKI_PATH = $OBSIDIAN_REPO/wiki/projects/{project}        # 开发项目
 | Stop Hook 自动触发 | **自动沉淀** | 分析对话，提取知识，静默写入 |
 | "项目沉淀" / "记录到项目" / "ob-project-log" | **手动沉淀** | 同上，但输出详细摘要 |
 | "追问文章" / "继续讨论" / "优化笔记" / "项目追问" | **浏览追问** | 列出文章，选择后进入追问循环 |
+| "架构回顾" / "项目回顾" / "review init" / "生成架构档案" | **架构回顾·init** | 派 Explore sub-agent 扫码 → 生成 architecture-flow.md + decisions.md → 建项目软链 |
+| "review resolve" / "处理批注" / "resolve 架构回顾" | **架构回顾·resolve** | 扫描 `> [!review]` 批注 → 列出确认 → TeamCreate 批量派单 → 改文档/改代码 |
 
 ---
 
@@ -505,6 +518,57 @@ Level 1: CLAUDE.md `<!-- ob-index -->` 区域（自动加载，紧凑概览）
 
 ---
 
+---
+
+## 模式四：架构回顾（review init / resolve）
+
+**完整流程详见 [references/architecture-review-guide.md](references/architecture-review-guide.md)**，本章只列入口和核心约束。
+
+### 子命令
+
+| 子命令 | 触发词 | 作用 |
+|--------|--------|------|
+| `init` | "架构回顾"、"项目回顾"、"review init"、"生成架构档案" | 派 Explore sub-agent 扫描代码 → 生成两份档案 → 项目根建软链 |
+| `resolve` | "review resolve"、"处理批注"、"resolve 架构回顾" | 扫描批注 → **列出让用户勾选** → TeamCreate 批量派单 → 改文档/改代码 |
+| `status` | "review status"、"查看批注" | 列出当前所有未处理的 `[!review]` 批注，不执行 |
+
+### 产出文件（真文件在 Obsidian，项目根软链）
+
+| 文件 | 真文件路径 | 项目根软链 |
+|------|-----------|-----------|
+| 架构流水线 | `$WIKI_PATH/architecture-flow.md` | `{project-root}/ARCHITECTURE.md` |
+| 决策清单 | `$WIKI_PATH/decisions.md` | `{project-root}/DECISIONS.md` |
+
+源文件锚点 ID 规则：流水线步骤 `F-001/F-002/...`，决策点 `D-001/D-002/...`，永久绑定不复用。
+
+### 批注语法（Obsidian Callout）
+
+用户在档案中任意位置写：
+
+```markdown
+> [!review] 可选标题
+> 我想把豆包换成 macOS say 当 fallback
+> 不要为了便宜牺牲稳定性
+```
+
+支持的批注类型（用 `[!review:类型]` 显式标注，未标注由 resolve 阶段自动判定）：
+
+| 类型 | 含义 | resolve 行为 |
+|------|------|-------------|
+| `[!review:clarify]` | 看不懂，要补充说明 | 改文档（追加补充内容） |
+| `[!review:modify]` | 要改代码 | 产出 diff 让用户确认后 apply |
+| `[!review:challenge]` | 质疑决策，想要论证 | 给推理回应，写入档案，不改代码 |
+| `[!review]`（无类型） | 由 resolve 阶段根据内容自动分类 | 同上对应类型 |
+
+### 核心约束
+
+1. **resolve 必须先列后改**：扫描出所有批注后，先用编号列表展示，让用户勾选要处理的项再派单
+2. **代码改动必须二次确认**：teammate 产出 diff，主会话展示给用户确认后才 apply
+3. **resolve 完成后清理批注**：成功处理的 `[!review]` 块从档案中删除，未处理的保留
+4. **软链幂等**：init 重复执行时，已存在的软链跳过；档案存在时增量更新（保留 `[!review]` 块）
+
+---
+
 ## 异常处理
 
 | 场景 | 处理 |
@@ -519,3 +583,7 @@ Level 1: CLAUDE.md `<!-- ob-index -->` 区域（自动加载，紧凑概览）
 | `index.md` 不存在 | fallback 到原有逻辑（ls + 逐个读取），完成后自动创建索引 |
 | `index.md` 损坏或格式异常 | 忽略索引，fallback 到原有逻辑，下次写入时重建索引 |
 | 索引与实际文件不一致 | 以实际文件为准，更新索引 |
+| review init 时档案已存在 | 增量更新：保留所有 `[!review]` 批注块，仅刷新自动生成内容 |
+| review resolve 时无批注 | 提示"无待处理批注"并退出 |
+| review resolve 时项目根软链丢失 | 重建软链后继续 |
+| review init 时项目根已有同名实体文件（非软链） | 报警提示并跳过软链创建，避免覆盖 |
