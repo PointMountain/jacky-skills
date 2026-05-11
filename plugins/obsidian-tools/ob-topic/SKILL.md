@@ -76,6 +76,7 @@ description: "对话中快速收藏通用知识点到 Obsidian 知识库。触�
 | 时事分析 | `wiki/current-affairs/` | 经济, 政治, 国际, 金融, 投资, 时事 |
 | 职业发展 | `wiki/career/` | 职级, 面试, 求职, 职业规划, 大厂 |
 | Obsidian | `wiki/obsidian/` | Obsidian, 知识管理, 笔记, 双链 |
+| 最佳实践 | `wiki/best-practice/` | 使用习惯, 效率技巧, 工具推荐, 插件体验, 工作流, 快捷键, 软件配置, 使用心得 |
 
 无匹配时自动创建新主题目录（kebab-case 英文命名）。
 
