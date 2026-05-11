@@ -1,285 +1,451 @@
 ---
 name: web-search
-description:
-  当需要搜索网络信息、获取网页内容时，必须先调用此 skill 进行工具选择决策。
-  触发场景：搜索、查询、调研、获取网络信息、读取网页内容、搜索 GitHub 项目文档等。
-  不触发场景：已有明确 URL 需要用浏览器交互操作（用 web-access）。
-  特殊指令：用户说 `/web-search setup` 时触发配置流程。
-  沉淀机制：每次搜索完成后自动检查是否需要更新经验。
+description: |
+  网络信息获取唯一决策入口。三层能力：
+  ① Layer 1 — OpenCLI 100+ 站点直采（含 External CLI 桥接 + 本机扩展 CLI）
+  ② Layer 2 — 通用搜索降级链（WebSearch → Tavily → DuckDuckGo）
+  ③ Layer 3/4 — 已知 URL 读取 + 浏览器 CDP 兜底
+  触发场景：搜索、查询、调研、读取网页、抓 SPA、登录后内容、采集前置「先搜后采」
+  不触发场景：URL 已明确且已确认走 OpenCLI（如 ob-collect 拿到具体视频 URL 后直接执行）
+  特殊指令：/web-search setup（注册 Tavily + 扫描本机 CLI）
+  沉淀机制：搜索完成后按规则更新 experience.local.md
 ---
 
 # Web Search 工具决策
 
-> 完整 Tradeoff 矩阵和经验沉淀见 Obsidian 文章 OBA-w8s3k7p2。
+> 完整 Tradeoff 矩阵和经验沉淀参考 Obsidian 文章 OBA-w8s3k7p2。
+> `${CLAUDE_SKILL_DIR}` 指本 SKILL.md 所在目录。
 
-## 配置与首次设置
+## 0. 一句话决策（90% 场景）
 
-### 配置文件
-
-位置：`${CLAUDE_SKILL_DIR}/config.local.json`
-
-首次使用时检查配置：
-
-```bash
-cat "${CLAUDE_SKILL_DIR}/config.local.json" 2>/dev/null || echo "NOT_CONFIGURED"
+```
+拿到信息获取请求
+  │
+  ├─ 有 URL？─────────────→ Layer 1（OpenCLI 路由）
+  │                          ├─ 内置 100+ 站点
+  │                          ├─ External CLI 桥接（gh/lark/notion/...）
+  │                          └─ 本机扩展 CLI（yuque-cli/linear/...）
+  │                          ↓ 全部未命中
+  │                         Layer 3（已知 URL 读取）
+  │                          ↓ 需要登录/SPA 失败
+  │                         Layer 4（浏览器 CDP 兜底）
+  │
+  └─ 没有 URL ───────────→ Layer 2（通用搜索降级链）
+                             WebSearch → Tavily → DuckDuckGo
 ```
 
-返回 `NOT_CONFIGURED` 时，主动引导用户完成配置。用户也可以通过 `/web-search setup` 随时重新配置。
+**核心原则**：零成本优先、按需升级、一工具失败立即换下一级，**不要在同一工具反复重试**。
 
-### 配置模板
+## 1. 首次使用提示（仅出现一次）
 
-```json
-{
-  "tavily": {
-    "apiKey": "<YOUR_API_KEY>",
-    "enabled": true
-  }
+进入 skill 时先读 `${CLAUDE_SKILL_DIR}/experience.local.md` 顶部。如果**没有** `setup-completed: ` 标记：
+
+> 💡 提示：跑 `/web-search setup` 可一次性完成 Tavily API Key 配置 + 扫描本机的搜索/采集 CLI 工具（语雀/Linear/Notion 等）。配好后下次自动用上，不会有打断。
+
+跑过一次后，setup 命令会在 experience.local.md 顶部写入 `setup-completed: {ISO 时间}`，从此不再提示。
+
+## 2. Layer 1：OpenCLI 站点路由（URL 已知）
+
+### 2.1 依赖检查
+
+```bash
+which opencli >/dev/null && opencli doctor 2>&1 | head -3
+```
+
+期望三项全绿（Daemon / Extension / Connectivity）。未安装时跳过 Layer 1，**不引导安装**。
+
+### 2.2 高频站点清单（覆盖 80% 场景）
+
+> 域名命中此表 → **必须**用 OpenCLI 对应命令；不命中 → 进 2.4/2.5/2.6。
+
+| 类别 | 域名 | 命令 | 认证 |
+|------|------|------|------|
+| **视频/播客** | youtube.com / youtu.be | `youtube search/transcript/video/download` | 🔐 |
+| | bilibili.com | `bilibili search/subtitle/video/favorite` | 🔐 |
+| | xiaoyuzhou.fm | `xiaoyuzhou transcript/episode/search` | 🌐 |
+| | apple-podcasts | `apple-podcasts episodes/search/top` | 🌐 |
+| | spotify | `spotify ...` | 🌐 |
+| **社交** | twitter.com / x.com | `twitter search/thread/bookmarks` | 🔐 |
+| | reddit.com | `reddit search/read` | 🔐 |
+| | xiaohongshu.com | `xiaohongshu search/note` | 🔐 |
+| | weibo.com | `weibo search/post` | 🔐 |
+| | bsky.app | `bluesky ...` | 🌐 |
+| | jike (即刻) | `jike ...` | 🔐 |
+| **技术社区** | news.ycombinator.com | `hackernews search/read` | 🌐 |
+| | stackoverflow.com | `stackoverflow search` | 🌐 |
+| | v2ex.com | `v2ex topic/search` | 🌐/🔐 |
+| | linux.do | `linux-do ...` | 🔐 |
+| | dev.to | `devto ...` | 🌐 |
+| | huggingface.co | `hf search/dataset/model` | 🌐 |
+| **资讯/内容** | zhihu.com | `zhihu answer/search` | 🔐 |
+| | 36kr.com | `36kr article/search/hot` | 🌐 |
+| | medium.com | `medium ...` | 🔐 |
+| | substack.com | `substack ...` | 🌐/🔐 |
+| | mp.weixin.qq.com | `weixin article/account` | 🔐 |
+| | douban.com | `douban subject/search` | 🔐 |
+| **学术** | arxiv.org | `arxiv search/paper` | 🌐 |
+| | wikipedia.org | `wikipedia ...` | 🌐 |
+| | scholar.google.com | `google-scholar search` | 🌐 |
+| **财经** | eastmoney.com | `eastmoney ...` | 🌐/🔐 |
+| | xueqiu.com | `xueqiu ...` | 🔐 |
+| **AI 平台** | chatgpt.com | `chatgpt ...` | 🔐 |
+| | gemini.google.com | `gemini ...` | 🔐 |
+| | doubao.com | `doubao ...` | 🔐 |
+| | deepseek.com | `deepseek ...` | 🔐 |
+| **通用兜底** | 任意 HTTP URL（含 SPA） | `opencli web read <url>` | — |
+| | Google 搜索（无登录）| `opencli google search "<keyword>"` | 🌐 |
+
+**认证标识**：🌐 public（无需登录） / 🔐 cookie（需本机 Chrome 已登录该站点） / 🔧 ui（需本机已装对应桌面应用）
+
+### 2.3 重操作确认
+
+执行前**必须询问用户**：字幕提取（`youtube transcript` / `bilibili subtitle`）、下载媒体（`<site> download`）、批量搜索（多个 opencli 组合）。
+
+不需要确认：单次 search、获取详情、热门趋势。
+
+### 2.4 未命中 → grep 兜底
+
+URL 域名不在 2.2 表里时：
+
+```bash
+opencli list 2>&1 | grep -i <域名前缀或关键词>
+```
+
+命中 → 用该命令；未命中 → 进 2.5 / 2.6。
+
+### 2.5 External CLI 桥接
+
+OpenCLI 主命令下挂载了第三方工具，与内置站点同等优先级：
+
+| 命令 | 适用域名 / 用途 |
+|------|----------------|
+| `opencli gh` | github.com（repo/PR/issue/release/gist）|
+| `opencli lark-cli` | feishu.cn / larksuite.com（消息/文档/表格/日历，200+ 命令）|
+| `opencli dws` | dingtalk.com（钉钉 Workspace）|
+| `opencli wecom-cli` | wecom.com（企业微信）|
+| `opencli obsidian` | 本地 Obsidian vault（笔记/搜索/标签）|
+| `opencli vercel` | vercel.com（部署/域名/env/日志）|
+
+碰到对应域名时优先用这些，而不是 Layer 3 通用读取。
+
+### 2.6 本机扩展 CLI（用户安装的非 OpenCLI 工具）
+
+URL 域名既不在内置清单也没有 External 桥接时：
+
+**第一步：读 experience.local.md 的「本机扩展站点」表**（最权威）
+
+如果表里已有该域名 → 直接用记录的 CLI。
+
+**第二步：懒汉式探测本机是否有相关工具**
+
+```bash
+# 示例：碰到 yuque.com
+which yuque-cli yuque 2>/dev/null
+# 示例：碰到 linear.app
+which linear 2>/dev/null
+```
+
+找到 → 调用该 CLI → **追加到 experience.local.md 的「本机扩展站点」表**：
+
+```markdown
+| yuque.com | yuque-cli | yuque-cli doc <id> | 2026-05-11 |
+```
+
+找不到 → 回到 Layer 3。
+
+> 这张表是 skill 的**知识扩展点**：用户安装新 CLI 后被发现一次，之后所有会话都自动用上。
+
+### 2.7 OpenCLI 命令失败的降级
+
+| 报错信号 | 处理 |
+|---------|------|
+| Authentication required / 401 / 403 | 提示用户在浏览器登录该站点后重试（不引导扫码，OpenCLI 不支持）|
+| Daemon not running | 跑 `opencli doctor`，按提示修复 |
+| 超时（>120s）| 退到 Layer 4 |
+
+## 3. Layer 2：通用搜索降级链（无 URL）
+
+### 3.1 决策链
+
+```
+WebSearch（内置，零配置）
+  ├─ 结果够 → 完成
+  └─ 不够 → 检查 Tavily 配置
+            ├─ 已配置 → Tavily（AI answer，~1.3s）
+            └─ 未配置 → 智能降级（见 3.3）
+```
+
+### 3.2 Trade-off 对照
+
+| 工具 | 速度 | 要 Key | 免费额度 | 适用 |
+|------|------|-------|---------|------|
+| **WebSearch**（内置）| 中 | 否 | 共享 Z.ai | 日常通用首选 |
+| **Tavily** | 1.3s | 是 | 1000/月 | 需要 AI 摘要 |
+| **DuckDuckGo**（`ddgs`）| ~10s | 否 | 无限 | 兜底 |
+| `mcp__web-search-prime` | 中 | 否 | 周/月有限 | **仅**限定 domain/recency 时用 |
+| `mcp__zread__search_doc` | 快 | 否 | 无限 | GitHub 仓库内搜索 |
+
+### 3.3 Tavily 未注册时的智能降级（LLM 自数会话搜索次数）
+
+进入 Layer 2 前回顾本会话历史，估算已搜索次数：
+
+```
+if 已搜索 < 3 次:
+  静默跳 DDG，不弹提示
+
+elif 已搜索 ≥ 3 次 AND 本会话未提示过:
+  仅提示一次：
+    "本会话已搜索 N 次。注册 Tavily 可减少等待（10s → 1.3s）。
+     执行 /web-search setup（1 分钟），或继续用 DDG。"
+  用户选择后本会话不再提示
+
+else (用户已跳过提示):
+  静默 DDG
+```
+
+> 计数完全靠 LLM 上下文记忆，不写文件，避免污染 experience.local.md。
+
+### 3.4 Tavily 用法
+
+```bash
+# Key 读取：环境变量优先 → config.local.json 兜底（与 6.1 配置顺序一致）
+TAVILY_KEY="${TAVILY_API_KEY:-}"
+[ -z "$TAVILY_KEY" ] && [ -f "${CLAUDE_SKILL_DIR}/config.local.json" ] && \
+  TAVILY_KEY=$(python3 -c "import json; print(json.load(open('${CLAUDE_SKILL_DIR}/config.local.json'))['tavily']['apiKey'])" 2>/dev/null)
+
+# Key 不存在时直接报告并跳到 DDG，不要假装能继续
+[ -z "$TAVILY_KEY" ] && { echo "Tavily 未配置，跳到 DDG"; } || {
+  # 搜索（含 AI answer）
+  curl -s -X POST "https://api.tavily.com/search" \
+    -H "Content-Type: application/json" \
+    -d "{\"api_key\":\"$TAVILY_KEY\",\"query\":\"<keyword>\",\"max_results\":5,\"include_answer\":true}"
+
+  # 提取 URL 内容
+  curl -s -X POST "https://api.tavily.com/extract" \
+    -H "Content-Type: application/json" \
+    -d "{\"api_key\":\"$TAVILY_KEY\",\"urls\":[\"<url>\"]}"
 }
 ```
 
-### 搜索后端注册指南
+### 3.5 DuckDuckGo (`ddgs`) 用法
 
-| 后端 | 免费额度 | 注册地址 | 配置字段 |
-|------|---------|---------|---------|
-| **Tavily** | 1,000 次/月 | https://app.tavily.com | `tavily.apiKey` |
+```bash
+# 依赖检查 / 安装
+python3 -c "from ddgs import DDGS" 2>/dev/null || pip3 install --break-system-packages ddgs
 
-**Tavily 注册步骤**：
+# 基本搜索（建议带代理，国内更稳）
+python3 -c "from ddgs import DDGS; [print(r['title'], r['href']) for r in DDGS(proxy='http://127.0.0.1:10802').text('<keyword>', max_results=5)]"
+
+# 时效过滤（d=日 / w=周 / m=月 / y=年）
+python3 -c "from ddgs import DDGS; [print(r['title']) for r in DDGS().text('<keyword>', max_results=5, timelimit='w')]"
+
+# 新闻 / 视频 / 图片 / 书籍 / 帖子 / 抽取：text|news|images|videos|books|threads|extract
+python3 -c "from ddgs import DDGS; [print(r['title'], r['date']) for r in DDGS().news('<keyword>', max_results=5)]"
+```
+
+### 3.6 知识扩展点
+
+发现新搜索后端（Serper / SearXNG / Brave）适合补充进降级链时：
+
+1. 验证免费额度、速度、是否需要 Key
+2. 追加到 3.2 Trade-off 表
+3. 在 experience.local.md「有效模式」记录使用经验
+
+## 4. Layer 3：已知 URL 的页面读取
+
+适用：URL 已知，但 Layer 1 没有专属命令、External 桥接、本机扩展都没匹配。
+
+| 工具 | JS 渲染 | 速度 | 适合 |
+|------|--------|-----|------|
+| `opencli web read <url>` | ✅ | 中 | SPA 但无需登录的公开页 |
+| `mcp__web_reader__webReader` | ❌ | 快 | 静态博客、文档站 |
+| `mcp__zread__read_file` | — | 快 | GitHub 仓库内文件 |
+| `WebFetch` | ❌ | 快 | 最后兜底 |
+
+**经验规则**：
+- SPA + 公开 → `opencli web read`
+- SPA + 登录 → Layer 4
+- 静态页 → `mcp__web_reader` 先试，慢再换 `WebFetch`
+- GitHub 文件 → `mcp__zread__read_file`（不用 clone）
+
+## 5. Layer 4：浏览器兜底（CDP）
+
+进入条件：
+- Layer 1 OpenCLI 命令报需要登录但当前未登录
+- Layer 3 全部读取失败（SPA + 登录 / 反爬 / 复杂交互）
+
+### 5.1 两种 CDP 入口的 Trade-off
+
+| 维度 | `opencli browser` | `/web-access` CDP |
+|------|------------------|-------------------|
+| 定位 | OpenCLI 内置浏览器子命令 | 通用 CDP 直连 |
+| 启动 | OpenCLI daemon 自动管理 | 需 Chrome 远程调试 + cdp-proxy |
+| 适合 | 已装 OpenCLI 时的首选 | 临时一次性交互 / 需要更精细控制 |
+| 反检测 | 依赖 daemon 设置 | 内置 Port Guard |
+| 学习成本 | 低 | 高 |
+
+**默认建议**：已装 OpenCLI → `opencli browser navigate/click/extract`；否则用 `/web-access`。
+
+详细 API 参考各自 skill 文档，本 skill 只做入口决策。
+
+## 6. /web-search setup 命令（一次性配置）
+
+用户执行 `/web-search setup` 时按顺序完成。**核心是 Tavily Key 配置；CLI 扫描是可选扩展**。
+
+### 6.1 Tavily Key 配置（核心步骤）
+
+#### 先检测是否已配置
+
+```bash
+CFG="${CLAUDE_SKILL_DIR}/config.local.json"
+TAVILY_KEY=""
+
+# 优先级 1: 环境变量（团队/CI 推荐）
+[ -n "$TAVILY_API_KEY" ] && TAVILY_KEY="$TAVILY_API_KEY"
+
+# 优先级 2: skill 本地配置
+[ -z "$TAVILY_KEY" ] && [ -f "$CFG" ] && \
+  TAVILY_KEY=$(python3 -c "import json,sys; d=json.load(open('$CFG')); print(d.get('tavily',{}).get('apiKey',''))" 2>/dev/null)
+
+# 验证 Key 有效性（轻量调用，max_results=1）
+if [ -n "$TAVILY_KEY" ]; then
+  STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "https://api.tavily.com/search" \
+    -H "Content-Type: application/json" \
+    -d "{\"api_key\":\"$TAVILY_KEY\",\"query\":\"ping\",\"max_results\":1}")
+  case "$STATUS" in
+    200) echo "✓ Tavily 已配置且 Key 有效" ;;
+    401|403) echo "✗ Tavily Key 无效（HTTP $STATUS），请重新配置" ; TAVILY_KEY="" ;;
+    *) echo "⚠ Tavily 探测异常（HTTP $STATUS），但 Key 已配置" ;;
+  esac
+else
+  echo "✗ Tavily 未配置"
+fi
+```
+
+#### 未配置时的注册引导
+
+如果上一步报「未配置」或「Key 无效」：
 
 1. 访问 https://app.tavily.com 注册账号
-2. 进入 Dashboard → API Keys → 复制 Key（格式 `tvly-xxx`）
-3. 将 Key 写入配置：
+2. Dashboard → API Keys → 复制 Key（格式 `tvly-xxx`）
+3. 写入配置（**二选一**）：
+
+   **方式 A：环境变量（推荐，跨 skill 复用）**
+
+   把下面这行加到 `~/.zshrc` 或 `~/.bashrc`，然后 `source` 一下：
+   ```bash
+   export TAVILY_API_KEY="tvly-粘贴你的 Key"
+   ```
+
+   **方式 B：skill 本地配置（隔离作用域）**
+   ```bash
+   cat > "${CLAUDE_SKILL_DIR}/config.local.json" << 'EOF'
+   {
+     "tavily": {
+       "apiKey": "<粘贴你的 Key>",
+       "enabled": true
+     }
+   }
+   EOF
+   ```
+
+4. 配置后重跑 `/web-search setup` 验证。
+
+> Layer 2 中读取 Key 的代码（3.4 节）也按 **环境变量优先 → config.local.json 兜底** 的顺序读取，与本节一致。
+
+### 6.2 扫描本机 CLI 工具（可选扩展，按需添加）
+
+> 当你**装了**网站专用 CLI（如语雀 `yuque-cli`、Linear `linear` 等）时，把它加进下面的扫描清单，下次进 Layer 1 时遇到对应域名会自动用上。**当前清单只列 1 个示例，按需扩展**。
 
 ```bash
-cat > "${CLAUDE_SKILL_DIR}/config.local.json" << 'EOF'
-{
-  "tavily": {
-    "apiKey": "<粘贴你的 Key>",
-    "enabled": true
-  }
-}
+EXP="${CLAUDE_SKILL_DIR}/experience.local.md"
+DATE=$(date +%Y-%m-%d)
+
+# 确保「本机扩展站点」表存在
+grep -q "^## 本机扩展站点" "$EXP" 2>/dev/null || cat >> "$EXP" << 'EOF'
+
+## 本机扩展站点
+
+| 域名 | CLI 命令 | 用法示例 | 发现日期 |
+|------|---------|---------|---------|
 EOF
+
+# 扫描清单（按需追加；格式: 域名|命令|用法）
+# 示例：
+for tool in \
+  "yuque.com|yuque-cli|yuque-cli doc <id>"; do
+  domain="${tool%%|*}"; rest="${tool#*|}"; cmd="${rest%%|*}"; usage="${rest##*|}"
+  if which "$cmd" >/dev/null 2>&1 && ! grep -q "| $domain |" "$EXP"; then
+    echo "| $domain | $cmd | $usage | $DATE |" >> "$EXP"
+    echo "✓ 发现 $cmd → 已登记 $domain"
+  fi
+done
 ```
 
-## 核心原则
-
-**零成本优先，按需升级。** 从最轻量的工具开始，结果不够再升级到下一级。
-
-## 决策流程
-
+**扩展示例**（用户按需添加新行到 for 列表）：
 ```
-搜索请求
-  → 涉及视频/社交/社区平台？ → ① OpenCLI（依赖检查通过后）
-  → 否则 → ② WebSearch（内置，零成本）
-  → 不够 → ③ 按场景选专业工具（含 Tavily）
-  → 还不够 → ④ 浏览器 CDP（/web-access）
+"linear.app|linear|linear issue list"
+"notion.so|notion-cli|notion-cli page <id>"
+"<新域名>|<新 CLI 命令>|<用法示例>"
 ```
 
-**每一步的结果都是证据**：对照目标判断是否达标，方向错了立即换工具，不在同一个工具上反复重试。
-
-## 工具选择矩阵
-
-### 搜索类（不知道信息在哪）
-
-| 优先级 | 场景 | 工具 | 原因 |
-|--------|------|------|------|
-| **首选** | 日常搜索、快速了解话题 | `WebSearch`（内置） | 零配置、无感知限额 |
-| 按需 | 内置搜索不可用、需要 AI 增强摘要 | **Tavily API** | 响应快 ~1.3s、返回 AI 摘要、1,000 次/月免费 |
-| 按需 | 限定域名搜索、限定时效（近一周/一月） | `mcp__web-search-prime` | 支持 domain/recency 过滤，**但配额有限** |
-| 按需 | 搜索 GitHub 项目文档/issue | `mcp__zread__search_doc` | 精准、无配额限制 |
-
-### Tavily 搜索用法
-
-使用前先读取 API Key：
+### 6.3 写入 setup-completed 标记
 
 ```bash
-TAVILY_KEY=$(python3 -c "import json; print(json.load(open('${CLAUDE_SKILL_DIR}/config.local.json'))['tavily']['apiKey'])")
+# 顶部追加，抑制首次使用提示
+if ! grep -q "^setup-completed:" "$EXP"; then
+  TMP=$(mktemp)
+  echo "setup-completed: $(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$TMP"
+  echo "" >> "$TMP"
+  cat "$EXP" >> "$TMP"
+  mv "$TMP" "$EXP"
+fi
 ```
 
-搜索（返回 AI 摘要 + 结果列表）：
+## 7. 硬约束
 
-```bash
-curl -s -X POST "https://api.tavily.com/search" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"api_key\": \"$TAVILY_KEY\",
-    \"query\": \"搜索关键词\",
-    \"max_results\": 5,
-    \"include_answer\": true
-  }"
-```
+- 禁止首选 `mcp__web-search-prime` 做通用搜索（配额有限）
+- 禁止用 `mcp__web_reader` 读已知 SPA（直接 Layer 4）
+- 一个工具失败立即升级，不在同一工具反复重试
+- Layer 1 命中 OpenCLI 时禁止跳 Layer 3（domain-specific 永远更准）
+- 子 Agent 任务分发用「获取/了解/调研」等中性词，避免暗示特定工具
+- Tavily 注册引导**仅本会话提示一次**
+- 本机扩展站点表必须先读、后探测（已记录的域名直接用，不重复探测）
 
-提取指定 URL 内容：
-
-```bash
-curl -s -X POST "https://api.tavily.com/extract" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"api_key\": \"$TAVILY_KEY\",
-    \"urls\": [\"https://example.com\"]
-  }"
-```
-
-### 读取类（已知 URL）
-
-| 场景 | 工具 | 原因 |
-|------|------|------|
-| 公开页面完整内容（博客、文档站） | `mcp__web_reader__webReader` | 返回完整 Markdown |
-| GitHub 仓库文件源码 | `mcp__zread__read_file` | 不用 clone |
-| GitHub 仓库目录结构 | `mcp__zread__get_repo_structure` | 快速了解布局 |
-
-### 浏览器类（需要 JS 渲染/登录态）
-
-| 场景 | 工具 | 原因 |
-|------|------|------|
-| SPA 页面（掘金、小红书等） | `/web-access` CDP | JS 渲染后才有内容 |
-| 需要登录的网站 | `/web-access` CDP | 复用本地 Chrome 登录态 |
-
-## 回退路径
-
-```
-WebSearch 结果不够
-  ├─ 需要 AI 增强摘要？         → Tavily API
-  ├─ 需要精确过滤（域名/时效）？ → web-search-prime
-  ├─ GitHub 相关？              → mcp__zread__search_doc
-  ├─ 已有 URL 需要全文？        → mcp__web_reader__webReader
-  ├─ 视频/社交/社区平台？       → OpenCLI（依赖检查通过后）
-  └─ SPA / 需要登录？           → /web-access CDP
-```
-
-## OpenCLI 平台搜索
-
-> OpenCLI 将 100+ 网站（YouTube、B 站、Twitter、Reddit 等）统一为 CLI 命令，适合调研视频内容、社交媒体讨论、技术社区问答等场景。
-> 完整命令速查见 Obsidian 文章 OBA-cmd4l1st。
-
-### 依赖检查
-
-使用前**必须**验证 opencli 可用：
-
-```bash
-which opencli 2>/dev/null && opencli doctor 2>&1 | head -5
-```
-
-期望输出三项全绿：
-```
-[OK] Daemon: running
-[OK] Extension: connected
-[OK] Connectivity: connected
-```
-
-**未安装时**：跳过 OpenCLI，退回其他搜索工具。不引导安装。
-
-### 适用场景 vs 其他工具
-
-| 场景 | 用 OpenCLI | 用其他工具 |
-|------|-----------|-----------|
-| 搜索 YouTube/B站视频并提取字幕 | ✅ `opencli youtube/bilibili` | ❌ 其他工具做不到 |
-| 搜索 Reddit/Twitter 社交媒体讨论 | ✅ `opencli reddit/twitter` | `WebSearch` 也能搜但信息少 |
-| 搜索技术社区（HN/StackOverflow） | ✅ `opencli hackernews/stackoverflow` | `mcp__zread__search_doc` 仅限 GitHub |
-| 通用网页搜索 | ❌ 杀鸡用牛刀 | ✅ `WebSearch` / Tavily |
-| 需要限定域名/时效 | ❌ 不支持 | ✅ `web-search-prime` |
-
-### 搜索流程
-
-```
-用户需求涉及视频/社交/社区平台
-  → ① 依赖检查（opencli doctor）
-  → ② opencli <site> search "关键词"
-  → 结果不够？→ 换其他工具
-  → 需要深入了解某个结果？→ 提取字幕/详情（见下方重操作确认）
-```
-
-### 常用平台速查
-
-| 平台 | 搜索命令 | 详情命令 | 认证 |
-|------|---------|---------|------|
-| **YouTube** | `opencli youtube search "AI Agent" --limit 5` | `opencli youtube video <url>` | 🔐 |
-| **B 站** | `opencli bilibili search "关键词" --type video` | `opencli bilibili video BV1xxx` | 🔐 |
-| **Reddit** | `opencli reddit search "keyword"` | `opencli reddit read <post_id>` | 🔐 |
-| **Twitter** | `opencli twitter search "keyword" --limit 10` | — | 🔐 |
-| **小红书** | `opencli xiaohongshu search "关键词" --limit 10` | `opencli xiaohongshu note <url>` | 🔐 |
-| **HN** | `opencli hackernews search "关键词"` | — | 🌐 |
-| **StackOverflow** | `opencli stackoverflow search "react hooks"` | — | 🌐 |
-| **Google** | `opencli google search "关键词"` | — | 🌐/🔐 |
-| **arXiv** | `opencli arxiv search "transformer" --limit 10` | `opencli arxiv paper <id>` | 🌐 |
-
-### 重操作确认
-
-以下操作较重（耗时长、消耗资源），**执行前必须询问用户**：
-
-| 操作 | 命令 | 为什么是重操作 | 确认话术 |
-|------|------|---------------|---------|
-| 提取字幕 | `opencli youtube transcript <url>` / `opencli bilibili subtitle BV1xxx` | 需要浏览器交互、耗时长 | "是否需要提取视频字幕？这可能需要一些时间。" |
-| 下载媒体 | `opencli <site> download ...` | 占用带宽和磁盘 | "是否需要下载该资源？" |
-| 批量搜索 | 多个 `opencli` 命令组合 | 多次浏览器操作 | "需要在多个平台搜索，是否继续？" |
-
-**不需要确认**的操作：
-- 单次搜索（`search`）
-- 获取详情（`video`/`read`/`note`）
-- 热门/趋势（`hot`/`trending`）
-
-### 字幕提取工作流
-
-调研视频内容时的推荐流程：
-
-```
-1. opencli youtube/bilibili search "关键词" --limit 5
-   → 找到相关视频列表
-
-2. 询问用户："找到 X 个相关视频，是否需要提取字幕？"
-
-3. 用户确认后：
-   opencli youtube transcript <url>
-   或 opencli bilibili subtitle BV1xxx --lang zh-CN
-
-4. 返回字幕文本给用户
-```
-
-## 硬约束
-
-- **禁止**在通用搜索场景首选 `mcp__web-search-prime`（配额有限，留给需要 domain/recency 过滤的场景）
-- **禁止**用 `mcp__web_reader` 读已知 SPA 页面（掘金、小红书、微信公众号等）
-- 搜索结果已满足目标时**停止**，不要再用 web_reader 去读每个链接
-- 一个工具失败后，**立即按回退路径升级**到下一个
-- 子 Agent 分发时用「获取/了解/调研」等中性词，不用「搜索/抓取」（避免暗示特定工具）
-- Z.ai 工具全部耗尽时，优先切换到 **Tavily API** 作为备选搜索
-
-## 经验沉淀机制
+## 8. 经验沉淀机制
 
 经验存储在 `${CLAUDE_SKILL_DIR}/experience.local.md`，由 LLM 自动维护。
 
-### 读取规则
+### 8.1 读取规则
 
-> 搜索开始前，**必须先读取** `experience.local.md` 中的已有经验，作为工具选择的先验知识。
+搜索开始前**必须先读取** experience.local.md，作为工具选择的先验。优先级：
+**本机扩展站点 > 失败模式 > 有效模式 > Trade-off 矩阵**
 
-### 写入规则
+### 8.2 写入规则
 
-搜索**完成**后，检查是否满足以下任一条件，满足则**主动写入**对应表格：
+搜索完成后按下表写入：
 
 | 触发条件 | 写入位置 | 内容 |
-|----------|---------|------|
-| 某个工具在特定场景表现特别好（比预期好） | 有效模式表 | `\| 结论 \| YYYY-MM-DD \| 场景 \|` |
-| 某个工具在特定场景失败，需要换工具 | 失败模式表 | `\| 陷阱 \| YYYY-MM-DD \| 正确做法 \|` |
-| 发现新工具的最佳使用场景 | 有效模式表 | `\| 结论 \| YYYY-MM-DD \| 场景 \|` |
+|---------|---------|------|
+| 首次发现本机有非内置 CLI 能搞定某域名 | 本机扩展站点表 | `\| 域名 \| CLI \| 用法 \| 日期 \|` |
+| 工具在新场景表现特别好 | 有效模式表 | `\| 结论 \| 日期 \| 场景 \|` |
+| 工具在特定场景失败 | 失败模式表 | `\| 陷阱 \| 日期 \| 正确做法 \|` |
 
-**不写的情况**：
-- 按预期正常工作（没有新发现）
-- 未经验证的猜测
-- 只是搜索结果不够好，但没有明确的工具归因
+**不写**：按预期工作的常规调用 / 未经验证的猜测。
 
-### 回退策略
+### 8.3 回退策略
 
-> 按经验选择工具后结果不达标时，**立即回退**到工具矩阵中的其他工具，并将导致错误的旧经验更新为失败模式。
+按经验选择工具后结果不达标 → 立即回退到下一级 → 将旧经验改为失败模式。
 
-### 写入示例
+### 8.4 写入示例
 
-发现新模式后，用 Edit 工具追加一行到 `experience.local.md` 对应表格：
+```markdown
+## 本机扩展站点
+| yuque.com | yuque-cli | yuque-cli doc <id> | 2026-05-11 |
 
-有效模式 — 追加到「有效模式」表最后一行之后：
-```
-| 结论 | 2026-05-01 | 场景描述 |
-```
+## 有效模式
+| Tavily 在编程问答比 WebSearch 命中率高 | 2026-05-11 | 编程概念解释 |
 
-失败模式 — 追加到「失败模式」表最后一行之后：
-```
-| 陷阱描述 | 2026-05-01 | 正确做法 |
+## 失败模式
+| web_reader 读小红书返回空 | 2026-05-11 | 改用 Layer 4 opencli browser |
 ```
