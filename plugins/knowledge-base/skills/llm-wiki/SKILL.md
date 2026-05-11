@@ -376,9 +376,6 @@ obsidian-vault/
 ├── outputs/                    # 输出文件
 │   ├── YYYY-MM-DD-*.md         # 问答回答
 │   └── lint-YYYY-MM-DD.md      # 健康报告
-├── .kb/                        # 系统状态
-│   ├── manifest.json           # 编译状态跟踪
-│   └── reflect_state.json      # 反思状态
 └── CLAUDE.md                   # Schema（告诉 LLM 如何管理此知识库）
 ```
 
