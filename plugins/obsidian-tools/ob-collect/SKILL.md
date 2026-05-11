@@ -1,9 +1,9 @@
 ---
 name: ob-collect
-description: "Obsidian 万物采集器。基于 OpenCLI 统一输入层，从 100+ 站点（文章、视频、播客、社交媒体、书籍、新闻）采集内容到 raw/ 并编译为结构化 wiki 笔记。支持批量并行、断点续传。触发词：采集、导入知识库、ob-collect、视频转笔记、采集书签、批量采集。"
+description: "Obsidian 万物采集器。委托 web-search 路由层获取内容（100+ 站点 + Layer 1-4 全栈），采集到 raw/ 并编译为结构化 wiki 笔记。支持批量并行、断点续传。触发词：采集、导入知识库、ob-collect、视频转笔记、采集书签、批量采集。"
 ---
 
-<role>Obsidian 万物采集器。基于 OpenCLI 统一输入层，从网页、社交媒体、视频平台、播客、书籍、新闻等来源提取内容，编译为结构化 wiki 笔记。</role>
+<role>Obsidian 万物采集器。委托 web-search 拿内容，自身专注于编译为结构化 wiki 笔记（raw/ 归档 + 主题分类 + 索引维护 + 批量并行 + 断点续传）。</role>
 <purpose>采集模式 — 将 URL/PDF/视频/文本采集到 raw/ 并编译到 wiki/{theme}/。建议 ≤ 500 字，超出部分用 [[reference]] 链接补充。</purpose>
 <trigger>
 
@@ -35,7 +35,7 @@ description: "Obsidian 万物采集器。基于 OpenCLI 统一输入层，从 10
   </gsd:deps>
   <gsd:goal>将来源采集到 raw/ 编译到 wiki/{theme}/。</gsd:goal>
   <gsd:phase>获取 OBSIDIAN_REPO 路径，识别输入类型和来源平台。</gsd:phase>
-  <gsd:phase>OpenCLI 路由 → 获取内容 → 主题分类 → 预览确认 → 写入 raw/ → 编译到 wiki/{theme}/。</gsd:phase>
+  <gsd:phase>委托 web-search 获取内容 → 主题分类 → 预览确认 → 写入 raw/ → 编译到 wiki/{theme}/。</gsd:phase>
   <gsd:phase>更新索引：wiki/{theme}/index.md、wiki/index.md（新主题时）、wiki/log.md、.kb/manifest.json。如果当前在 git 项目中，同步更新项目 CLAUDE.md 的 Obsidian 索引段。</gsd:phase>
 </gsd:workflow>
 
@@ -82,61 +82,79 @@ $OBSIDIAN_REPO/.kb/
 
 如果 `wiki/index.md` 不存在，创建初始索引。
 
-## OpenCLI 路由层
+## 获取内容（硬委托 web-search）
 
-> **核心原则**：OpenCLI 为主引擎，WebFetch 为回退。
+> **【硬约束】所有「如何拿到内容」的决策由 [web-search](../../dev-tools/web-search/SKILL.md) skill 负责。本 skill 不维护路由表。**
 
-### 来源平台检测 + 命令映射
+### 调用流程
 
-根据 URL 域名自动识别平台，选择最佳获取方式：
+收到 URL / 主题 / 文件后：
 
-| 平台 | 域名 | raw 目录 | OpenCLI 命令（主引擎） | 回退 |
-|------|------|----------|----------------------|------|
-| 知乎 | `zhihu.com` | `raw/web/` | `opencli zhihu answer <id>` | WebFetch |
-| 36氪 | `36kr.com` | `raw/web/` | `opencli 36kr article <id>` | WebFetch |
-| Hacker News | `news.ycombinator.com` | `raw/news/` | `opencli hackernews read <id>` | WebFetch |
-| Reddit | `reddit.com` | `raw/news/` | `opencli reddit read <id>` | WebFetch |
-| Twitter/X | `twitter.com`, `x.com` | `raw/web/` | `opencli twitter thread <id>` | WebFetch |
-| B站 | `bilibili.com` | `raw/videos/` | `opencli bilibili subtitle <bv>` → `video <bv>` | — |
-| YouTube | `youtube.com`, `youtu.be` | `raw/videos/` | `opencli youtube transcript <url>` → `video <url>` | — |
-| 小宇宙 | `xiaoyuzhou.fm` | `raw/videos/` | `opencli xiaoyuzhou transcript <id>` → `episode <id>` | — |
-| 微信公众号 | `mp.weixin.qq.com` | `raw/wechat/` | `opencli web read <url>` | WebFetch |
-| Medium | `medium.com` | `raw/web/` | `opencli web read <url>` | WebFetch |
-| Substack | `substack.com` | `raw/web/` | `opencli web read <url>` | WebFetch |
-| 豆瓣 | `douban.com` | `raw/web/` | `opencli douban subject <id>` | WebFetch |
-| 掘金小册 | `juejin.cn/book/` | `raw/juejin/` | 专用脚本（见掘金小册章节） | — |
-| 通用网页 | 其他 HTTP URL | `raw/web/` | `opencli web read <url>` | WebFetch |
-| PDF | 本地 `.pdf` 文件 | `raw/web/` | Read 工具 | — |
-| 纯文本 | 无 URL，人工输入 | `raw/notes/` | 直接使用 | — |
-| AI 调研 | 无 URL，AI 产出 | `raw/ai-notes/` | 直接使用 | — |
+1. **本地 PDF / 纯文本 / AI 调研产出** → 跳过 web-search，直接用 Read / 内容本身
+2. **掘金小册 URL（`juejin.cn/book/*`）** → 跳过 web-search，使用本 skill 的[掘金小册采集模式](#掘金小册采集模式)
+3. **其他 URL** → 委托 web-search：
+   - web-search Layer 1（OpenCLI 路由 / External CLI 桥接 / 本机扩展 CLI）拿内容
+   - Layer 1 未命中 → web-search 自动走 Layer 3（opencli web read / web_reader / WebFetch）
+   - 登录或反爬失败 → web-search 自动走 Layer 4（opencli browser / web-access CDP）
+4. **无 URL（如「采集 RLHF 这个话题」）** → 先调 web-search Layer 2（WebSearch → Tavily → DDG）拿候选列表，用户选定后回到步骤 3
+5. **视频/音频专用**：URL 命中 YouTube/B站/小宇宙/播客等时，仍由 web-search 调 OpenCLI subtitle/transcript；**无字幕时**回到本 skill 的 [ASR 回退流程](#asr-回退流程)
 
-**检测优先级**：域名精确匹配 → 平台关键词 → 默认归类
+**为什么硬委托**：路由表是单一真理来源。两份路由会必然分裂，LLM 选错的成本远高于多一次 skill 跳转。
 
-**路由逻辑**：
-1. 平台有 OpenCLI 命令映射 → 优先用 OpenCLI（`-f json` 获取结构化数据）
-2. OpenCLI 失败 → 文章类回退 WebFetch，视频类报告失败原因
-3. 无 OpenCLI 映射的平台 → 直接 WebFetch
+### 平台 → raw 子目录映射（采集独有）
 
-### 路由执行模板
+web-search 负责"怎么拿"，ob-collect 负责"放哪儿"。raw/ 归档目录按平台类别映射：
 
-```bash
-# 文章类：OpenCLI 优先 + WebFetch 回退
-opencli zhihu answer <id> -f json     # 优先
-# 失败时回退 WebFetch
+| 平台类别 | raw 子目录 | 域名示例 |
+|---------|-----------|---------|
+| 视频 / 播客 | `raw/{作者名}/` | youtube / bilibili / xiaoyuzhou |
+| 微信公众号 | `raw/wechat/` | mp.weixin.qq.com |
+| 资讯聚合 | `raw/news/` | hackernews / reddit / 36kr |
+| 通用网页 | `raw/web/` | medium / substack / zhihu / douban |
+| 掘金小册 | `raw/juejin/` | juejin.cn/book |
+| 本地 PDF | `raw/web/` | — |
+| 人工输入 | `raw/notes/` | — |
+| AI 调研 | `raw/ai-notes/` | — |
 
-# 视频类：字幕优先 + ASR 回退
-opencli youtube transcript <url> -f json   # 第一步：获取字幕
-opencli youtube video <url> -f json        # 同时获取元信息
-# 无字幕时：
-opencli youtube download <url> -o /tmp/    # 下载
-python3 {A2S_DIR}/scripts/transcribe.py /tmp/audio.wav --engine local -f md --yolo  # ASR
+> `{A2S_DIR}` 为 audio-to-subtitle skill 所在目录：`/Users/jiashengwang/jacky-github/jacky-skills/plugins/video-processing/skills/audio-to-subtitle`（ASR 回退流程会用到）
 
-# 通用网页
-opencli web read <url>                     # OpenCLI 渲染感知读取
-# 失败时回退 WebFetch
-```
+## 可扩展模式与约束（核心范式）
 
-> `{A2S_DIR}` 为 audio-to-subtitle skill 所在目录。路径：`/Users/jiashengwang/jacky-github/jacky-skills/plugins/video-processing/skills/audio-to-subtitle`
+> 与 web-search 同范式：**能力按需累加 + 经验沉淀 + 约束在范式之内**。
+> - web-search 沉淀「怎么找到内容」（站点路由 / 工具降级链 / 本机扩展 CLI）
+> - ob-collect 沉淀「哪些内容值得保留 + 怎么归档」（raw 子目录 / 主题分类 / 提取约束）
+
+### 可扩展点（按需添加，不要预先列满）
+
+| 扩展点 | 怎么扩展 | 落地位置 |
+|--------|---------|---------|
+| 新增 raw 子目录类型 | 在上方「平台 → raw 子目录映射」表追加一行 + 约定该类型 frontmatter | 本 SKILL.md + [references/frontmatter-schema.md](references/frontmatter-schema.md) |
+| 新增主题分类 | 在下方「主题关键词映射」表追加（kebab-case 英文目录 + 关键词）| 本 SKILL.md |
+| 新增内容类型的提取规则 | 例如「行业研报」「论文」要哪些字段、wiki 模板长什么样 | [references/compile-templates.md](references/compile-templates.md) |
+| 新增视频平台字幕来源 | 由 web-search Layer 1 路由表负责，本 skill 不维护 | web-search SKILL.md 第 2.2 节 |
+
+### 必须遵守的范式（硬约束，不可扩展）
+
+> 这些是采集质量的底线，**新增扩展点不能破坏这些约束**。
+
+1. **视频类只存字幕，不存视频本身**
+   - 优先 OpenCLI `subtitle`/`transcript`（web-search Layer 1 自动调用）
+   - 字幕缺失 → 调用 audio-to-subtitle skill 做 ASR（用本地音视频大模型转字幕）
+   - ASR 完成后**立即删除**临时视频/音频文件（详见 ASR 回退流程）
+   - 例外：用户**显式**要求保留视频时才下载，且事前确认
+2. **raw 层一次写入不可修改**（要改进 → 在 wiki 层追加引用，不动 raw）
+3. **每篇 wiki 文章必须有 article_id**（`OBA-{8 位 lowercase}` 格式）
+4. **新主题目录用 kebab-case 英文命名**（如 `wiki/llm-evals/`，不用中文目录名）
+5. **frontmatter 必须三件套**：`tags`（非空）/ `type`（预定义值）/ `updated_at`（YYYY-MM-DD）
+6. **不为一次性需求扩展**：模式 ≥ 3 次重复才固化为新子目录 / 新主题；否则归入 `raw/notes/` 或现有目录
+
+### 沉淀机制 & 职能边界
+
+经验沉淀写入 `${OBSIDIAN_REPO}/.kb/collect-experience.md`（含模板 / 写入规则 / 固化回流），与 web-search 的职能边界划分，详见 **[references/extension-protocol.md](references/extension-protocol.md)**。
+
+一句话总结：
+- **web-search 管「怎么拿」**（URL 路由 + 本机 CLI + 通用搜索降级）
+- **ob-collect 管「放哪 + 留什么」**（raw 子目录 + 主题分类 + 视频字幕范式 + frontmatter）
 
 ## 主题分类
 
@@ -166,9 +184,9 @@ opencli web read <url>                     # OpenCLI 渲染感知读取
 
 ### 流程概要
 
-1. **识别输入类型**：URL → OpenCLI 路由，PDF → Read，视频 → 视频/音频流，文本 → 直接使用
-2. **平台检测**：根据 URL 域名确定 raw/ 子目录和 OpenCLI 命令
-3. **获取内容**：通过 OpenCLI 或 WebFetch 抓取正文，提取关键要点（3-5 条）
+1. **识别输入类型**：URL → 委托 web-search，PDF → Read，视频 → 委托 web-search（含 ASR 兜底），文本 → 直接使用
+2. **平台检测**：根据 URL 域名确定 raw/ 子目录（命令路由由 web-search 决定）
+3. **获取内容**：web-search 返回正文后，提取关键要点（3-5 条）
 4. **主题分类**：根据关键词映射确定目标主题目录
 5. **预览确认**：展示平台、主题、标题、来源、要点、标签，等待用户确认。**必须同时展示 raw 层和 wiki 层两步路径**：
    - raw 层：`raw/{子目录}/文件名`（原始内容存放位置）
@@ -227,137 +245,14 @@ URL 输入：
 
 > **超时设置**：OpenCLI download 命令设置超时 `OPENCLI_BROWSER_COMMAND_TIMEOUT=120000`（120s）
 
-### raw 模板（带时间轴分段）
+### 模板与归纳规则
 
-视频/音频的 raw 层按作者名归档：`raw/[作者名]/标题.md`
+完整模板细节见 **[references/video-collect.md](references/video-collect.md)**：
 
-```markdown
----
-source: "https://..."
-author: "作者名"
-ingested_at: {YYYY-MM-DD}
-type: transcript
-category: Audio
-duration: "10:30"
-status: uncompiled
-tags: [音频笔记, {作者名}]
----
-
-# 标题
-
-### 0:00 主题段落标题
-
-句子内容，可以多句组成一个语义完整的段落。
-每段以 `### M:SS 主题标题` 开头，方便 Obsidian heading 跳转。
-
-### 1:30 下一个主题段落标题
-
-下一段内容...
-
----
-#音频笔记 #{作者名}
-```
-
-**关键规则**：
-- 每个语义段落用 `### M:SS 标题` 作为 heading
-- raw 层不可变：写入后不再修改
-- 文件名特殊字符替换为下划线，长度 ≤ 200 字符
-
-### wiki 归纳模板
-
-视频/音频的 wiki 层生成归纳笔记，用 `[[raw/作者名/标题]]` 引用 raw 层原文。
-
-```markdown
----
-article_id: OBA-k7jm2p9q
-tags: [{主题标签}, {作者名}, 归纳]
-type: {预定义类型}
-updated_at: {YYYY-MM-DD}
----
-
-# 标题 - 归纳
-
-> **作者**: {author}
-> **来源**: {url}
-> **时长**: {duration}
-> **提取时间**: {date}
-> **原文**: [[raw/作者名/标题]]
-
-[embedCode — 如有则插入，如 B 站 iframe]
-
-## 音频来源
-
-> [!quote] 🔗 [点击播放]({url})
-
----
-
-## 核心观点
-
-### 1. {观点标题}
-
-简明扼要地概括这个观点（2-5句话）。
-包括论据、因果逻辑、关键数据。
-
-→ [[raw/作者名/标题#1:30]] ~ [[raw/作者名/标题#3:45]]
-
-### 2. {观点标题}
-
-下一个核心观点的概括。
-
-→ [[raw/作者名/标题#5:00]] ~ [[raw/作者名/标题#7:20]]
-
-## 关键引用
-
-> [原文金句1] — [[raw/作者名/标题#2:15]]
-
-> [原文金句2] — [[raw/作者名/标题#8:30]]
-
-## 我的思考
-
-[待补充]
-
----
-#音频笔记 #{作者名} #归纳
-```
-
-### 归纳生成规则
-
-AI 归纳视频/音频内容时遵循以下原则：
-
-1. **观点拆解**：将内容拆解为 3-7 个核心观点/论点，每个有独立标题
-2. **raw 引用**：每个观点必须用 `[[raw/作者名/标题#M:SS]]` 链接到 raw 层原文的 heading
-3. **时间范围**：观点跨多段时用 `~` 连接起止：`[[raw/作者名/标题#1:30]] ~ [[raw/作者名/标题#3:45]]`
-4. **不搬运原文**：归纳用自己的话概括，不直接复制原文句子
-5. **关键结论**：提炼 3-5 条一句话可消化的结论，附链接
-6. **金句引用**：选取 2-4 条原文中最有表达力的原话，附链接
-7. **我的思考**：留空，供用户自行补充
-8. **不做延伸**：只归纳，不添加 transcript 中没有的观点
-
-### 作者索引
-
-视频/音频写入后自动维护 `raw/index.md` 作者索引：
-
-```markdown
----
-type: index
-updated_at: {YYYY-MM-DD}
-authors: {N}
-files: {N}
----
-
-# 作者索引
-
-> 自动维护 · {N} 位作者 · {N} 篇资料
-
-## 作者A
-
-- [[raw/作者A/标题1]] — {YYYY-MM-DD}
-- [[raw/作者A/标题2]] — {YYYY-MM-DD}
-
-## 作者B
-
-- [[raw/作者B/标题3]] — {YYYY-MM-DD}
-```
+- **raw 模板**：按作者归档（`raw/[作者名]/标题.md`）+ 时间轴分段（`### M:SS 标题`）+ frontmatter
+- **wiki 归纳模板**：核心观点 + raw 引用（含时间范围 `#1:30 ~ #3:45`）+ 关键金句 + 我的思考
+- **归纳生成 8 条规则**：观点拆解 / raw 引用 / 不搬运原文 / 不做延伸 等
+- **作者索引模板**：`raw/index.md` 按作者分组的自动索引
 
 ## 批量采集模式
 
@@ -376,54 +271,17 @@ files: {N}
 
 **并行要求**：所有 Sub Agent 的 Bash 调用**必须在同一条响应中发起**。
 
-### 状态追踪
+### 状态追踪 + 断点续传
 
-批量任务使用工作目录追踪状态：
+批量任务在 `~/Downloads/collect-pipeline/{platform}-{id}/meta.json` 记录状态（pending/in_progress/completed/failed/skipped）+ 时间。下次启动时扫描所有 meta.json，从 `status != completed` 的位置继续。
 
-```
-~/Downloads/collect-pipeline/
-└── {platform}-{id}/
-    ├── meta.json    # 状态 + 时间记录
-    └── (临时文件)
-```
-
-**meta.json schema**：
-
-```json
-{
-  "id": "task-identifier",
-  "url": "https://...",
-  "platform": "youtube",
-  "title": "标题",
-  "status": "pending|in_progress|completed|failed|skipped",
-  "startedAt": "ISO8601",
-  "completedAt": "ISO8601",
-  "duration": 123.4,
-  "error": null
-}
-```
-
-**断点续传**：扫描 `~/Downloads/collect-pipeline/` 下所有 meta.json，找到 status != completed 的任务，从断点继续。
+meta.json schema、字段说明、报告模板见 **[references/batch-collect.md](references/batch-collect.md)**。
 
 ### 自动停止
 
 - 连续 3 个任务失败 → 暂停整个批量，报告失败项
 - 单个任务失败 → 记录错误，继续下一个
 - HTTP 429/403 → 立即停止
-
-### 批量报告
-
-```
-📊 批量采集完成
-✅ 成功: 8 (耗时: 12m30s)    ❌ 失败: 1    ⏭ 跳过: 1
-
-生成文件:
-  • $OBSIDIAN_REPO/raw/作者/标题.md
-  • $OBSIDIAN_REPO/wiki/标题-归纳.md
-
-失败项:
-  • https://... → 原因: OpenCLI download 超时
-```
 
 ## 采集收藏/书签
 
@@ -447,94 +305,15 @@ files: {N}
 
 ## 掘金小册采集模式
 
-当采集来源为掘金小册 URL（`juejin.cn/book/xxx`）时，使用专用提取脚本。
-
-### 触发条件
-
-- URL 匹配 `juejin.cn/book/{booklet_id}`
-- 或用户说"采集掘金小册"、"提取掘金小册"
-
-### 提取流程
-
-1. **解析 URL**：提取 `booklet_id`（19 位数字）
-2. **获取元数据**：调用掘金 API 获取小册标题、作者、章节列表
-3. **批量提取**：逐章获取内容（Markdown/HTML），下载所有图片
-4. **保存到 raw/juejin/**：
-   ```
-   raw/juejin/{booklet-slug}/
-   ├── README.md          # 小册索引（标题、作者、目录）
-   ├── 01-章节标题.md      # 每章一篇，带 frontmatter
-   ├── 02-章节标题.md
-   ├── ...
-   └── images/
-       ├── cover.png       # 封面图
-       ├── 01-1.png        # 章节图片
-       └── ...
-   ```
-5. **图片处理**：Markdown 中的图片 URL 替换为本地相对路径 `./images/xx`
-
-### 脚本位置
+URL 匹配 `juejin.cn/book/{booklet_id}` 时走专用脚本（不经 web-search）：
 
 ```bash
-# 提取脚本（ob-collect 内置）
 node scripts/extract-juejin-booklet.mjs <booklet_url_or_id> \
   --output-dir "$OBSIDIAN_REPO/raw/juejin/{slug}" \
   --download-images
 ```
 
-### 章节文件格式
-
-```markdown
----
-title: "章节标题"
-booklet: "小册标题"
-section_id: "7304230207517360169"
-section_index: 2
-date: "2026-04-28"
-tags: ["掘金小册", "小册标题"]
----
-
-章节内容（HTML 或 Markdown）
-```
-
-### HTML→Markdown 自动转换
-
-脚本内置 HTML→Markdown 转换（基于 turndown 库），自动处理：
-
-- **API 返回的 HTML**：免费小册 API 返回的内容可能是 HTML 格式
-- **web-access 浏览器提取**：使用 web-access 从 DOM 提取的 innerHTML 会自动转为 Markdown
-- **转换规则**：去掉 `<style>` 标签、data-v-* 属性、掘金特有 class；保留代码块语言标记
-- **无需手动二次处理**：脚本输出即为干净的 Markdown
-
-### 图片下载优化
-
-v2 版本图片下载性能优化：
-
-| 参数 | 值 | 说明 |
-|------|-----|------|
-| 并发数 | 20 | 高并发批量下载 |
-| 超时 | 5s | 快速跳过失败图片 |
-| 连接复用 | keepAlive | 减少 TCP 握手 |
-| 去重 | URL hash | 相同 URL 只下载一次 |
-| 跳过 | 已存在 | 断点续传友好 |
-
-### web-access 模式
-
-当 API 方式无法获取内容（如付费小册）时，可使用 web-access 通过浏览器 DOM 提取：
-
-1. 启动 Chrome 调试模式 + cdp-proxy
-2. 使用 web-access 导航到小册页面
-3. 从 DOM 提取 innerHTML（得到的是 HTML）
-4. 运行提取脚本 `--download-images` 自动完成 HTML→Markdown 转换 + 图片下载
-
-### 注意事项
-
-- **免费小册**：无需登录，直接 API 提取
-- **付费小册**：需要通过 web-access 浏览器模式提取（API 方式返回空内容）
-- **请求间隔**：脚本内置 300ms 延迟，避免频率限制
-- **图片格式**：掘金 CDN 图片可能无标准扩展名，自动检测并保持原始格式
-- **内容格式**：自动检测 HTML/Markdown，HTML 自动转换为 Markdown
-- **版权**：仅下载用户已购买或免费的小册内容
+完整流程（API 解析 / HTML→Markdown 转换 / 图片并发下载 / 付费小册的 web-access 兜底 / 注意事项）见 **[references/juejin-booklet.md](references/juejin-booklet.md)**。
 
 ## 写入后验证
 
@@ -554,10 +333,9 @@ v2 版本图片下载性能优化：
 
 | 场景 | 处理 |
 |------|------|
-| OpenCLI 命令失败 | 文章类回退 WebFetch，视频类报告失败原因 |
-| 视频无字幕 | OpenCLI download → A2S ASR 转录 |
+| 视频无字幕 | OpenCLI download → A2S ASR 转录（见 ASR 回退流程） |
 | A2S 转录失败 | 提示用户提供文字稿 |
-| URL 抓取失败 | 提示用户检查 URL 或手动粘贴内容 |
+| web-search 全部 Layer 失败 | 提示用户检查 URL 或手动粘贴内容（路由失败由 web-search 内部处理）|
 | 内容为空或过短 | 提示用户确认是否继续 |
 | 概念文章已存在 | 读取并更新，不创建重复 |
 | 概念冲突 | 在文章中标注矛盾，追加说明 |
