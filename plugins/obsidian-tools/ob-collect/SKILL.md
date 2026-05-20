@@ -31,10 +31,13 @@ description: "Obsidian 万物采集器。委托 web-search 路由层获取内容
 <gsd:workflow xmlns:gsd="urn:gsd:workflow">
   <gsd:meta>requires=OBSIDIAN_REPO,opencli; focus=ingest,compile</gsd:meta>
   <gsd:deps>
-    <dep name="audio-to-subtitle" source="plugin" pluginName="video-processing" skillName="audio-to-subtitle" />
+    <dep name="web-search" source="local" skillName="web-search" required="true" />
+    <dep name="ob-router" source="local" skillName="ob-router" required="true" />
+    <dep name="ob-compile" source="local" skillName="ob-compile" required="true" />
+    <dep name="audio-to-subtitle" source="plugin" pluginName="video-processing" skillName="audio-to-subtitle" required="false" />
   </gsd:deps>
   <gsd:goal>将来源采集到 raw/ 编译到 wiki/{theme}/。</gsd:goal>
-  <gsd:phase>获取 OBSIDIAN_REPO 路径，识别输入类型和来源平台。</gsd:phase>
+  <gsd:phase>**委托 ob-router skill** 解析当前激活仓库路径（硬委托，不自行读取文件），识别输入类型和来源平台。</gsd:phase>
   <gsd:phase>委托 web-search 获取内容 → 主题分类 → 预览确认 → 写入 raw/ → 编译到 wiki/{theme}/。</gsd:phase>
   <gsd:phase>更新索引：wiki/{theme}/index.md、wiki/index.md（新主题时）、wiki/log.md、.kb/manifest.json。如果当前在 git 项目中，同步更新项目 CLAUDE.md 的 Obsidian 索引段。</gsd:phase>
 </gsd:workflow>
@@ -45,10 +48,20 @@ description: "Obsidian 万物采集器。委托 web-search 路由层获取内容
 
 **执行前必读**：本 skill 需要以下配置。
 
-1. 检查全局 CLAUDE.md 中是否定义了 `OBSIDIAN_REPO` 配置变量
-2. 如果未定义，使用 AskUserQuestion 询问用户
-3. 将用户提供的路径保存为 `$OBSIDIAN_REPO` 变量供后续使用
-4. 检查 `opencli` 是否可用：`opencli doctor`，三项全绿才继续
+### 【硬约束】仓库路径一律委托 ob-router 解析
+
+> **不要自行读取 `ob-router.json` 或 `CLAUDE.md`。仓库路由是 ob-router 的职责，本 skill 不维护路径逻辑。**
+
+调用 ob-router skill 获取 `$OBSIDIAN_REPO`，ob-router 内部处理以下优先级：
+
+1. `~/.claude/ob-router.json` → `repos[active]` 路径
+2. 若文件不存在 → 从 CLAUDE.md 中的 `OBSIDIAN_REPO` 读取，并**主动提示用户运行 `ob-router init` 持久化**
+3. 若存在多个已注册仓库 → **主动询问用户要切换到哪个仓库**，不静默使用默认值
+4. 以上均失败 → AskUserQuestion 询问路径
+
+将 ob-router 返回的路径保存为 `$OBSIDIAN_REPO`，后续全程使用此变量。
+
+5. 检查 `opencli` 是否可用：`opencli doctor`，三项全绿才继续
 
 **脚本依赖检查**：
 
@@ -82,9 +95,11 @@ $OBSIDIAN_REPO/.kb/
 
 如果 `wiki/index.md` 不存在，创建初始索引。
 
-## 获取内容（硬委托 web-search）
+## 获取内容（默认委托 web-search + 明确例外）
 
-> **【硬约束】所有「如何拿到内容」的决策由 [web-search](../../dev-tools/web-search/SKILL.md) skill 负责。本 skill 不维护路由表。**
+> **【硬约束】所有「如何拿到内容」的决策**默认**由 [web-search](../../dev-tools/web-search/SKILL.md) skill 负责。本 skill 不维护路由表。**
+>
+> **例外口子由本节末尾的「例外清单」统一管理**。未列入清单的绕过路径一律视为违规。
 
 ### 调用流程
 
@@ -118,6 +133,18 @@ web-search 负责"怎么拿"，ob-collect 负责"放哪儿"。raw/ 归档目录�
 
 > `{A2S_DIR}` 为 audio-to-subtitle skill 所在目录：`/Users/jiashengwang/jacky-github/jacky-skills/plugins/video-processing/skills/audio-to-subtitle`（ASR 回退流程会用到）
 
+### 例外清单（绕过 web-search 的口子）
+
+以下场景是已注册的例外，直接调用底层工具而不经 web-search：
+
+| 例外场景 | 直接调用 | 理由 |
+|---------|---------|------|
+| 掘金小册采集 | `node scripts/extract-juejin-booklet.mjs` | API 路由 + 图片下载有专用脚本，效率优于通用路由 |
+| 批量采集 Sub Agent 内部 | 直接调用 opencli 命令 | 批处理时直接调用 opencli 减少 skill 跳转开销 |
+| ASR 回退流程 | `opencli <site> download` + ffmpeg + ASR | download + ffmpeg + ASR 三步紧耦合，由本 skill 内聚管理 |
+
+**注册规则**：未来如需新增「绕过 web-search」的口子，**必须先在本清单注册并说明理由**，否则一律走 web-search。
+
 ## 可扩展模式与约束（核心范式）
 
 > 与 web-search 同范式：**能力按需累加 + 经验沉淀 + 约束在范式之内**。
@@ -146,6 +173,7 @@ web-search 负责"怎么拿"，ob-collect 负责"放哪儿"。raw/ 归档目录�
 3. **每篇 wiki 文章必须有 article_id**（`OBA-{8 位 lowercase}` 格式）
 4. **新主题目录用 kebab-case 英文命名**（如 `wiki/llm-evals/`，不用中文目录名）
 5. **frontmatter 必须三件套**：`tags`（非空）/ `type`（预定义值）/ `updated_at`（YYYY-MM-DD）
+   - **raw 层额外必填 `status` 字段**（`uncompiled` | `compiled`），契约对象为 ob-compile 和 ob-index，详见 [references/frontmatter-schema.md](references/frontmatter-schema.md) 的「raw 层契约」一节
 6. **不为一次性需求扩展**：模式 ≥ 3 次重复才固化为新子目录 / 新主题；否则归入 `raw/notes/` 或现有目录
 
 ### 沉淀机制 & 职能边界
@@ -182,21 +210,51 @@ web-search 负责"怎么拿"，ob-collect 负责"放哪儿"。raw/ 归档目录�
 
 ## 采集流程
 
+### 采集模式判断（接到任务的第一步）
+
+**【硬约束】接到采集任务时，第一步必须判断采集模式。模式判断仅在采集开始时执行一次，不在中途切换。**
+
+| 输入特征 | 模式 | 行为 |
+|---------|------|------|
+| 单 URL + 内容预估 > 3000 字 | **长文一站式** | 写 raw（`status: compiled`） + 立即编译单篇 wiki |
+| 单 URL + 短文 (< 3000 字) | **长文一站式** | 同上 |
+| 用户明确说"采集这一篇" | **长文一站式** | 同上 |
+| 多 URL（≥ 3 个）批量输入 | **集锦批量** | 仅写 raw（`status: uncompiled`），**不立即编译** |
+| 同作者批量（B 站收藏夹、公众号专题等） | **集锦批量** | 同上 |
+| 视频字幕（任意数量，YouTube/B 站/播客等） | **集锦批量** | 同上 |
+| 用户明确说"批量采集 / 采集 X 的所有文章" | **集锦批量** | 同上 |
+
+两种模式的核心差异：
+- **长文一站式** → raw 写入即标 `status: compiled`，紧接着同步生成 wiki/{theme}/{slug}.md
+- **集锦批量** → raw 写入标 `status: uncompiled`，**只归档不编译**，等达到阈值或用户主动触发 ob-compile
+
 ### 流程概要
 
 1. **识别输入类型**：URL → 委托 web-search，PDF → Read，视频 → 委托 web-search（含 ASR 兜底），文本 → 直接使用
 2. **平台检测**：根据 URL 域名确定 raw/ 子目录（命令路由由 web-search 决定）
 3. **获取内容**：web-search 返回正文后，提取关键要点（3-5 条）
-4. **主题分类**：根据关键词映射确定目标主题目录
-5. **预览确认**：展示平台、主题、标题、来源、要点、标签，等待用户确认。**必须同时展示 raw 层和 wiki 层两步路径**：
+4. **图片检测与处理**：获取内容后，**必须**检测页面中的图片（见[图片处理规范](#图片处理规范)）
+5. **主题分类**：根据关键词映射确定目标主题目录
+6. **预览确认**：展示平台、主题、标题、来源、要点、标签，等待用户确认。**必须同时展示 raw 层和 wiki 层两步路径**：
    - raw 层：`raw/{子目录}/文件名`（原始内容存放位置）
    - wiki 层：`wiki/{theme}/文件名`（编译归纳目标位置）
-6. **写入 raw/**：带 frontmatter 的原始笔记
-7. **编译到 wiki/{theme}/**：生成主题文章 → 创建/更新概念 → 更新主题 index → 更新全局 index/log/manifest
+7. **写入 raw/**：带 frontmatter 的原始笔记，**图片以 OCR callout + 嵌入的形式写入 raw 层**
+   - **【硬约束】raw frontmatter 必须带 `status` 字段**（值为 `uncompiled` 或 `compiled`）
+   - 长文一站式模式 → 写入时直接标 `status: compiled`
+   - 集锦批量模式 → 写入时标 `status: uncompiled`
+   - 详见 [references/frontmatter-schema.md](references/frontmatter-schema.md) 的「raw 层契约」一节
+8. **编译到 wiki/{theme}/**（仅长文一站式模式立即执行；集锦批量模式跳过本步）：生成主题文章 → 引用 raw 层（不重复嵌入图片）→ 更新主题 index → 更新全局 index/log/manifest
+9. **集锦批量模式的批后检查**：写入完成后，检查 `raw/{author}/` 或 `raw/{platform}/` 下 `status: uncompiled` 数量是否达到 **20 篇阈值**
+   - 达到 → 提示用户「raw/X 下已有 N 篇未编译，是否触发 `ob-compile --author X --mode thematic`？」
+   - 未达到 → 静默归档，等阈值或用户主动触发
 
 ### 关键规则
 
 - 文件名规范：`{YYYY-MM-DD}-{slug}.md`
+- **raw 层 `status` 字段**（契约链：ob-collect 写入 → ob-compile 翻转 → ob-index 消费）
+  - 写入时：长文一站式 → `status: compiled`；集锦批量 → `status: uncompiled`
+  - 翻转责任不在本 skill：ob-compile 完成编译后会将 `uncompiled` 翻转为 `compiled`
+  - 不得省略：缺失 status 字段会破坏 ob-compile 与 ob-index 的契约链
 - **article_id 分配**：每篇新建的 wiki 文章必须在 frontmatter 中包含 `article_id` 字段
   - 格式：`OBA-{8位随机小写字母数字}`（如 `OBA-k7jm2p9q`）
   - 全局唯一：随机生成后验证唯一性
@@ -206,6 +264,36 @@ web-search 负责"怎么拿"，ob-collect 负责"放哪儿"。raw/ 归档目录�
 - 概念文章已存在时：读取并合并，不覆盖
 - 概念冲突时：标注矛盾，追加说明
 - 详细模板见 [references/compile-templates.md](references/compile-templates.md)
+
+## 图片处理规范
+
+> **【硬约束】网页内容包含图片时，必须完整处理。图片归属 raw 层，wiki 层只做引用，不重复嵌入。**
+
+核心规则速览：
+
+1. **不能用 `innerText` 读图片** — `<img>` 会被忽略，需 `querySelectorAll('img')` 单独提取
+2. **先滚动再读 `data-src`** — 多数平台图片懒加载，`src` 是 SVG 占位符
+3. **【硬约束】图片下载到「就近 attachments」目录** — 不写死全局 `$OBSIDIAN_REPO/attachments/`，而是和 raw md 同级：`{raw_md_dir}/attachments/{date-slug}/img_NNN.{ext}`，编号 1-based 三位补零（如 `img_001.jpeg`）
+4. **Read 工具直读图片做 OCR**（Claude 多模态）
+5. **raw 层格式**：`> [!note] OCR callout` 在前，`![[图片]]` 在后
+6. **wiki 层不嵌入图片**，只用 `[[raw/.../文件名]]` 引用 raw
+
+### 就近 attachments 路径规则（硬约束）
+
+为什么不用全局 `$OBSIDIAN_REPO/attachments/`：raw 内容和它的图片应该是一个目录单元，移动/备份/迁移作为整体。Obsidian `app.json` 的 `attachmentFolderPath` 是给手动新建笔记用的，**不适用程序化批量采集**。
+
+路径规则按 raw md 的归档层级就近：
+
+| raw md 路径 | 就近 attachments 路径 |
+|-------------|----------------------|
+| `raw/wechat/{author}/{date}-{slug}.md` | `raw/wechat/{author}/attachments/{date}-{slug}/img_NNN.{ext}` |
+| `raw/{author}/{title}.md`（视频） | `raw/{author}/attachments/{slug}/img_NNN.{ext}` |
+| `raw/web/{date}-{slug}.md` | `raw/web/attachments/{date}-{slug}/img_NNN.{ext}` |
+| `raw/juejin/{book-slug}/{ch}.md` | `raw/juejin/{book-slug}/attachments/{ch}/img_NNN.{ext}` |
+
+raw md 中的图片引用一律用相对 wikilink：`![[attachments/{date-slug}/img_NNN.jpeg]]`（Obsidian 会自动解析相对路径）。
+
+完整提取工作流、各平台 img 标签特性矩阵、OCR 模板、常见陷阱见 **[references/wechat-extract.md](references/wechat-extract.md)**。
 
 ## 视频/音频采集模式
 
@@ -314,6 +402,110 @@ node scripts/extract-juejin-booklet.mjs <booklet_url_or_id> \
 ```
 
 完整流程（API 解析 / HTML→Markdown 转换 / 图片并发下载 / 付费小册的 web-access 兜底 / 注意事项）见 **[references/juejin-booklet.md](references/juejin-booklet.md)**。
+
+## 微信公众号批量采集模式
+
+> **【硬约束】当输入是公众号文章 URL 列表（xlsx 导出 / 历史归档）且数量 ≥ 50 时，必须走本节流程，不走通用 web-search 路由。**
+
+### 触发条件
+
+- 输入是公众号导出 xlsx（含 `文章链接` 列）
+- 同一公众号的批量 URL 列表（≥ 50 条）
+- 用户明确说"批量采集 XX 公众号 / 把这个公众号沉淀到 ob"
+
+### 工具栈
+
+| 角色 | 工具 |
+|------|------|
+| 抓取（一篇） | `opencli weixin download --url <URL> --output <dir> --download-images true -f json` |
+| 状态机 | `~/Downloads/collect-pipeline/wechat-{author-slug}/meta.json`（schema 见 [references/batch-collect.md](references/batch-collect.md)）|
+| 并发控制 | 自写 Python/Node 脚本，3 个 worker 上限（实测 wechat ~3s/篇，更高并发风险 429）|
+| 规范化 | normalize 脚本（见下节）|
+| OCR | 独立异步阶段（见 [references/wechat-extract.md](references/wechat-extract.md)）|
+
+### 处理管线（两阶段解耦）
+
+```
+xlsx / URL 列表
+      │
+      ▼
+[阶段 1] 抓取（粗下载）
+  - 建 meta.json（每条 status=pending）
+  - 并发 opencli weixin download
+  - 产物原样落地 raw/wechat/{author}/__opencli_raw/{date}-{N}/...
+      │
+      ▼
+[阶段 2] normalize（规范化后处理）
+  - 移动 md 文件到平铺路径 raw/wechat/{author}/{date}-{slug}.md
+  - 改写：顶部 > 引用块 → YAML frontmatter（七件套 + status: uncompiled）
+  - 图片迁移：images/{wechat-hash}.jpg → attachments/{date-slug}/img_NNN.{ext}
+  - 正文：![图片](https://mmbiz...) → ![[attachments/{date-slug}/img_NNN.jpeg]]（本地化）
+  - 文末追加 <!-- TODO OCR --> 占位
+  - 删除中间目录 __opencli_raw/
+      │
+      ▼
+[阶段 3] 异步 OCR（独立触发，可延后）
+  - 扫 status: uncompiled
+  - 每张图 Read → 多模态 OCR → 在图片上方插入 [!note] callout
+  - status: uncompiled → compiled
+```
+
+### 规范化产物结构（强制）
+
+```
+raw/wechat/{author}/
+├── {YYYY-MM-DD}-{slug}.md        ← 平铺 md（一文一文件）
+├── {YYYY-MM-DD}-{slug}.md
+├── ...
+├── attachments/                   ← 就近 attachments
+│   ├── {YYYY-MM-DD}-{slug}/
+│   │   ├── img_001.jpeg
+│   │   ├── img_002.jpeg
+│   │   └── ...
+│   └── ...
+└── index.md                       ← 全文章索引表（标题/日期/URL/status）
+```
+
+### raw md frontmatter（七件套，硬约束）
+
+```yaml
+---
+article_id: OBA-{8位}
+tags: ["wechat", "{author}", "{topic-tag}"]
+type: source
+source_url: <原文 URL>
+publish_date: YYYY-MM-DD
+author: {author}
+updated_at: YYYY-MM-DD
+status: uncompiled       # 待 OCR + wiki 编译
+---
+```
+
+### normalize 后处理规则（硬约束）
+
+1. **文件名 slug 化**：去掉标题里的【日期】前缀、特殊字符、空格替换为 `-`
+2. **frontmatter 替换正文 > 引用块**：opencli 默认在正文顶部写 `> 公众号:` `> 发布时间:` `> 原文链接:`，normalize 阶段全部移除，信息全部进 frontmatter
+3. **图片本地化**：
+   - opencli 默认下载到 `{title}/images/{wechat-hash}.{ext}`，hash 不可读
+   - normalize 按出现顺序重编号为 `img_001`、`img_002`，迁移到 `attachments/{date-slug}/`
+   - 正文中的 `![图片](远程URL#imgIndex=N)` 替换为 `![[attachments/{date-slug}/img_{N+1:03d}.{ext}]]`（imgIndex 0-based → 文件名 1-based 三位补零）
+4. **OCR 占位**：每张图片本地引用上方插入 `<!-- TODO OCR -->` HTML 注释，OCR 完成后 OCR 脚本会把它替换为 `[!note] OCR callout`
+5. **去除嵌套**：删除 opencli 自带的 `{title}/` 中间目录，所有 md 平铺到 `raw/wechat/{author}/` 下
+
+### 失败处理
+
+- opencli 返回 `status: failed — no title`：原文已删除/纯图片帖，标记 `permanent_failure: true`，不再重试
+- 单条超时：重试 2 次后标记 failed
+- 连续 5 次失败 / 429 / 403：立即停止，写日志，等用户介入
+
+### 与通用批量模式的差异
+
+| 维度 | 通用批量（5-50 条混合 URL）| 微信批量专项（≥ 50 条单源）|
+|------|--------------------------|-------------------------|
+| 下载工具 | web-search 路由（Layer 1-4）| 直接 opencli weixin download |
+| 并发 | Sub Agent 4 个 | Python 进程 3 worker |
+| 编译时机 | 边采边编（每条 raw + wiki）| 阶段解耦（先全采，再 normalize，再 OCR，wiki 多对一蒸馏）|
+| wiki 产出 | 1 URL → 1 wiki | N URL → 1 方法论 wiki（多对一蒸馏，调 distiller）|
 
 ## 写入后验证
 
