@@ -30,9 +30,14 @@ description: "对话中快速收藏通用知识点到 Obsidian 知识库。触�
 
 **执行前必读**：本 skill 需要使用 Obsidian 仓库路径。
 
-1. 首先检查全局 CLAUDE.md 中是否定义了 `OBSIDIAN_REPO` 配置变量
-2. 如果未定义，使用 AskUserQuestion 询问用户
-3. 将用户提供的路径保存为 `$OBSIDIAN_REPO` 变量供后续使用
+**【硬约束】仓库路径一律委托 ob-router skill 解析，本 skill 不自行读取路径文件。**
+
+调用 ob-router skill 获取 `$OBSIDIAN_REPO`：
+- ob-router 内部处理优先级（ob-router.json → CLAUDE.md → 询问）
+- 若 ob-router.json 不存在，ob-router 会**主动提示** `ob-router init` 持久化
+- 若存在多个仓库，ob-router 会**主动询问**切换目标，不静默使用默认值
+
+将 ob-router 返回的路径保存为 `$OBSIDIAN_REPO`，后续全程使用此变量。
 
 ## 收藏流程
 

@@ -31,7 +31,7 @@ description: "Obsidian 知识库健康检查与维护。当用户想要检查知
 <gsd:workflow xmlns:gsd="urn:gsd:workflow">
   <gsd:meta>requires=OBSIDIAN_REPO; focus=lint,fix,health</gsd:meta>
   <gsd:goal>检测知识库健康问题，生成报告并提供修复建议或自动修复。</gsd:goal>
-  <gsd:phase>获取 OBSIDIAN_REPO，扫描 wiki/ 目录下所有文件。</gsd:phase>
+  <gsd:phase>**委托 ob-router skill** 解析当前激活仓库路径，扫描 wiki/ 目录下所有文件。</gsd:phase>
   <gsd:phase>运行十四项健康检查：标题清晰度、文章结构、断裂链接、孤立文章、低链接文章、重复概念、缺失概念、长文章、缺失索引、Frontmatter 规范、标签体系、内容新鲜度、偏好规则遵循度、缺少 article_id。</gsd:phase>
   <gsd:phase>生成健康报告，展示问题清单（按优先级排序）。</gsd:phase>
   <gsd:phase>对可自动修复的问题提供修复选项，等待用户确认后执行。</gsd:phase>
@@ -43,10 +43,16 @@ description: "Obsidian 知识库健康检查与维护。当用户想要检查知
 
 ## 配置检查
 
-1. 检查全局 CLAUDE.md 中 `OBSIDIAN_REPO` 配置变量
-2. 如果未定义，使用 AskUserQuestion 询问用户
-3. 检查 `$OBSIDIAN_REPO/wiki/` 目录是否存在
-4. 如果不存在，提示用户先运行 ob-index 初始化
+**【硬约束】仓库路径一律委托 ob-router skill 解析，本 skill 不自行读取路径文件。**
+
+调用 ob-router skill 获取 `$OBSIDIAN_REPO`：
+- ob-router 内部处理优先级（ob-router.json → CLAUDE.md → 询问）
+- 若 ob-router.json 不存在，ob-router 会**主动提示** `ob-router init` 持久化
+- 若存在多个仓库，ob-router 会**主动询问**切换目标，不静默使用默认值
+
+将 ob-router 返回的路径保存为 `$OBSIDIAN_REPO`，后续全程使用此变量。
+4. 检查 `$OBSIDIAN_REPO/wiki/` 目录是否存在
+5. 如果不存在，提示用户先运行 ob-index 初始化
 
 ## 执行流程
 

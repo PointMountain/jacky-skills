@@ -24,7 +24,7 @@ description: "Obsidian 文章质量评分系统。通过交互式问答对知识
 <gsd:workflow xmlns:gsd="urn:gsd:workflow">
   <gsd:meta>requires=OBSIDIAN_REPO; focus=rate,preference,feedback</gsd:meta>
   <gsd:goal>通过交互式评分记录文章质量反馈，自动提炼用户写作偏好，持续优化知识库质量标准。</gsd:goal>
-  <gsd:phase>获取 OBSIDIAN_REPO，扫描 wiki/ 目录，展示主题文件夹列表供用户选择。</gsd:phase>
+  <gsd:phase>**委托 ob-router skill** 解析当前激活仓库路径，扫描 wiki/ 目录，展示主题文件夹列表供用户选择。</gsd:phase>
   <gsd:phase>逐篇展示选中文件夹的文章摘要信息（标题、标签、字数、更新时间），用户在 Obsidian 中查看后打分（1-10）并描述缺点，记录到评分表。</gsd:phase>
   <gsd:phase>每评完 5 篇触发批量统计和偏好提炼，更新偏好文件。</gsd:phase>
   <gsd:phase>文件夹评完后展示总结，用户可选择继续下一个文件夹或结束。</gsd:phase>
@@ -36,10 +36,16 @@ description: "Obsidian 文章质量评分系统。通过交互式问答对知识
 
 ## 配置检查
 
-1. 检查全局 CLAUDE.md 中 `OBSIDIAN_REPO` 配置变量
-2. 如果未定义，使用 AskUserQuestion 询问用户
-3. 检查 `$OBSIDIAN_REPO/wiki/` 目录是否存在
-4. 如果不存在，提示用户先运行 ob-index 初始化
+**【硬约束】仓库路径一律委托 ob-router skill 解析，本 skill 不自行读取路径文件。**
+
+调用 ob-router skill 获取 `$OBSIDIAN_REPO`：
+- ob-router 内部处理优先级（ob-router.json → CLAUDE.md → 询问）
+- 若 ob-router.json 不存在，ob-router 会**主动提示** `ob-router init` 持久化
+- 若存在多个仓库，ob-router 会**主动询问**切换目标，不静默使用默认值
+
+将 ob-router 返回的路径保存为 `$OBSIDIAN_REPO`，后续全程使用此变量。
+4. 检查 `$OBSIDIAN_REPO/wiki/` 目录是否存在
+5. 如果不存在，提示用户先运行 ob-index 初始化
 
 ## 数据文件
 

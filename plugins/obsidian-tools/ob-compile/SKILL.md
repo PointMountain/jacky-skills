@@ -55,7 +55,7 @@ Obsidian raw→wiki 编译器。将 raw/ 层已有的资料按主题归纳编译
   <gsd:goal>将 raw/ 层资料编译归纳到 wiki/{theme}/，更新索引。</gsd:goal>
 
   <gsd:phase name="scan" order="1">
-    <gsd:step>获取 OBSIDIAN_REPO 路径</gsd:step>
+    <gsd:step>**委托 ob-router skill** 解析当前激活仓库路径</gsd:step>
     <gsd:step>扫描 raw/{author}/ 下的文件，统计已编译和未编译数量</gsd:step>
     <gsd:step>确认编译模式和目标范围</gsd:step>
     <gsd:checkpoint>用户确认编译目标和模式</gsd:checkpoint>
@@ -87,9 +87,15 @@ Obsidian raw→wiki 编译器。将 raw/ 层已有的资料按主题归纳编译
 
 ## 配置检查
 
-1. 从全局 CLAUDE.md 获取 `OBSIDIAN_REPO` 路径
-2. 如果未定义，使用 AskUserQuestion 询问用户
-3. 确认 `raw/` 和 `wiki/` 目录存在
+**【硬约束】仓库路径一律委托 ob-router skill 解析，本 skill 不自行读取路径文件。**
+
+调用 ob-router skill 获取 `$OBSIDIAN_REPO`：
+- ob-router 内部处理优先级（ob-router.json → CLAUDE.md → 询问）
+- 若 ob-router.json 不存在，ob-router 会**主动提示** `ob-router init` 持久化
+- 若存在多个仓库，ob-router 会**主动询问**切换目标，不静默使用默认值
+
+将 ob-router 返回的路径保存为 `$OBSIDIAN_REPO`，后续全程使用此变量。
+4. 确认 `raw/` 和 `wiki/` 目录存在
 
 ## Phase 1: 扫描与目标确认
 
@@ -120,8 +126,8 @@ ls raw/{author}/*.md | wc -l                               # 总数
 
 | 模式 | 触发条件 | 行为 |
 |------|----------|------|
-| **增量** (incremental) | 默认；已有 wiki 存在时 | 只编译 `status: uncompiled` 的 raw 文件，追加到已有 wiki |
-| **全量** (full) | 用户说"重新编译"/`--mode full` | 重新编译所有 raw 文件，覆盖已有 wiki |
+| **增量** (incremental) | 默认；已有 wiki 存在时 | 只编译 `status: uncompiled` 的 raw 文件，**通过观点对齐流程合并到已有 wiki（详见 3.6）** |
+| **全量** (full) | 用户说"重新编译"/`--mode full` | 重新编译所有 raw 文件，**覆盖已有 wiki（覆盖前自动备份）** |
 | **主题合并** (thematic) | raw 文件 ≥ 20 篇时默认推荐 | 按主题分组，每组生成一篇综合 wiki（活文档） |
 
 展示扫描结果，让用户确认编译模式。
@@ -282,13 +288,70 @@ python3 -c "import random,string; print(''.join(random.choices(string.ascii_lowe
 grep -rh "OBA-{生成的ID}" "$OBSIDIAN_REPO/wiki/" --include="*.md"
 ```
 
-### 3.6 增量更新已有 wiki
+### 3.6 增量更新已有 wiki（观点对齐流程）
 
-读取已有 wiki 文件，追加新 raw 内容的归纳：
-- 在已有核心观点后追加新观点
-- 更新 frontmatter 的 `updated_at`
-- 更新涵盖数量
-- **文件名不变**
+incremental 模式不是机械追加，必须做「观点对齐」避免内容碎裂。
+
+#### 3.6.1 提取阶段
+
+1. 读取已有 wiki 文件，提取**现有观点列表**（existing_views，每条带标题 + 概括）
+2. 读取所有新 raw 文件，提取**候选观点列表**（candidate_views）
+
+#### 3.6.2 对齐阶段（对每个 candidate）
+
+| 与 existing 的关系 | 处理方式 |
+|------|---------|
+| **重复**（讨论同一论点） | 不新增观点，把新 raw 引用追加到该 existing 观点的「raw 引用列表」 |
+| **补充**（深化某 existing 观点的细节/案例） | 不新增观点，把新内容 merge 到该 existing 观点的描述段落 |
+| **反驳/矛盾**（与 existing 观点对立） | 保留为新观点，并在原 existing 观点处加注「← 与观点 #N 冲突」 |
+| **全新角度** | 追加为新观点 #M |
+
+判断标准：使用语义相似度，不靠字面匹配。建议：
+- 相似度 > 0.8 → 重复
+- 0.5 < 相似度 < 0.8 → 补充（merge 内容）
+- 相似度 < 0.5 → 全新
+
+#### 3.6.3 写回阶段
+
+1. 重写已有 wiki 文件（保留文件名 + article_id）
+2. 更新 `updated_at`、`涵盖视频/文章` 数量
+3. 在文件末尾「## 变更日志」区域追加一行：
+   `## [{date}] +{N} 篇 raw / 新增 {X} 观点 / 强化 {Y} 观点 / 冲突 {Z}`
+4. 将处理过的 raw 文件 status 翻转为 `compiled`
+
+#### 3.6.4 极端情况
+
+- **新 raw 全部为重复**：仍要更新 updated_at 和 raw 引用列表（不需要新增观点）
+- **新 raw 全部为冲突**：考虑是不是开新主题（参考 3.6.5）
+- **新 raw 主题与已有 wiki 完全不匹配**：跳过该 wiki，进入新主题判断（3.6.5）
+
+#### 3.6.5 新主题阈值判断
+
+当新增 raw 的主题与现有所有 thematic wiki 都不匹配时：
+
+| 累积同新主题的 uncompiled raw 数 | 行为 |
+|------|------|
+| ≥ 5 篇 | **自动开新主题** — 新建一篇 thematic wiki，归入对应 wiki/{theme}/ |
+| < 5 篇 | **暂存** — raw 保持 uncompiled 状态，等达到阈值或用户主动触发 full 模式 |
+
+提示用户：
+
+```
+检测到 N 篇 raw 不匹配现有 thematic wiki，暂存中（等达到 5 篇阈值后自动开新主题）。
+当前暂存：{主题猜测} - {N} 篇
+```
+
+#### 3.6.6 重新综合阈值（提示用户走 full 模式）
+
+incremental 反复增量更新会让 wiki 越来越臃肿。当累积新增达到阈值时，提示用户考虑 full 模式重新综合：
+
+| 累积新增 raw / 原 raw 总数 | 行为 |
+|------|------|
+| < 20% | 静默继续 incremental |
+| 20% - 50% | 提示「累积新增达 N%，建议考虑 full 模式重新综合」 |
+| > 50% | 强烈建议 full 模式，需要用户明确确认是否继续 incremental |
+
+full 模式会**覆盖**已有 wiki，会丢失用户在「## 我的思考」段落的手写内容——所以必须用户明确确认。建议在覆盖前自动备份到 `wiki/{theme}/.archive/{filename}-{date}.md`。
 
 ### 3.7 全量重编译
 

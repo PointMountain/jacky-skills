@@ -33,7 +33,7 @@ description: "Obsidian 知识库问答。当用户想要查询知识库、基于
 <gsd:workflow xmlns:gsd="urn:gsd:workflow">
   <gsd:meta>requires=OBSIDIAN_REPO; focus=query,answer</gsd:meta>
   <gsd:goal>通过索引优先检索从知识库中找到最相关文章，综合回答用户问题，并将答案归档回 wiki 实现知识复利。</gsd:goal>
-  <gsd:phase>获取 OBSIDIAN_REPO，读取 wiki/index.md 作为导航入口。</gsd:phase>
+  <gsd:phase>**委托 ob-router skill** 解析当前激活仓库路径，读取 wiki/index.md 作为导航入口。</gsd:phase>
   <gsd:phase>从索引中定位 1-2 个最相关子分类，选择 3-5 篇具体文章。</gsd:phase>
   <gsd:phase>读取选中的完整文章，综合回答用户问题，带 [[wikilinks]] 引用。</gsd:phase>
 
@@ -45,10 +45,16 @@ description: "Obsidian 知识库问答。当用户想要查询知识库、基于
 
 ## 配置检查
 
-1. 检查全局 CLAUDE.md 中 `OBSIDIAN_REPO` 配置变量
-2. 如果未定义，使用 AskUserQuestion 询问用户
-3. 检查 `$OBSIDIAN_REPO/wiki/index.md` 是否存在
-4. 如果不存在，提示用户先运行 ob-index 初始化知识库
+**【硬约束】仓库路径一律委托 ob-router skill 解析，本 skill 不自行读取路径文件。**
+
+调用 ob-router skill 获取 `$OBSIDIAN_REPO`：
+- ob-router 内部处理优先级（ob-router.json → CLAUDE.md → 询问）
+- 若 ob-router.json 不存在，ob-router 会**主动提示** `ob-router init` 持久化
+- 若存在多个仓库，ob-router 会**主动询问**切换目标，不静默使用默认值
+
+将 ob-router 返回的路径保存为 `$OBSIDIAN_REPO`，后续全程使用此变量。
+4. 检查 `$OBSIDIAN_REPO/wiki/index.md` 是否存在
+5. 如果不存在，提示用户先运行 ob-index 初始化知识库
 
 ## 执行流程
 

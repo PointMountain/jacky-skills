@@ -27,7 +27,7 @@ description: "Obsidian 知识库索引构建与维护。编译环节委托给 ob
 <gsd:workflow xmlns:gsd="urn:gsd:workflow">
   <gsd:meta>requires=OBSIDIAN_REPO; focus=index,reflect</gsd:meta>
   <gsd:goal>维护索引完整性，发现知识间关联并生成综合文章。编译环节委托给 ob-compile。</gsd:goal>
-  <gsd:phase>获取 OBSIDIAN_REPO，扫描 raw/ 下 status: uncompiled 的文件。</gsd:phase>
+  <gsd:phase>**委托 ob-router skill** 解析当前激活仓库路径，扫描 raw/ 下 status: uncompiled 的文件。</gsd:phase>
   <gsd:phase>调用 ob-compile --mode incremental 编译未处理内容。</gsd:phase>
   <gsd:phase>编译完成后运行反思引擎：从索引摘要中发现跨领域主题、隐含关系、矛盾和空白。</gsd:phase>
   <gsd:phase>对证据充分的关联生成综合文章，写入对应主题目录，更新索引。</gsd:phase>
@@ -39,8 +39,14 @@ description: "Obsidian 知识库索引构建与维护。编译环节委托给 ob
 
 ## 配置检查
 
-1. 检查全局 CLAUDE.md 中 `OBSIDIAN_REPO` 配置变量
-2. 如果未定义，使用 AskUserQuestion 询问用户
+**【硬约束】仓库路径一律委托 ob-router skill 解析，本 skill 不自行读取路径文件。**
+
+调用 ob-router skill 获取 `$OBSIDIAN_REPO`：
+- ob-router 内部处理优先级（ob-router.json → CLAUDE.md → 询问）
+- 若 ob-router.json 不存在，ob-router 会**主动提示** `ob-router init` 持久化
+- 若存在多个仓库，ob-router 会**主动询问**切换目标，不静默使用默认值
+
+将 ob-router 返回的路径保存为 `$OBSIDIAN_REPO`，后续全程使用此变量。
 
 ## 执行流程
 
