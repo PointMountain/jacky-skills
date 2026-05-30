@@ -52,12 +52,16 @@ DEBATE_DIR="${SPEC%.md}.debate"; mkdir -p "$DEBATE_DIR"
 1. 读 `references/reviewer-prompt.md` 与 `references/json-contract.md`，把 `{{SPEC_CONTENT}}` 替换为 spec 全文，得到评审提示 `P`。
 2. **并行**发起两侧：
    - **辩手甲**：用 Agent 工具起 general-purpose 子 agent，prompt = `P` + 附上 json-contract 正文。要求返回 envelope JSON。
-   - **辩手乙**：起 Codex 后台任务，取回结果：
+   - **辩手乙**：起 Codex 后台任务，轮询完成后取回结果：
      ```bash
-     JOB=$(node "$COMPANION" task --background "$P_ESCAPED" | grep -oE 'job[-_][A-Za-z0-9]+' | head -1)
-     node "$COMPANION" result "$JOB" --json
+     # 起任务：输出形如 "Codex Task started ... as task-xxxx"
+     JOB=$(node "$COMPANION" task --background "$P_ESCAPED" | grep -oE 'task-[A-Za-z0-9-]+' | head -1)
+     # 轮询直到 status=completed（每 6s 一次，Codex 通常数十秒～数分钟）
+     until node "$COMPANION" status "$JOB" --json | grep -q '"status": *"completed"'; do sleep 6; done
+     # 取回：辩手乙的最终输出在 result JSON 的 .job.summary 字段
+     node "$COMPANION" result "$JOB" --json | python3 -c 'import json,sys;print(json.load(sys.stdin)["job"]["summary"])'
      ```
-     （`P_ESCAPED` 为转义后的提示文本；如取回为空，`status` 轮询后再 `result`。）
+     （`P_ESCAPED` 为转义后的提示文本。`.job.summary` 即 Codex 的完整回答，对它做 JSON 抽取。）
 3. 对两侧返回各做 **JSON 抽取**（见下「JSON 抽取兜底」），得到 `甲_r1`、`乙_r1` 两个 envelope。
 4. **立即增量写日志**：把第 1 轮两侧 envelope 追加到 `$DEBATE_DIR/debate-log.md`（带轮次标题 + 可读转录）。
 
