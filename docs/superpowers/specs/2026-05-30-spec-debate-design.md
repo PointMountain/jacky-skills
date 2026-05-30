@@ -57,7 +57,7 @@ node "<codex-plugin>/scripts/codex-companion.mjs" result <job-id> --json
 # → 取回 stdout
 ```
 
-`<codex-plugin>` 在实现时动态定位（`~/.claude/plugins/cache/openai-codex/codex/<ver>/`）。
+`<codex-plugin>` 在实现时动态定位：glob `~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs`，按版本号取最新；若 cache 路径缺失，回退到 `~/.claude/plugins/marketplaces/openai-codex/...` 下的同名脚本。两处都找不到 → 视为 Codex 未就绪（见 §7）。
 
 ---
 
@@ -105,6 +105,7 @@ node "<codex-plugin>/scripts/codex-companion.mjs" result <job-id> --json
 
 - Codex 易把 JSON 裹进散文 → 提示词强约束「只输出 JSON，不要任何解释文字」+ 正则抽取 ```json``` 块或最外层 `{...}` 兜底。
 - 解析失败 → 对该方**重请求一次**；再失败则在 log 记 warning，把该轮该方视为空 findings 跳过（不中断整体流程）。
+- **空 findings 不等于收敛**：若某轮**双方都**返回空/非法 findings，不得据此判定收敛提前停机——记为失败轮，编排器报告并按 §7 处理（重试该轮或询问用户），避免"空辩论"被误当成"已达成一致"。
 
 ---
 
@@ -181,9 +182,9 @@ debate-log.md 增量写入也充当**状态持久化**：每轮结束即落盘�
 
 ## 八、验证策略
 
-编排类 skill 难写传统单测，主验证 = 拿一份**样例 spec** 跑 dry-run，逐项核查：
+编排类 skill 难写传统单测，主验证 = 拿一份**样例 spec** 跑一次完整流程（dry-run 指"对固定样例 spec 实跑全流程"，非 no-op 空跑），逐项核查：
 
-1. 四个产物齐全：`debate-log.md` 存在且每轮 JSON 合法可解析
+1. 产物齐全：`debate-log.md` + `spec.final.md` 两个文件都生成，且 `debate-log.md` 每轮 JSON 合法可解析
 2. 收敛能在 ≤3 轮内停（不会无限循环）
 3. 匿名化生效：日志中无"Claude/Codex/GPT"等模型身份泄漏给对方或裁判
 4. 终稿 `spec.final.md` 确实纳入了被采纳的 finding，且理由表完整（每条 finding 都有裁决）
