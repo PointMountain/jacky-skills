@@ -48,7 +48,9 @@ recall / resume / 学习日志
     </checkpoints>
 
     <constraints>
-      <constraint>用户未明确确认今日话题前，禁止创建任何文件或目录</constraint>
+      <constraint>【硬约束】禁止把任何学习笔记/产出写入被学习的原仓库，必须写到兄弟目录 {repo-name}-study/ 下</constraint>
+      <constraint>学习前必须在 {repo-name}-study/ 下做源码快照（git clone --depth 1 + 删 .git），并把 commit SHA 记进 .study-meta.json，保证笔记可追溯</constraint>
+      <constraint>用户未明确确认今日话题前，禁止创建任何文件或目录（含 study 目录与源码快照）</constraint>
       <constraint>章节讲解完毕必须先问"还有什么不明白的吗？"，用户确认无疑问后才能写笔记</constraint>
       <constraint>禁止讲解一结束就立即写笔记，必须经过确认环节</constraint>
       <constraint>每写一篇主题笔记，必须同步更新 overview 的全部四个部分</constraint>
@@ -61,7 +63,7 @@ recall / resume / 学习日志
   <gsd:goal>通过持续的交互式教学，把项目相关知识沉淀为结构化、可追溯、有进度的学习日志</gsd:goal>
 
   <gsd:phase name="resume" order="0">
-    <gsd:step>Glob 查找 docs/topics/**/*-overview.md</gsd:step>
+    <gsd:step>Glob 查找 {GitHub 项目目录}/*-study/docs/topics/**/*-overview.md</gsd:step>
     <gsd:step>读取最近 overview，恢复学员背景、学习路线、当前进度</gsd:step>
     <gsd:checkpoint>用户确认恢复的上下文准确，或确认从零开始</gsd:checkpoint>
   </gsd:phase>
@@ -73,8 +75,16 @@ recall / resume / 学习日志
     <gsd:checkpoint>三要素全部明确后才允许进入下一阶段</gsd:checkpoint>
   </gsd:phase>
 
+  <gsd:phase name="workspace" order="1.5">
+    <gsd:step>确定被学习的仓库：默认 = cwd 所在 git 仓库；或用户给定的 URL/路径</gsd:step>
+    <gsd:step>从 CLAUDE.md 读取 GitHub 项目目录，算出 study 目录 = {GitHub 项目目录}/{repo-name}-study</gsd:step>
+    <gsd:step condition="study 目录不存在">创建 study 目录；git clone --depth 1 源码到 source/；删除 .git；记录 commit SHA 到 .study-meta.json</gsd:step>
+    <gsd:step condition="study 目录已存在">复用；如学习同一仓库新主题，仅在 docs/topics/ 下新增，不重复 clone</gsd:step>
+    <gsd:checkpoint>study 目录与源码快照就绪，.study-meta.json 已记录 repo + commit</gsd:checkpoint>
+  </gsd:phase>
+
   <gsd:phase name="overview" order="2">
-    <gsd:step>创建 docs/topics/&lt;topic-name&gt;/&lt;date&gt;-&lt;topic&gt;-overview.md</gsd:step>
+    <gsd:step>创建 {study目录}/docs/topics/&lt;topic-name&gt;/&lt;date&gt;-&lt;topic&gt;-overview.md</gsd:step>
     <gsd:step>填充 6 个标准小节</gsd:step>
     <gsd:checkpoint>用户确认 overview 结构和学习路线</gsd:checkpoint>
   </gsd:phase>
@@ -89,7 +99,7 @@ recall / resume / 学习日志
   </gsd:phase>
 
   <gsd:phase name="persist" order="4">
-    <gsd:step>写入 docs/topics/&lt;topic&gt;/&lt;date&gt;-&lt;topic&gt;-&lt;chapter&gt;.md</gsd:step>
+    <gsd:step>写入 {study目录}/docs/topics/&lt;topic&gt;/&lt;date&gt;-&lt;topic&gt;-&lt;chapter&gt;.md</gsd:step>
     <gsd:step>同步 overview：笔记目录表 / 知识全景图 / 认知纠错记录 / 下次学习建议</gsd:step>
     <gsd:checkpoint>四个部分全部同步完成，回到 Phase 3 进入下一章节</gsd:checkpoint>
   </gsd:phase>
@@ -97,7 +107,29 @@ recall / resume / 学习日志
 
 # 项目学习导师 Skill
 
-> 本 skill 实现持久化学习日志系统。所有产出物存放于工作目录的 `docs/topics/` 下，按主题组织。
+> 本 skill 实现持久化学习日志系统。**所有产出物存放于独立的 `{repo-name}-study/` 兄弟目录，绝不写入被学习的原仓库。**
+
+## 存储模型（核心）
+
+学习产出**不放进原仓库**，而是放在原仓库的兄弟目录 `{GitHub 项目目录}/{repo-name}-study/`，并对源码做快照、记录 commit，让笔记可追溯：
+
+```
+{GitHub 项目目录}/
+├── html-anything/                ← 原仓库（只读，绝不写入）
+└── html-anything-study/          ← 学习工作区（本 skill 的全部产出）
+    ├── .study-meta.json          ← repo URL / commit SHA / topics 列表
+    ├── source/                   ← 源码快照（git clone --depth 1 后删 .git）
+    └── docs/topics/<topic>/      ← 沿用原有结构的学习笔记
+        ├── <date>-<topic>-overview.md
+        └── <date>-<topic>-<chapter>.md
+```
+
+**为什么这样设计**（借鉴 repo-study）：
+- **不污染原仓库**：学习笔记不该进被学的项目，避免脏 git status / 误提交
+- **可追溯**：记录学习时所基于的 commit，日后源码演进了，笔记里的 file:line 仍能对照 source/ 快照
+- **可并存**：同一 GitHub 项目目录下多个 `*-study` 互不干扰，resume 时统一扫描
+
+> 全文出现的 `{study目录}` 均指 `{GitHub 项目目录}/{repo-name}-study/`。`{GitHub 项目目录}` 从 CLAUDE.md 配置读取（如 `/Users/jiashengwang/jacky-github`），不要硬编码。
 
 ## 整体流程
 
@@ -109,7 +141,8 @@ flowchart TD
     AskLog --> Kickoff
     LoadCtx --> Kickoff
     Kickoff[Phase 1: 会话初始化<br/>话题/水平/目标] -->|未确认| Kickoff
-    Kickoff -->|已确认| OverviewGate{overview 已存在?}
+    Kickoff -->|已确认| Workspace[Phase 1.5: 准备 study 工作区<br/>建 {repo}-study + 源码快照 + 记 commit]
+    Workspace --> OverviewGate{overview 已存在?}
     OverviewGate -->|否| CreateOv[Phase 2: 创建 overview.md]
     OverviewGate -->|是| Teach
     CreateOv --> Teach[Phase 3: 交互式教学<br/>先考后教 + 实战驱动]
@@ -131,6 +164,8 @@ flowchart TD
 | 错误信号 | 正确做法 |
 |---------|---------|
 | 用户刚说想学，我就开始 mkdir / Write | 先做 Phase 1 三要素确认（话题/水平/目标） |
+| 把笔记直接写进原仓库的 docs/ 里 | 必须写到兄弟目录 {repo-name}-study/，绝不碰原仓库 |
+| 跳过源码快照、不记 commit | Phase 1.5 必须 clone 源码到 source/ 并记 commit 到 .study-meta.json |
 | 讲完一章就直接 Write 笔记文件 | 必须先问"还有什么不明白的吗？" |
 | 用户说"差不多懂了"，我就当作确认 | 不接受"差不多"，必须明确"无疑问"或"懂了" |
 | 一次问用户多个知识点 | 一次只考一个 |
@@ -148,7 +183,7 @@ flowchart TD
 **目标**：判断是否存在历史学习日志，决定从恢复还是从零开始。
 
 **步骤**：
-1. 用 Glob 查找：`docs/topics/**/*-overview.md`
+1. 从 CLAUDE.md 读取 `{GitHub 项目目录}`，用 Glob 查找：`{GitHub 项目目录}/*-study/docs/topics/**/*-overview.md`
 2. 若找到多个，按文件名日期排序，列出近 3 个让用户选择
 3. 读取选定的 overview，提取：
    - 学员背景
@@ -178,16 +213,65 @@ flowchart TD
 
 ---
 
+### Phase 1.5：准备学习工作区（建 study 目录 + 源码快照）
+
+**目标**：在写任何笔记前，建立独立的 `{repo-name}-study/` 工作区，并对源码做可追溯快照。**这是不碰原仓库的关键一步。**
+
+**步骤**：
+
+1. **确定被学习的仓库**：
+   - 默认 = 当前 cwd 所在的 git 仓库（`git -C <cwd> rev-parse --show-toplevel`）
+   - 或用户明确给出的 GitHub URL / 本地路径
+   - 取仓库名 `{repo-name}`（如 `html-anything`）、远程 URL（`git remote get-url origin`，可能为空）
+
+2. **算出 study 目录**：从 CLAUDE.md 读取 `{GitHub 项目目录}`，`{study目录} = {GitHub 项目目录}/{repo-name}-study`
+
+3. **若 `{study目录}` 不存在 → 创建并快照源码**：
+   ```bash
+   mkdir -p "{study目录}/docs/topics"
+   # 源码快照：从本地仓库或远程浅克隆，再删 .git（快照不需要版本历史）
+   git clone --depth 1 "<repo-path-or-url>" "{study目录}/source"
+   rm -rf "{study目录}/source/.git"
+   # 记录学习所基于的 commit
+   COMMIT=$(git -C "<repo-path>" rev-parse HEAD)
+   ```
+   然后写 `{study目录}/.study-meta.json`（schema 见下方「.study-meta.json 结构」）。
+
+4. **若 `{study目录}` 已存在 → 复用**：
+   - 学习同一仓库的**新主题**时，**不要重复 clone**，只在 `docs/topics/` 下新增 topic 目录
+   - 可选：比对原仓库当前 commit 与 meta 里记录的 commit，若漂移则提示用户「源码已更新，是否刷新快照」
+
+> 🛑 **Checkpoint** — `{study目录}` 与 `source/` 快照就绪、`.study-meta.json` 已记录 repo + commit 后，才进入 Phase 2。
+> 📝 学习同一仓库的多个主题共用一份 `source/` 快照与一个 `.study-meta.json`，topics 累加。
+
+#### .study-meta.json 结构
+
+```json
+{
+  "repo": "html-anything",
+  "repoUrl": "https://github.com/nexu-io/html-anything.git",
+  "commit": "145a40ebd79624bbd6a28ec379148a895896573c",
+  "commitShort": "145a40e",
+  "createdAt": "2026-05-31",
+  "updatedAt": "2026-05-31",
+  "topics": [
+    { "name": "local-cli-agent", "createdAt": "2026-05-31", "noteCount": 8 }
+  ]
+}
+```
+
+---
+
 ### Phase 2：创建 overview.md
 
 **目标**：建立本主题的学习全景图。
 
 **路径规则**：
-- 目录：`docs/topics/<topic-name>/`
+- 目录：`{study目录}/docs/topics/<topic-name>/`
 - 文件名：`<YYYY-MM-DD>-<topic>-overview.md`
 - 命名约定：全小写英文 + 短横线（kebab-case）
 
-**例子**：`docs/topics/react-fiber/2026-05-11-react-fiber-overview.md`
+**例子**：`{GitHub 项目目录}/react-fiber-study/docs/topics/react-fiber/2026-05-11-react-fiber-overview.md`
 
 **6 个必备小节**：
 
@@ -284,10 +368,10 @@ flowchart LR
 **触发条件**：Phase 3 章节确认通过。
 
 **路径规则**：
-- 目录：`docs/topics/<topic-name>/`
+- 目录：`{study目录}/docs/topics/<topic-name>/`
 - 文件名：`<YYYY-MM-DD>-<topic>-<chapter-slug>.md`
 
-**例子**：`docs/topics/react-fiber/2026-05-11-react-fiber-double-buffer.md`
+**例子**：`{GitHub 项目目录}/react-fiber-study/docs/topics/react-fiber/2026-05-11-react-fiber-double-buffer.md`
 
 **笔记结构模板**：
 
@@ -333,6 +417,7 @@ flowchart LR
 | 4 | **下次学习建议** | 更新到认知纠错记录的"下次学习建议"列 / 或在"学习路线"末尾标注下一步 |
 
 > ✅ **Checkpoint** — 四个部分全部 Edit 完成后才算闭环。回到 Phase 3 进入下一章节。
+> 📝 同时更新 `{study目录}/.study-meta.json` 的 `updatedAt` 与对应 topic 的 `noteCount`。
 
 ---
 
@@ -349,7 +434,8 @@ flowchart LR
 
 ## 约束总结（硬性）
 
-1. **创建文件需确认**：用户未明确确认话题/水平/目标三要素前，禁止创建任何文件或目录
+0. **不碰原仓库**：所有产出写入兄弟目录 `{repo-name}-study/`，禁止写进被学习的原仓库；学习前先在 study 目录做源码快照并记录 commit 到 `.study-meta.json`
+1. **创建文件需确认**：用户未明确确认话题/水平/目标三要素前，禁止创建任何文件或目录（含 study 目录与源码快照）
 2. **章节先确认再写笔记**：讲解完毕必须问"还有什么不明白的吗？"，得到明确确认才写笔记
 3. **四同步原则**：每写一篇笔记必须同步 overview 的全部四个部分
 4. **命名统一**：所有文件名使用简洁英文短横线（kebab-case）
@@ -363,6 +449,7 @@ flowchart LR
 
 执行过程中持续自查：
 
+0. [ ] 笔记是否写进了 `{repo-name}-study/`（而非原仓库）？是否已做源码快照 + 记录 commit？
 1. [ ] 是否在用户未确认三要素时创建了文件？（应为否）
 2. [ ] 是否每个新概念都先考了用户？
 3. [ ] 章节讲完是否问了"还有什么不明白的吗？"
@@ -383,14 +470,15 @@ flowchart LR
 
 ### 状态管理
 
-- **主状态文件**：`docs/topics/<topic>/<date>-<topic>-overview.md`
+- **主状态文件**：`{study目录}/docs/topics/<topic>/<date>-<topic>-overview.md`
+- **工作区元数据**：`{study目录}/.study-meta.json`（repo / commit / topics）
 - **进度追踪**：knowledge graph 中的 `:::doing` 节点即为当前断点
 - **下次建议**：认知纠错表的"下次学习建议"列即为恢复入口
 
 ### 恢复流程
 
 1. 新会话触发 skill
-2. Glob `docs/topics/**/*-overview.md` 列出所有主题
+2. Glob `{GitHub 项目目录}/*-study/docs/topics/**/*-overview.md` 列出所有主题
 3. 用户选择主题后，读取对应 overview
 4. 提取 `:::doing` 节点 + 最新一条"下次学习建议"
 5. 向用户复述："上次进度：X，下次建议：Y，今天继续这个方向吗？"
@@ -416,7 +504,8 @@ flowchart LR
 
 完成一轮学习循环后自检：
 
-- `docs/topics/<topic>/` 目录下至少有 1 个 overview + N 个章节笔记
+- 笔记写在 `{study目录}/docs/topics/<topic>/` 下（**不在原仓库**），且 `{study目录}` 含 `source/` 快照 + `.study-meta.json`
+- `{study目录}/docs/topics/<topic>/` 目录下至少有 1 个 overview + N 个章节笔记
 - overview 的 Mermaid 图节点状态与笔记数量匹配
 - 每篇笔记在 overview 笔记目录表中都有对应行
 - 笔记表的"核心知识点"列填写不为空
