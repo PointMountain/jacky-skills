@@ -1,0 +1,24 @@
+{
+  "name": "thinking-tools",
+  "version": "0.1.0",
+  "description": "谈话型思考工具集 - 以 AI 为第三视角，通过结构化对话帮你把工作/生活/学习/情感抽丝剥茧地理清",
+  "author": {
+    "name": "Jacky Wang",
+    "email": "wangjs.jacky@gmail.com",
+    "url": "https://github.com/wangjs-jacky"
+  },
+  "homepage": "https://github.com/wangjs-jacky/jacky-skills/tree/main/plugins/thinking-tools",
+  "repository": "https://github.com/wangjs-jacky/jacky-skills",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "thinking",
+    "socratic",
+    "introspection",
+    "long-session",
+    "obsidian"
+  ],
+  "skills": [
+    "./sounding-board/"
+  ]
+}
