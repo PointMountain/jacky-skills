@@ -319,19 +319,43 @@ URL 输入：
 | YouTube | `transcript`（带时间戳） | `video` | `download`（需 yt-dlp） | 字幕优先，无字幕→下载+ASR |
 | B站 | `subtitle`（部分有） | `video` | `download`（需 yt-dlp） | 字幕优先，很多无字幕→下载+ASR |
 | 小宇宙 | `transcript` | `episode` | `download` | transcript 优先 |
+| 抖音 | ❌ 无字幕命令 | `stats`（仅自己作品） | ❌ 无 download 子命令 | **browser 提取真实地址 + ASR**（见下方兜底）|
 | 通用网页 | `web read` | — | — | 直接提取文字 |
+
+### 拿不到视频文件时：browser 登录态提取真实地址（兜底）
+
+> **触发场景**：平台**没有 opencli download 子命令**（如抖音），或 **yt-dlp 解析失效**（抖音 web detail JSON 强反爬，返回空、报 "Fresh cookies needed"）。
+>
+> **原理**：不破解平台接口签名，而是让真实浏览器在登录态下渲染页面，从渲染好的 DOM 里读 `<video>` 的真实 CDN 直链（带时效 `sign` 签名），再 curl 下载。详见 [references/video-collect.md](references/video-collect.md) 的「browser 提取真实地址」一节。
+
+```bash
+# 1. opencli browser 登录态打开视频页（session 名任取，复用同名保持 tab）
+opencli browser <session> open "<video_url>"
+opencli browser <session> wait time 5
+# 2. eval 读真实 mp4 地址（抖音在 video.currentSrc）
+opencli browser <session> eval 'document.querySelector("video").currentSrc'   # → https://...douyinvod.com/...?sign=...
+# 3. curl 带 Referer 下载（直链有时效，尽快下）
+curl -sL --max-time 180 -H 'Referer: https://www.douyin.com/' -H 'User-Agent: Mozilla/5.0 ...' "<url>" -o video.mp4
+opencli browser <session> close   # 释放 tab lease
+```
+
+> ⚠️ 抖音 `/video/{id}` 会重定向到精选流的**别的**视频；用原始 `jingxuan?modal_id={id}` URL 打开，eval 前先核对 `location.href` 的 modal_id 与目标一致。
 
 ### ASR 回退流程
 
-当视频无字幕时，使用 audio-to-subtitle 进行 ASR 转录：
+当视频无字幕时（或上一步刚下到 mp4），使用 audio-to-subtitle 进行 ASR 转录：
 
-1. `opencli <site> download <url> -o /tmp/collect-download/` 下载视频
+1. `opencli <site> download <url> -o /tmp/collect-download/` 下载视频（无 download 子命令的平台改用上方 browser 兜底）
 2. `ffmpeg -i /tmp/collect-download/video.mp4 -vn -acodec pcm_s16le -ar 16000 -ac 1 /tmp/collect-download/audio.wav` 提取音频
 3. `python3 {A2S_DIR}/scripts/transcribe.py /tmp/collect-download/audio.wav --engine local -m large-v3-turbo -f md -o /tmp/collect-download/ --yolo` ASR 转录
 4. 读取转录结果，继续正常 raw/ → wiki/ 流程
 5. 清理临时文件：`rm -rf /tmp/collect-download/`
 
 > **超时设置**：OpenCLI download 命令设置超时 `OPENCLI_BROWSER_COMMAND_TIMEOUT=120000`（120s）
+>
+> **⚠️ ASR 模型已缓存却报 `ProxyError: 502 Bad Gateway`**：本机沙箱会注入 `HTTP_PROXY/HTTPS_PROXY`，MLX-Whisper 启动时联网校验 HuggingFace 被代理拦截。模型已在 `~/.cache/huggingface/hub/` 时直接走离线：在 transcribe.py 命令前加 `env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1`。
+>
+> **配图**：讲解类视频（思维导图/案例 K 线）建议 `ffmpeg -ss <时间点> -i video.mp4 -frames:v 1 frame.jpg` 抽关键帧，存就近 attachments 并配 OCR callout，删视频前先抽完。
 
 ### 模板与归纳规则
 

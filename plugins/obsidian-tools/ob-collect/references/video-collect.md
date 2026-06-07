@@ -48,23 +48,20 @@ article_id: OBA-k7jm2p9q
 tags: [{主题标签}, {作者名}, 归纳]
 type: {预定义类型}
 updated_at: {YYYY-MM-DD}
+author: {作者名}
+source_url: {采集来源 url}
+origin_url: {原始来源 url，如转载视频的源站；无则省略此行}
+duration: "{duration}"     # 必须加引号，否则 YAML 把 70:33 当 60 进制数字
+ingested_at: {YYYY-MM-DD}
+raw_note: "[[raw/作者名/标题]]"
 ---
 
 # 标题 - 归纳
 
-> **作者**: {author}
-> **来源**: {url}
-> **时长**: {duration}
-> **提取时间**: {date}
-> **原文**: [[raw/作者名/标题]]
+> {一句话作者/来源背景，如「作者 X 解说 Y 演讲」}
+> 原文：[[raw/作者名/标题]] · [来源]({source_url})（如有 origin_url 再补一个链接）
 
 [embedCode — 如有则插入，如 B 站 iframe]
-
-## 音频来源
-
-> [!quote] 🔗 [点击播放]({url})
-
----
 
 ## 核心观点
 
@@ -107,6 +104,49 @@ AI 归纳视频/音频内容时遵循以下原则：
 6. **金句引用**：选取 2-4 条原文中最有表达力的原话，附链接
 7. **我的思考**：留空，供用户自行补充
 8. **不做延伸**：只归纳，不添加 transcript 中没有的观点
+9. **元数据进 frontmatter**：author / source_url / origin_url / duration / ingested_at / raw_note 一律写入 YAML，**不要**塞进正文 `>` 引用块——结构化字段进 frontmatter 才能被 Dataview/Bases 查询、过滤、聚合。正文顶部只留一句背景 + 一行原文/来源链接。`duration` 形如 `70:33` 必须加引号，否则被 YAML 当 60 进制数字解析。
+
+## browser 提取真实地址（yt-dlp / opencli download 失效时的兜底）
+
+> 实战来源：采集抖音视频（2026-06）。抖音既无 opencli `subtitle/download` 子命令，yt-dlp 也解析失效，靠本方案打通。
+
+### 为什么需要这条路
+
+| 路线 | 怎么拿地址 | 卡在哪 |
+|------|-----------|--------|
+| yt-dlp / API 直采 | 直接 HTTP 请求平台的 detail JSON 接口 | 抖音要 `ms_token`/`a_bogus` 等**加密签名 + 风控**，缺参数返回空 JSON，报 `Failed to parse JSON` / `Fresh cookies needed`（升级 yt-dlp 也不解决，根因是接口签名不是 cookie）|
+| **browser 提取**（本方案）| 让真实 Chrome 在登录态下渲染页面，从 DOM 读 `<video>` 直链 | 几乎不卡——浏览器自己对抗风控、自己生成签名拉流，我们只读渲染结果 |
+
+**本质**：网页播放器加载视频时，会把真实 CDN 直链（带时效 `sign` 签名）写进 `<video>` 元素的 `currentSrc` / `<source>`。这个地址就是浏览器实际拉流的地址，curl 带 Referer 即可下载。绕过 API 签名问题。
+
+### 完整链路（以抖音为例）
+
+```bash
+# ① 登录态打开（session 名任取，同名复用 tab）。抖音用原始 jingxuan?modal_id 别用 /video/{id}
+opencli browser dycol open "https://www.douyin.com/jingxuan?modal_id={aweme_id}"
+opencli browser dycol wait time 5
+
+# ② 核对当前 modal 是目标视频，并读真实地址 + 文案
+opencli browser dycol eval 'JSON.stringify({url:location.href, title:document.title, desc:(document.querySelector("[data-e2e=video-desc]")||{}).innerText, src:document.querySelector("video").currentSrc})'
+
+# ③ curl 下载（直链有时效签名，过期 403，拿到尽快下）
+curl -sL --max-time 180 \
+  -H 'Referer: https://www.douyin.com/' \
+  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36' \
+  "<currentSrc>" -o /tmp/collect-download/video.mp4
+
+# ④ 用完关闭释放 tab lease
+opencli browser dycol close
+```
+
+### 注意事项 / 坑
+
+- **登录态是关键**：opencli browser 复用已登录该平台的 Chrome profile；没登录态页面可能不渲染视频或跳登录墙。
+- **抖音 URL 重定向**：`/video/{id}` 会被重定向到精选流并展示**别的**推荐视频，eval 出来的是错的；用原始 `jingxuan?modal_id={id}`，eval 前先核对 `location.href`。
+- **直链时效**：`currentSrc` 带 `sign=` + 时间戳，几分钟内失效，下载要紧接 eval。
+- **清晰度**：拿到的是网页播放码率（如 `br=154`），非最高码率，但做 ASR / 抽帧足够。
+- **eval 输出干扰**：opencli 输出可能夹带 `UNDICI-EHPA` warning 和 "Update available" 行，提地址时 `grep -E '^https'` 过滤。
+- **拿到 mp4 后**：接 ASR 回退流程（ffmpeg 抽音频 → transcribe.py），讲解类视频再 `ffmpeg -ss` 抽关键帧配图。
 
 ## 作者索引
 
