@@ -45,7 +45,8 @@ gsd skill 创建
       <checkpoint order="2">已确认工作区路径</checkpoint>
       <checkpoint order="3">LLM 可用性验证通过（如需要）</checkpoint>
       <checkpoint order="4">用户确认生成的 SKILL.md 内容</checkpoint>
-      <checkpoint order="5">skill 集成验证通过</checkpoint>
+      <checkpoint order="5">生成后可移植性/隐私自检通过（无真实本地路径/用户名/密钥 + 外部依赖均有探测降级）</checkpoint>
+      <checkpoint order="6">skill 集成验证通过</checkpoint>
     </checkpoints>
 
     <constraints>
@@ -54,6 +55,8 @@ gsd skill 创建
       <constraint>每个交互点必须等待用户确认后才继续（YOLO 模式下仅高风险步骤阻塞）</constraint>
       <constraint>不自动执行 git push 或破坏性操作</constraint>
       <constraint>需要 LLM 的 skill，必须先验证可用性，失败时给出友好修复建议而非原始报错</constraint>
+      <constraint>【隐私/可移植 · 硬门】生成的 SKILL.md、示例、任何产物中禁止出现真实的本地绝对路径、用户名、vault/仓库名、token/密钥；一律用变量（$VAR）或 &lt;占位符&gt;，真实值仅运行时解析</constraint>
+      <constraint>【新人视角 · 硬门】生成的 skill 必须对每个外部依赖（CLI、插件、其他 skill、API key、路径）做前置探测 + 缺失降级，不假设作者本机环境</constraint>
     </constraints>
   </gsd:meta>
 
@@ -82,6 +85,12 @@ gsd skill 创建
     <gsd:step>获取 skill 名称和功能描述</gsd:step>
     <gsd:step>根据 Phase 0 选择从 references/skill-templates.md 组装模板</gsd:step>
     <gsd:checkpoint>用户确认生成的模板内容</gsd:checkpoint>
+  </gsd:phase>
+
+  <gsd:phase name="portability-audit" order="3.5">
+    <gsd:step>grep 扫描生成内容是否泄露真实本地绝对路径/用户名/vault·仓库名/token·密钥</gsd:step>
+    <gsd:step>逐项核对每个外部依赖（CLI/插件/skill/API key/路径）是否都有「前置探测 + 缺失降级」分支</gsd:step>
+    <gsd:checkpoint>可移植性/隐私自检通过（YOLO 模式下发现泄露/缺失仍暂停）</gsd:checkpoint>
   </gsd:phase>
 
   <gsd:phase name="dependencies" order="4" condition="用户选择添加依赖">
@@ -193,6 +202,37 @@ gsd skill 创建
 
 > 🛑 **Checkpoint** — 用户确认生成的模板内容后继续
 
+### Phase 3.5: 生成后自检（硬门 · 新人视角）
+
+**目标**：集成前确保生成的 skill **不泄露作者本机信息**，且**对全新环境可用**。这是质量门，不可跳过。
+
+**1. 隐私 / 可移植性扫描**（真实本地信息严禁进入产物）：
+
+```bash
+# 真实本地绝对路径 / 用户名
+grep -rnE "/Users/[^/]+|/home/[^/]+|C:\\\\Users" <skill-dir>
+# token / 密钥 / 凭证
+grep -rniE "api[_-]?key|token|secret|password|PAT|Bearer|sk-|tvly-|ghp_" <skill-dir>
+```
+
+- 命中真实**绝对路径 / 用户名 / vault·仓库名 / token·密钥** → **必须**改为变量（`$VAR`）或 `<占位符>`，真实值仅运行时解析。
+- 路径、名称、日期等运行时解析，不写字面量（如 `$(basename "$REPO")`、`$(date +%F)`）。
+- 误报（如规则说明文本本身提到 “token”）可豁免，但要人工确认确非真实值。
+
+**2. 前置条件覆盖检查**（站「新用户 / 全新环境」视角逐项过）：
+
+| 依赖类型 | 必须有的处理 |
+|----------|-------------|
+| CLI 工具 / 二进制 | `command -v` 探测；未装 → 提示安装或降级，不直接报错 |
+| 编辑器 / Obsidian 插件 | 读配置探测是否安装；缺失 → 降级路径 |
+| 其他 skill | 探测可用性；不可用 → 回退方案 |
+| API key / 凭证 | 预检查是否配置；缺失 → 友好引导，不暴露原始报错 |
+| 路径 / 仓库 | 运行时解析（env / 配置 / 询问），不写死 |
+
+任一依赖没有「缺失分支」→ 补上再继续。
+
+> 🛑 **Checkpoint** — 扫描无泄露 + 依赖探测齐全后才进入集成（YOLO 模式下发现泄露/缺失仍暂停）
+
 ### Phase 4: 外部依赖管理（条件执行）
 
 **触发条件**：Phase 0 选择「有外部依赖」
@@ -270,6 +310,9 @@ gsd skill 创建
 10. `SKILL.md` 行数 ≤ 500，超出部分抽离到 `references/`
 11. **hooks 目录在 skill 目录内**（不是 plugin 根目录），参考 `references/hooks-creation-guide.md`
 12. **hook 脚本**有标准头部、守卫条件、静默失败、`exit 0`
+13. **无隐私泄露**：grep 验证 SKILL.md/示例/产物中无真实本地绝对路径、用户名、vault·仓库名、token/密钥
+14. **新人视角可用**：每个外部依赖（CLI/插件/skill/API key/路径）都有「探测 + 缺失降级」分支，不假设作者环境
+15. 路径、名称、日期等运行时解析，无字面量
 
 ---
 
@@ -282,6 +325,7 @@ gsd skill 创建
 | Phase 2 | 🛑 | LLM 验证（如需要） | 验证失败仍暂停 |
 | Phase 3 | 📝 | 输入 skill 名称和功能描述 | — |
 | Phase 3 | 🛑 | 确认 SKILL.md 内容 | 自动继续 |
+| Phase 3.5 | 🛑✅ | 隐私/可移植性自检 + 依赖探测覆盖 | 发现泄露/缺失仍暂停 |
 | Phase 4 | 🔄 | 添加外部依赖 | 自动跳过（如无依赖） |
 | Phase 5 | ✅ | 确认安装成功 | 自动验证 |
 | Phase 6 | 🔄 | 选择是否优化 | 自动跳过 |
