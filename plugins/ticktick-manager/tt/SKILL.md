@@ -134,8 +134,8 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
 | 查看未完成昨日任务 | `tt task undone --start 2026-04-03 --end 2026-04-04` |
 | 查看未完成指定日期任务 | `tt task undone --start <startDate> --end <endDate>` |
 | 查看已完成今日任务 | `tt task completed --start <date> --end <date>` |
-| 搜索任务 | `tt task-search <keyword>` |
-| 搜索任务（结构化） | `tt task-search <keyword> --json` ⚡ |
+| 搜索任务（快速，有盲区） | `tt task-search <keyword>` ⚠️ 不支持 `--json`；见「全文搜索盲区与兜底扫描」 |
+| 全文搜索（兜底，搜全） | 遍历 `project-list` → 各清单 `project-tasks <id> --json` → 本地过滤 title+content+tags |
 | 按ID查找任务 | `tt task-find <taskId>` |
 | 创建任务（不含时间） | `tt task-add <title> -p <projectId> --content <text>` |
 | 创建任务（两步法，含时间） | 先 `tt task-add`，再 `tt task-update <taskId> -p <projectId> --startDate 'YYYY-MM-DDTHH:mm' --dueDate 'YYYY-MM-DDTHH:mm'` |
@@ -153,6 +153,20 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
 | 切换区域 | `tt config --region cn\|global` |
 
 ## 核心规则
+
+### 全文搜索盲区与兜底扫描
+
+**`tt task-search` 不是全库全文搜索**，它走 TickTick 开放 API 的有限来源（收集箱 + 近期已完成 + 带日期的近期任务）。盲区是：
+
+> **「非收集箱清单」+「无日期」+「未完成」** 的任务一律搜不到（典型如「任务池」、五色清单里随手记的待办）。
+
+**规则**：用户要"搜全"某关键词、或说"应该还有 / 不止这些"时，**禁止只信 `task-search`**，必须走全清单兜底扫描：
+
+1. `tt project-list` 拿到所有**活跃**清单 ID（务必含「任务池」这类容易被忽略的清单；ID 动态获取，禁止硬编码）
+2. 对每个清单**并行** `tt project-tasks <id> --json`
+3. 本地按关键词过滤 `title + content + tags`（不区分大小写）
+
+`task-search` 仍可先跑（快、够用），但结果不全或用户质疑时立即回退到全清单扫描。注意 `task-search` **不支持 `--json`**（历史 doc 误标，勿用）。
 
 ### 标题与内容规则
 
