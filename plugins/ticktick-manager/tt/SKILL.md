@@ -134,8 +134,8 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
 | 查看未完成昨日任务 | `tt task undone --start 2026-04-03 --end 2026-04-04` |
 | 查看未完成指定日期任务 | `tt task undone --start <startDate> --end <endDate>` |
 | 查看已完成今日任务 | `tt task completed --start <date> --end <date>` |
-| 搜索任务 | `tt task-search <keyword>` |
-| 搜索任务（结构化） | `tt task-search <keyword> --json` ⚡ |
+| 搜索任务（全清单，搜全） | `tt task-search <keyword>`（CLI ≥0.1.2 已遍历所有清单兜底，覆盖无日期/非收集箱任务，并匹配 tags） |
+| 搜索任务（结构化） | `tt task-search <keyword> --json` ⚡（CLI ≥0.1.2） |
 | 按ID查找任务 | `tt task-find <taskId>` |
 | 创建任务（不含时间） | `tt task-add <title> -p <projectId> --content <text>` |
 | 创建任务（两步法，含时间） | 先 `tt task-add`，再 `tt task-update <taskId> -p <projectId> --startDate 'YYYY-MM-DDTHH:mm' --dueDate 'YYYY-MM-DDTHH:mm'` |
@@ -153,6 +153,12 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
 | 切换区域 | `tt config --region cn\|global` |
 
 ## 核心规则
+
+### 全文搜索（task-search 已全清单覆盖）
+
+**CLI ≥ 0.1.2 的 `tt task-search` 已遍历所有清单兜底**：合并「按日期未完成 + 已完成 + 各项目 `/project/{id}/data`」并按 id 去重，覆盖「无日期 + 非收集箱清单」的任务（典型如「任务池」、五色清单里随手记的待办），关键词同时匹配 `title + content + tags`，并支持 `--json` 输出结构化数据。**直接用即可，无需手动遍历清单。**
+
+> ⚠️ **旧版（< 0.1.2）有盲区**：只查「收集箱 + 近期已完成 + 带日期任务」，搜不到「非收集箱 + 无日期 + 未完成」的任务，且不支持 `--json`。若发现搜不全、或 `--json` 报错，多半是 CLI 太旧 → `npm i -g @wangjs-jacky/ticktick-cli` 升级。临时兜底：`tt project-list` 拿全部活跃清单 ID（含「任务池」，动态获取勿硬编码）→ 并行 `tt project-tasks <id> --json` → 本地过滤 `title+content+tags`。
 
 ### 标题与内容规则
 
