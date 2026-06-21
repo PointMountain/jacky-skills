@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>产物的最后一公里 · 手机遥控远端写代码,产物如何出远端</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@600,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0b; --bg-elev:#131316; --bg-elev2:#1a1a1f;
+  --text:#e5e5e7; --muted:#6b6b76; --muted2:#9494a0;
+  --border:rgba(255,255,255,.07); --border-strong:rgba(255,255,255,.13);
+  --green:#00ff88; --green-dim:rgba(0,255,136,.13); --green-line:rgba(0,255,136,.34);
+  --blue:#00d4ff; --blue-dim:rgba(0,212,255,.10); --blue-line:rgba(0,212,255,.32);
+  --amber:#ffb800; --amber-dim:rgba(255,184,0,.12); --amber-line:rgba(255,184,0,.34);
+  --red:#ff4757; --red-dim:rgba(255,71,87,.12); --red-line:rgba(255,71,87,.36);
+  --gray:#6b6b76; --gray-dim:rgba(150,150,160,.08); --gray-line:rgba(150,150,160,.3);
+  --purp:#b78bff; --purp-dim:rgba(183,139,255,.12); --purp-line:rgba(183,139,255,.34);
+  --cf:#f6a01f; --cf-dim:rgba(246,160,31,.12); --cf-line:rgba(246,160,31,.38);
+  --ali:#ff6a3d; --ali-dim:rgba(255,106,61,.13); --ali-line:rgba(255,106,61,.40);
+  --display:"Clash Display","JetBrains Mono",ui-sans-serif,sans-serif;
+  --body:"Outfit",ui-sans-serif,system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--bg);color:var(--text);scroll-behavior:smooth}
+body{font-family:var(--body);font-size:16px;line-height:1.6;background:var(--bg);
+  position:relative;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:42px 42px}
+body::after{content:"";position:fixed;top:-30%;left:50%;transform:translateX(-50%);
+  width:120vw;height:60vh;z-index:-1;pointer-events:none;opacity:.5;
+  background:radial-gradient(ellipse at center,rgba(246,160,31,.09),transparent 60%)}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px}
+
+/* hero */
+header.hero{padding:70px 0 24px}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.26em;text-transform:uppercase;
+  color:var(--cf);margin-bottom:18px;display:flex;align-items:center;gap:10px}
+.kicker::before{content:"";width:34px;height:1px;background:var(--cf);box-shadow:0 0 8px var(--cf)}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(32px,5vw,54px);line-height:1.06;
+  letter-spacing:-.02em;margin-bottom:16px}
+h1 .gp{color:var(--cf);text-shadow:0 0 28px rgba(246,160,31,.4)}
+.tldr{font-size:clamp(15px,1.9vw,18px);color:var(--muted2);max-width:76ch;line-height:1.62}
+.tldr b{color:var(--text);font-weight:600}.tldr .hl{color:var(--cf);font-weight:600}
+.tldr .hl2{color:var(--green);font-weight:600}.tldr .bad{color:#ff9aa4;font-weight:600}
+
+.mission{margin-top:22px;padding:17px 20px;border:1px solid var(--cf-line);border-radius:14px;
+  background:linear-gradient(150deg,var(--cf-dim),transparent 72%);position:relative}
+.mission .mtag{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--cf);margin-bottom:9px;display:flex;align-items:center;gap:9px}
+.mission .mtag::before{content:"";width:24px;height:1px;background:var(--cf);box-shadow:0 0 7px var(--cf)}
+.mission .mtext{font-size:15.5px;color:var(--muted2);line-height:1.64;max-width:84ch}
+.mission .mtext b{color:var(--text);font-weight:600}
+.mission .mtext .hl{color:var(--cf);font-weight:600}.mission .mtext .hl2{color:var(--green);font-weight:600}
+
+/* sections */
+section{padding:38px 0 6px}
+.sec-h{display:flex;align-items:baseline;gap:14px;margin-bottom:7px}
+.sec-h .num{font-family:var(--mono);font-size:13px;letter-spacing:.1em;color:var(--cf)}
+.sec-h h2{font-family:var(--display);font-weight:600;font-size:clamp(22px,3vw,31px);letter-spacing:-.01em}
+.sec-sub{color:var(--muted);font-size:14.5px;margin-bottom:22px;max-width:80ch;line-height:1.6}
+.sec-sub b{color:var(--muted2)}
+
+/* pills (沿用主 guide 语义) */
+.pill{font-family:var(--mono);font-size:12px;padding:4px 10px;border-radius:7px;white-space:nowrap;line-height:1.3;
+  border:1px solid var(--gray-line);color:var(--muted2);background:var(--gray-dim);display:inline-flex;align-items:center}
+.pill small{font-size:9.5px;opacity:.72;font-weight:400;margin-left:5px}
+.pill.l1{border-color:var(--green-line);color:#b8ffd9;background:var(--green-dim)}
+.pill.l2{border-color:var(--blue-line);color:#aeeeff;background:var(--blue-dim);border-style:dashed}
+.pill.cf{border-color:var(--cf-line);color:#ffdb96;background:var(--cf-dim)}
+.pill.ali{border-color:var(--ali-line);color:#ffc0ad;background:var(--ali-dim)}
+.pill.env{border-color:var(--amber-line);color:#ffe09a;background:var(--amber-dim)}
+.pill.ob{border-color:var(--purp-line);color:#dcc7ff;background:var(--purp-dim)}
+.pill.gap{border-color:var(--red-line);color:#ff9aa4;background:var(--red-dim)}
+.cl{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:4px;flex:none}
+.arr{color:var(--muted);font-family:var(--mono);font-size:13px;opacity:.65;font-weight:700}
+.par{color:var(--muted);font-family:var(--mono);font-size:11px;opacity:.6;padding:0 2px}
+.chain{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+
+/* === §01 场景流图 === */
+.flow{display:flex;flex-direction:column;gap:0;max-width:740px;margin:6px auto 0}
+.fnode{display:flex;align-items:center;gap:15px;background:var(--bg-elev);border:1px solid var(--border);
+  border-radius:14px;padding:14px 18px;position:relative;transition:border-color .2s}
+.fnode:hover{border-color:var(--border-strong)}
+.fn-ic{font-size:24px;width:46px;height:46px;border-radius:12px;display:grid;place-items:center;flex:none;
+  background:var(--bg-elev2);border:1px solid var(--border)}
+.fn-t{font-family:var(--display);font-weight:600;font-size:15.5px;margin-bottom:3px}
+.fn-d{font-size:12.5px;color:var(--muted2);line-height:1.46}
+.fnode.phone{border-color:var(--blue-line)} .fnode.phone .fn-ic{border-color:var(--blue-line);color:var(--blue)} .fnode.phone .fn-t{color:#aeeeff}
+.fnode.remote{border-color:var(--amber-line)} .fnode.remote .fn-ic{border-color:var(--amber-line);color:var(--amber)} .fnode.remote .fn-t{color:#ffe09a}
+.fnode.artifact{border-color:var(--gray-line)} .fnode.artifact .fn-ic{border-color:var(--gray-line);color:var(--muted2)} .fnode.artifact .fn-t{color:var(--text)}
+.fnode.bridge{border-color:var(--cf-line);background:linear-gradient(120deg,var(--cf-dim),var(--bg-elev) 72%);box-shadow:0 0 22px rgba(246,160,31,.13)}
+.fnode.bridge .fn-ic{border-color:var(--cf-line);color:var(--cf)} .fnode.bridge .fn-t{color:#ffdb96}
+.fnode.url{border-color:var(--green-line);background:linear-gradient(120deg,var(--green-dim),var(--bg-elev) 72%);box-shadow:0 0 20px rgba(0,255,136,.12)}
+.fnode.url .fn-ic{border-color:var(--green-line);color:var(--green)} .fnode.url .fn-t{color:#b8ffd9}
+.fconn{height:28px;display:flex;align-items:center;justify-content:center;position:relative}
+.fconn::before{content:"";position:absolute;width:2px;height:100%;background:var(--border-strong)}
+.fconn span{font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--bg);padding:2px 9px;z-index:1;letter-spacing:.06em}
+.fconn.ok::before{background:var(--green-line)} .fconn.ok span{color:var(--green)}
+.fconn.cf::before{background:var(--cf-line)} .fconn.cf span{color:var(--cf)}
+/* 断点 */
+.gap-break{margin:13px 0;padding:14px 18px;border:1.5px dashed var(--red-line);border-radius:14px;
+  background:linear-gradient(160deg,var(--red-dim),transparent 78%);position:relative;overflow:hidden}
+.gap-break::after{content:"";position:absolute;top:0;left:0;right:0;height:100%;pointer-events:none;
+  background:repeating-linear-gradient(45deg,transparent,transparent 11px,rgba(255,71,87,.04) 11px,rgba(255,71,87,.04) 22px)}
+.gap-badge{font-family:var(--mono);font-size:12.5px;font-weight:700;color:#ff9aa4;letter-spacing:.04em;
+  margin-bottom:6px;display:flex;align-items:center;gap:9px;position:relative}
+.gap-note{font-size:12.5px;color:var(--muted2);line-height:1.55;position:relative}
+.gap-note code{font-family:var(--mono);font-size:11px;color:#ff9aa4;background:var(--red-dim);padding:1px 6px;border-radius:5px;border:1px solid var(--red-line)}
+
+/* === §02 三道墙 === */
+.obs{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:4px}
+.obs-card{border:1px solid var(--red-line);border-radius:13px;padding:15px 16px;background:linear-gradient(165deg,var(--red-dim),transparent 82%)}
+.obs-card .oh{font-family:var(--display);font-weight:600;font-size:14px;color:#ff9aa4;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.obs-card p{font-size:12.5px;color:var(--muted2);line-height:1.6}
+.obs-card code{font-family:var(--mono);font-size:11px;color:#ff9aa4;background:var(--red-dim);padding:1px 5px;border-radius:4px}
+.obs-card b{color:var(--text)}
+.resolve{margin-top:14px;padding:14px 18px;border:1px solid var(--cf-line);border-radius:13px;
+  background:linear-gradient(150deg,var(--cf-dim),transparent 74%);font-size:13.5px;color:var(--muted2);line-height:1.62}
+.resolve b{color:#ffdb96}.resolve .hl2{color:#b8ffd9;font-weight:600}
+.resolve code{font-family:var(--mono);font-size:11.5px;color:#ffdb96;background:var(--cf-dim);padding:1px 6px;border-radius:5px;border:1px solid var(--cf-line)}
+
+/* === §03 五层 skills === */
+.layer{border:1px solid var(--border);border-radius:14px;padding:15px 18px;margin-bottom:12px;position:relative}
+.layer-h{display:flex;align-items:center;gap:11px;margin-bottom:4px}
+.layer-n{font-family:var(--display);font-weight:700;font-size:14px;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none;background:var(--bg-elev2);border:1px solid var(--border)}
+.layer-h h3{font-family:var(--display);font-weight:600;font-size:15.5px}
+.layer-h .lt{font-family:var(--mono);font-size:10px;margin-left:auto;color:var(--muted);letter-spacing:.04em;text-align:right}
+.layer .note{font-size:12px;color:var(--muted);margin:2px 0 11px;line-height:1.55}.layer .note b{color:var(--muted2)}
+.layer.l-env{border-color:var(--amber-line);background:linear-gradient(168deg,var(--amber-dim),transparent 84%)}
+.layer.l-env .layer-n{border-color:var(--amber-line);color:var(--amber)}.layer.l-env h3{color:#ffe09a}
+.layer.l-prod{border-color:var(--blue-line);background:linear-gradient(168deg,var(--blue-dim),transparent 84%)}
+.layer.l-prod .layer-n{border-color:var(--blue-line);color:var(--blue)}.layer.l-prod h3{color:#aeeeff}
+.layer.l-ship{border-color:var(--cf-line);background:linear-gradient(150deg,var(--cf-dim),transparent 72%);box-shadow:0 0 24px rgba(246,160,31,.10)}
+.layer.l-ship .layer-n{border-color:var(--cf-line);color:var(--cf)}.layer.l-ship h3{color:#ffdb96}
+.layer.l-ship .lt{color:var(--cf)}
+.layer.l-verify{border-color:var(--green-line);background:linear-gradient(168deg,var(--green-dim),transparent 84%)}
+.layer.l-verify .layer-n{border-color:var(--green-line);color:var(--green)}.layer.l-verify h3{color:#b8ffd9}
+.layer.l-ob{border-color:var(--purp-line);background:linear-gradient(168deg,var(--purp-dim),transparent 84%)}
+.layer.l-ob .layer-n{border-color:var(--purp-line);color:var(--purp)}.layer.l-ob h3{color:#dcc7ff}
+.hero-star{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--cf);background:var(--cf-dim);border:1px solid var(--cf-line);padding:2px 7px;border-radius:20px;margin-left:8px}
+
+/* === §04 命令 === */
+.recipe{background:#070708;border:1px solid var(--cf-line);border-radius:14px;overflow:hidden;margin-top:6px}
+.recipe-bar{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);background:rgba(246,160,31,.05)}
+.recipe-bar .dotr{width:11px;height:11px;border-radius:50%;background:#2a2a30}
+.recipe-bar .rt{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:6px;letter-spacing:.05em}
+.recipe pre{margin:0;padding:16px 18px;overflow-x:auto}
+.recipe code{font-family:var(--mono);font-size:12.5px;line-height:1.85;color:#e5e5e7;white-space:pre}
+.recipe .c-cmt{color:var(--muted)}
+.recipe .c-cf{color:#ffdb96}
+.recipe .c-flag{color:#aeeeff}
+.recipe .c-ok{color:#b8ffd9}
+.result-line{margin-top:13px;padding:13px 16px;border-radius:11px;border:1px solid var(--green-line);
+  background:linear-gradient(150deg,var(--green-dim),transparent 78%);font-size:13px;color:var(--muted2);line-height:1.6}
+.result-line b{color:#b8ffd9}
+.result-line a{color:#b8ffd9;text-decoration:none;border-bottom:1px dashed var(--green-line)}
+.result-line code{font-family:var(--mono);font-size:11.5px;color:#b8ffd9;background:var(--green-dim);padding:1px 6px;border-radius:5px;border:1px solid var(--green-line)}
+.traps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:13px}
+.trap{border:1px solid var(--border);border-radius:11px;padding:12px 14px;background:var(--bg-elev)}
+.trap .th{font-family:var(--display);font-weight:600;font-size:13px;color:#ffd27a;margin-bottom:5px}
+.trap p{font-size:11.5px;color:var(--muted2);line-height:1.55}
+.trap code{font-family:var(--mono);font-size:10.5px;color:#ffd27a;background:var(--amber-dim);padding:1px 5px;border-radius:4px}
+
+footer{margin:50px 0 50px;padding-top:24px;border-top:1px solid var(--border);font-size:13.5px;color:var(--muted);line-height:1.72}
+footer b{color:var(--muted2)}
+footer .punch{font-size:15px;color:var(--muted2);line-height:1.66;margin-bottom:14px}
+footer .punch b{color:var(--text)}.footer .punch .hl{color:var(--cf)}
+footer a{color:#b8ffd9;text-decoration:none;border-bottom:1px dashed var(--green-line)}
+.foot-tag{font-family:var(--mono);color:var(--cf);font-size:12px}
+
+@media(max-width:800px){
+  .obs{grid-template-columns:1fr}
+  .traps{grid-template-columns:1fr}
+  .layer-h .lt{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="kicker">发布部署 · 场景放大 · 移动遥控开发</div>
+    <h1>产物的最后一公里:<br>手机遥控写代码,<span class="gp">产物如何出远端</span></h1>
+    <p class="tldr">用 <b>Happy</b> 在手机上遥控远端 <b>Mac mini</b> 跑 Claude Code 写代码——很爽,远端算力强、能放手干。但写完后的<b>产物</b>(网页 / 报告 / 可视化 / 图)<span class="bad">困死在远端磁盘</span>:手机端没有 <span class="bad">file://</span>、没有 <span class="bad">localhost</span>、够不着远端文件系统,于是<b>看不到、存不下、发不出</b>。
+       解法是给产物补一条<span class="hl">交付管道</span>:用 <span class="hl">Cloudflare</span> 一条命令把产物静态部署成公网站点,<span class="hl2">输出一个 URL</span>——手机即看、任何人可点、随手分享。</p>
+
+    <div class="mission">
+      <div class="mtag">// 核心洞察 · 这页讲什么</div>
+      <p class="mtext">远程开发(尤其手机遥控)真正的瓶颈<b>不在"写",在"交付"</b>。代码在远端跑得飞起,可只要产物还是远端磁盘上一个本地文件,它就<b>不属于你</b>——你看不见、也分享不出去。这一页把这个<span class="hl">「最后一公里」断点</span>讲清,并<span class="hl2">收集这条交付闭环里用到的全部 Skills</span>(操控 → 生产 → 交付 → 验证 → 沉淀,五层)。它本身,就是用文末那条命令发出来的。</p>
+    </div>
+  </header>
+
+  <!-- §01 场景流图 -->
+  <section>
+    <div class="sec-h"><span class="num">01</span><h2>场景全景 · 一条会断在中间的链</h2></div>
+    <p class="sec-sub">从手机按下指令,到产物真正能被看见,中间有<b>一个致命断点</b>。Cloudflare 这一节,就是把断点接上的那座桥。</p>
+    <div class="flow">
+
+      <div class="fnode phone">
+        <div class="fn-ic">📱</div>
+        <div class="fn-body">
+          <div class="fn-t">手机端 · Happy</div>
+          <div class="fn-d">在手机上遥控远端 Claude Code · 经自建 happy-server + Tailscale 打通,人不在电脑前也能下指令</div>
+        </div>
+      </div>
+      <div class="fconn"><span>操控 ↓</span></div>
+
+      <div class="fnode remote">
+        <div class="fn-ic">🖥️</div>
+        <div class="fn-body">
+          <div class="fn-t">远端 · Mac mini · Claude Code</div>
+          <div class="fn-d">算力强、真正干活的机器 · 跑编码与内容生产 skills,放手让它自主执行</div>
+        </div>
+      </div>
+      <div class="fconn"><span>产出 ↓</span></div>
+
+      <div class="fnode artifact">
+        <div class="fn-ic">📦</div>
+        <div class="fn-body">
+          <div class="fn-t">产物 · 落在远端磁盘上</div>
+          <div class="fn-d">HTML 网页 · 数据可视化 · 报告 · PPT · 图——此刻它只是远端某个目录里的本地文件</div>
+        </div>
+      </div>
+
+      <!-- THE GAP -->
+      <div class="gap-break">
+        <div class="gap-badge">✂ 断点 · 手机够不着</div>
+        <div class="gap-note">产物困在远端:手机端没有 <code>file://</code> 双击打开、没有共享的 <code>localhost</code>、也没有远端文件系统访问 → <b style="color:#ff9aa4">看不到 / 存不下 / 发不出</b>。链条断在这里。</div>
+      </div>
+
+      <div class="fnode bridge">
+        <div class="fn-ic">⚡</div>
+        <div class="fn-body">
+          <div class="fn-t">交付管道 · Cloudflare Pages</div>
+          <div class="fn-d">在远端用 <b style="color:#ffdb96">wrangler</b> 一条命令,把产物目录直接发成公网静态站(Direct Upload,不必先推 Git)</div>
+        </div>
+      </div>
+      <div class="fconn cf"><span>产出 URL ↓</span></div>
+
+      <div class="fnode url">
+        <div class="fn-ic">🔗</div>
+        <div class="fn-body">
+          <div class="fn-t">公网 URL · 脱离远端</div>
+          <div class="fn-d">手机即看 · 任何人点开即可 · 随手丢进聊天就分享——产物终于属于你</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- §02 三道墙 -->
+  <section>
+    <div class="sec-h"><span class="num">02</span><h2>为什么产物"存不下来"</h2></div>
+    <p class="sec-sub">桌面端干活时,产物双击 <code style="font-family:var(--mono)">file://</code> 就能看,根本没有这个问题。一旦换成<b>手机遥控远端</b>,三道墙同时立起来。</p>
+    <div class="obs">
+      <div class="obs-card">
+        <div class="oh">🚫 没有 file://</div>
+        <p>桌面端双击 HTML 即 <code>open</code>。手机遥控时,产物在<b>另一台机器</b>的磁盘上,你手上的浏览器根本访问不到远端文件系统。</p>
+      </div>
+      <div class="obs-card">
+        <div class="oh">🚫 没有 localhost</div>
+        <p>远端起个 <code>python -m http.server</code> 也只在<b>远端的 localhost</b>。Tailscale 虽能内网直连,但要端口转发 + 一直开着机,既不持久、更不能丢给别人点。</p>
+      </div>
+      <div class="obs-card">
+        <div class="oh">🚫 易逝 · 不可分享</div>
+        <p>产物常是"用完即弃"的临时文件,<b>没有稳定地址</b>。想发给同事 / 自己手机存档,连个能点的链接都凑不出来。</p>
+      </div>
+    </div>
+    <div class="resolve">
+      <b>⚡ 那一步"静态部署"到底在做什么:</b>本质是<b>给易逝的本地文件,换一个持久、可寻址、可分享的公网身份</b>。从「远端磁盘上的一个文件」升级成「一个谁都能点的 <span class="hl2">URL</span>」——<code>Cloudflare Pages</code> 就是这条管道里<b>最短、最省心</b>的一根:无需服务器、无需买域名,<code>*.pages.dev</code> 子域自动给,免费额度足够个人产物用。
+    </div>
+  </section>
+
+  <!-- §03 五层 skills -->
+  <section>
+    <div class="sec-h"><span class="num">03</span><h2>这条闭环用到的 Skills · 按五层收集</h2></div>
+    <p class="sec-sub">把整条链拆成五层,每层列出真正会用上的 skill / 工具。沿用主 guide 的色彩语义:<b style="color:var(--green)">绿=自研</b> · <b style="color:var(--blue)">蓝=外部生态</b> · <b style="color:var(--cf)">橙=Cloudflare</b> · <b style="color:var(--amber)">琥珀=环境</b> · <b style="color:var(--purp)">紫=沉淀</b>。</p>
+
+    <div class="layer l-env">
+      <div class="layer-h"><span class="layer-n">1</span><h3>操控层 · 人在手机,活在远端</h3><span class="lt">环境轴 · 见主 guide §02</span></div>
+      <div class="note">把"手机下指令"接到"远端真正执行"。<b>Happy</b> 是手机操控入口(App,非 skill);连接与远端工作流靠环境轴两个 skill 兜底。</div>
+      <div class="chain">
+        <span class="pill env">Happy<small>App · 手机遥控 Claude Code 入口</small></span>
+        <span class="arr">→</span>
+        <span class="pill l1">ssh-connect<small>认机器 · Tailscale 免密 · 放手在远端执行</small></span>
+        <span class="arr">→</span>
+        <span class="pill l1">remote-dev-sync<small>远端(算力强)改 → 本地 git pull 跑</small></span>
+      </div>
+    </div>
+
+    <div class="layer l-prod">
+      <div class="layer-h"><span class="layer-n">2</span><h3>生产层 · 产物从哪来</h3><span class="lt">需要被交付的东西</span></div>
+      <div class="note">远端真正产出"要给人看"的东西——它们正是接下来要被部署的对象。按产物类型挂对应 skill。</div>
+      <div class="chain">
+        <span class="cl">网页/原型</span>
+        <span class="pill l2">web-design-engineer<small>高质量可视化网页/仪表盘</small></span><span class="par">·</span>
+        <span class="pill l2">html-artifacts<small>自包含单文件 HTML</small></span><span class="par">·</span>
+        <span class="pill l2">frontend-design<small>设计方向</small></span>
+      </div>
+      <div class="chain" style="margin-top:7px">
+        <span class="cl">图文/演示</span>
+        <span class="pill l1">article-with-images<small>带图文章/报告</small></span><span class="par">·</span>
+        <span class="pill l2">ppt-generation<small>演示稿</small></span><span class="par">·</span>
+        <span class="pill l2">web-video-presentation<small>网页式视频</small></span>
+      </div>
+      <div class="chain" style="margin-top:7px">
+        <span class="cl">图</span>
+        <span class="pill l1">fireworks-tech-graph<small>架构/流程图</small></span><span class="par">·</span>
+        <span class="pill l2">gpt-image-2</span><span class="par">·</span>
+        <span class="pill l1">warm-doodle<small>手绘插图</small></span>
+      </div>
+    </div>
+
+    <div class="layer l-ship">
+      <div class="layer-h"><span class="layer-n">3</span><h3>交付层 · 把产物变成 URL</h3><span class="hero-star">本场景核心</span><span class="lt">cloudflare/skills</span></div>
+      <div class="note">整条闭环的<b style="color:#ffdb96">关键一节</b>。Cloudflare 是首选(本页就用它);Vercel / 阿里云 OSS 是等效备选。</div>
+      <div class="chain">
+        <span class="cl">主选 · CF</span>
+        <span class="pill cf">wrangler<small>部署 CLI · 一条命令上线 · 本次主角</small></span><span class="par">·</span>
+        <span class="pill cf">cloudflare<small>平台总览 Pages/Workers/R2/KV</small></span><span class="par">·</span>
+        <span class="pill cf">workers-best-practices<small>若要配动态 Worker</small></span>
+      </div>
+      <div class="chain" style="margin-top:7px">
+        <span class="cl">备选</span>
+        <span class="pill l2">deploy-to-vercel<small>一键静态部署 · 思路一一对应</small></span><span class="par">·</span>
+        <span class="pill l2">vercel-cli</span>
+        <span class="par">‖</span>
+        <span class="pill ali">阿里云 OSS<small>via alibabacloud-find-skills · ossutil</small></span>
+      </div>
+      <div class="chain" style="margin-top:7px">
+        <span class="cl">缺口</span>
+        <span class="pill gap">deploy-to-cloudflare<small>待造 · 对标 deploy-to-vercel,把本页流程固化成一句话 skill</small></span>
+      </div>
+    </div>
+
+    <div class="layer l-verify">
+      <div class="layer-h"><span class="layer-n">4</span><h3>验证层 · 确认手机真能打开</h3><span class="lt">部署后</span></div>
+      <div class="note">拿到 URL 不等于成功——部署完顺手验一下状态码 / 渲染,免得发出去是个 404。</div>
+      <div class="chain">
+        <span class="pill l1">web-connect<small>CDP 真浏览器打开 + 截图,比 curl 直观</small></span><span class="par">·</span>
+        <span class="pill l2">playwright-cli<small>无头浏览器自动化校验</small></span><span class="par">·</span>
+        <span class="pill">curl<small>状态码 / 重定向终点 / 标题</small></span>
+      </div>
+    </div>
+
+    <div class="layer l-ob">
+      <div class="layer-h"><span class="layer-n">5</span><h3>沉淀层 · 让这次经验复用</h3><span class="lt">沉淀底座 · 见主 guide §02</span></div>
+      <div class="note">部署经验 + 产物本身都值得回收,免得下次又从零摸。</div>
+      <div class="chain">
+        <span class="pill ob">ob-bridge<small>产物 + 会话 transcript 卸货到 Obsidian _inbox</small></span><span class="par">·</span>
+        <span class="pill ob">ob-collect / ob-topic<small>把命令/踩坑收进知识库</small></span><span class="par">·</span>
+        <span class="pill l1">distiller<small>提炼成可复用方案</small></span><span class="par">·</span>
+        <span class="pill l2">skill-creator<small>固化成 deploy-to-cloudflare</small></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- §04 最短命令 -->
+  <section>
+    <div class="sec-h"><span class="num">04</span><h2>最短交付命令 · 一条把产物送上公网</h2></div>
+    <p class="sec-sub">难点从来不在命令长短,而在三个隐性点:<b>鉴权</b>、<b>非交互的 -y</b>、<b>clean URL 的 308</b>(见下方三块)。命令本身就这么短:</p>
+    <div class="recipe">
+      <div class="recipe-bar"><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="rt">远端 Mac mini · zsh</span></div>
+<pre><code><span class="c-cmt"># 1) 准备一个干净目录,把产物复制成 index.html(它会成为根路径 /)</span>
+mkdir -p cf-deploy && cp out/report.html cf-deploy/index.html
+
+<span class="c-cmt"># 2) 一条命令部署 —— npx 即用即跑不污染全局,-y 免交互(后台/非 TTY 必加)</span>
+npx -y <span class="c-cf">wrangler@latest</span> pages deploy cf-deploy \
+  <span class="c-flag">--project-name</span> my-artifact \
+  <span class="c-flag">--branch</span> main \
+  <span class="c-flag">--commit-dirty=true</span>
+
+<span class="c-cmt"># 3) 验证(期望 200)</span>
+curl -s -o /dev/null -w <span class="c-ok">"%{http_code}\n"</span> https://my-artifact.pages.dev/
+
+<span class="c-cmt"># ✨ Success! → 🌎 https://my-artifact.pages.dev  ← 把这个 URL 发回手机</span></code></pre>
+    </div>
+    <div class="result-line">
+      <b>🔗 实证:</b> 本页与主 guide 都是这么发出来的 —— <a href="https://skill-system-guide.pages.dev/">skill-system-guide.pages.dev</a>(HTTP 200 ✅)。首次需先 <code>npx -y wrangler@latest pages project create &lt;名字&gt; --production-branch main</code> 建项目;之后每次改完只跑第 2 步即可重新发布。
+    </div>
+    <div class="traps">
+      <div class="trap">
+        <div class="th">① 鉴权</div>
+        <p>OAuth(<code>wrangler login</code> 走浏览器,token 会自动续期)或 API Token(<code>CLOUDFLARE_API_TOKEN</code>,适合无浏览器/CI)。权限需含 <b>pages (write)</b>。</p>
+      </div>
+      <div class="trap">
+        <div class="th">② 非交互 -y</div>
+        <p>首次装包的 "Ok to proceed?" 在非 TTY(后台 / 手机遥控)下无人应答会<b>卡死</b>。<code>npx -y</code> 自动确认,是无人值守部署的关键。</p>
+      </div>
+      <div class="trap">
+        <div class="th">③ clean URL 308</div>
+        <p>Pages 默认把 <code>/x.html</code> <b>308 永久重定向</b>到去扩展名的 <code>/x</code>。对外只给根路径 <code>/</code> 或无扩展名路径,最稳。</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p class="punch">手机遥控远端写代码,爽点在<b>"放手让远端干"</b>,痛点在<b>"产物困在远端"</b>。补上 Cloudflare 这条交付管道,闭环才真正闭合——<b>产物拿到公网 URL,才属于你、能被看见、能分享</b>。</p>
+    <span class="foot-tag">// 关联</span> 这是主 guide <b>§03 发布矩阵</b>的场景化放大。回到全景 → <a href="https://skill-system-guide.pages.dev/">skill-system-guide</a>(本地 <code style="font-family:var(--mono)">docs/skill-system-guide.html</code>)。<br>
+    <span class="foot-tag">// 用到的 skills 速记</span> 操控 <b>ssh-connect · remote-dev-sync</b>(+Happy App) → 生产 <b>web-design-engineer / html-artifacts / article-with-images …</b> → 交付 <b>wrangler · cloudflare</b>(备选 deploy-to-vercel / 阿里云 OSS) → 验证 <b>web-connect / playwright-cli / curl</b> → 沉淀 <b>ob-bridge / ob-collect / distiller</b>。<br>
+    <span class="foot-tag">// 缺口</span> 还差一个 <b>deploy-to-cloudflare</b> skill,把本页这套「准备目录 → whoami 校验 → project create → pages deploy → curl 验证 → 处理 308」固化成一句话即可复用——对标已有的 deploy-to-vercel。
+  </footer>
+
+</div>
+</body>
+</html>

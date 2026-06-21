@@ -81,13 +81,15 @@ description: "Obsidian 万物采集器。委托 web-search 路由层获取内容
 $OBSIDIAN_REPO/raw/
 ├── web/            # 通用网页采集（博客、技术文章等）
 ├── wechat/         # 微信公众号文章
-├── videos/         # 视频平台字幕（B站、抖音、小红书等）
+├── videos/         # 【视频/音频唯一落盘区】所有视频/播客字幕转写，按 raw/videos/{作者名}/ 归档
+│   └── {作者名}/   # 例：raw/videos/罗永浩的十字路口/
+├── finance/        # 【财经例外】财经类 UP主 视频源仍归此处 raw/finance/{作者名}/（沿用既有聚合）
+│   └── {作者名}/   # 例：raw/finance/牛牛复利/
 ├── news/           # 资讯聚合（Hacker News、Reddit 等）
 ├── official/       # 官方文档和文章（Claude Code、OpenAI 等）
 ├── notes/          # 自由笔记（人工输入的原始文档）
 ├── ai-notes/       # AI 调研产出（AI 查询/分析/整理的原始资料）
-├── juejin/         # 掘金小册（全书提取，含图片）
-└── [作者名]/       # 音视频按作者归档
+└── juejin/         # 掘金小册（全书提取，含图片）
 
 $OBSIDIAN_REPO/wiki/{ai,claude,current-affairs,career,dev-tools,front-end,obsidian,tauri,distill}/
 $OBSIDIAN_REPO/.kb/
@@ -122,7 +124,8 @@ web-search 负责"怎么拿"，ob-collect 负责"放哪儿"。raw/ 归档目录�
 
 | 平台类别 | raw 子目录 | 域名示例 |
 |---------|-----------|---------|
-| 视频 / 播客 | `raw/{作者名}/` | youtube / bilibili / xiaoyuzhou |
+| **视频 / 播客（非财经）** | `raw/videos/{作者名}/` | youtube / bilibili / xiaoyuzhou |
+| **视频 / 播客（财经类）** | `raw/finance/{作者名}/` | 财经 UP主（见下方判定） |
 | 微信公众号 | `raw/wechat/` | mp.weixin.qq.com |
 | 资讯聚合 | `raw/news/` | hackernews / reddit / 36kr |
 | 通用网页 | `raw/web/` | medium / substack / zhihu / douban |
@@ -130,6 +133,12 @@ web-search 负责"怎么拿"，ob-collect 负责"放哪儿"。raw/ 归档目录�
 | 本地 PDF | `raw/web/` | — |
 | 人工输入 | `raw/notes/` | — |
 | AI 调研 | `raw/ai-notes/` | — |
+
+> **【硬约束·视频统一落盘】** 任何来源（B站/YouTube/小宇宙/抖音/小红书/播客…）的视频、音频转写，**一律按作者落到 `raw/videos/{作者名}/`**——禁止再写到 `raw/{作者名}/`（顶层）、`raw/bilibili/`、`raw/bilibili-batch/` 等任何其它位置。视频内容只有这一个家。
+>
+> **财经例外**：若作者是财经投资类 UP主（实盘/股市/宏观/财报解读，如 王站岗、牛牛复利、貔貅PX、硬核姬老板、来去由心、胡慢慢滚雪球、梦想早日退休的韭菜、战国时代、追涨杀跌的小白、坤元财研、YaowAlpha投资笔记 等），归到 `raw/finance/{作者名}/`，沿用既有财经聚合区。无法判定财经属性时，默认进 `raw/videos/{作者名}/`。
+>
+> **作者名缺失时**：用平台账号名或频道名；仍无法确定时用 `raw/videos/未知作者/`，不要散落到顶层。
 
 > `{A2S_DIR}` 为 audio-to-subtitle skill 所在目录：`/Users/jiashengwang/jacky-github/jacky-skills/plugins/video-processing/skills/audio-to-subtitle`（ASR 回退流程会用到）
 

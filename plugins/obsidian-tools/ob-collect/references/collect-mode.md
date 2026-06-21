@@ -28,7 +28,8 @@
 |----------|------|----------|
 | `raw/web/` | 通用网页采集 | 博客文章、技术文档、个人网站 |
 | `raw/wechat/` | 微信公众号 | 公众号文章（mp.weixin.qq.com） |
-| `raw/videos/` | 视频平台 | B站字幕、YouTube、小宇宙播客 |
+| `raw/videos/{作者名}/` | 视频平台（非财经，唯一落盘区） | B站字幕、YouTube、小宇宙播客，按作者分子目录 |
+| `raw/finance/{作者名}/` | 财经视频 UP主（例外聚合区） | 实盘/股市/宏观/财报解读类 UP主 |
 | `raw/news/` | 资讯聚合 | Hacker News、Reddit、技术资讯 |
 | `raw/official/` | 官方文档 | Claude Code 博客、OpenAI 文档、框架 Release Notes |
 | `raw/notes/` | 自由笔记 | 用户手动输入的文本内容 |
