@@ -73,7 +73,7 @@ j-skills uninstall <name> -g  # 卸载
 
 ## 路径信息
 
-- **本项目路径**: `/Users/jiashengwang/jacky-github/jacky-skills`
+- **本项目路径**: `~/jacky-github/jacky-skills`
 - **全局 Skills 目录**: `~/.claude/skills/`
 
 ## 快速参考

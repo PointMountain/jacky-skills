@@ -140,7 +140,7 @@ web-search 负责"怎么拿"，ob-collect 负责"放哪儿"。raw/ 归档目录�
 >
 > **作者名缺失时**：用平台账号名或频道名；仍无法确定时用 `raw/videos/未知作者/`，不要散落到顶层。
 
-> `{A2S_DIR}` 为 audio-to-subtitle skill 所在目录：`/Users/jiashengwang/jacky-github/jacky-skills/plugins/video-processing/skills/audio-to-subtitle`（ASR 回退流程会用到）
+> `{A2S_DIR}` 为 audio-to-subtitle skill 所在目录：`~/jacky-github/jacky-skills/plugins/video-processing/skills/audio-to-subtitle`（ASR 回退流程会用到）
 
 ### 例外清单（绕过 web-search 的口子）
 

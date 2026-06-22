@@ -129,7 +129,7 @@ recall / resume / 学习日志
 - **可追溯**：记录学习时所基于的 commit，日后源码演进了，笔记里的 file:line 仍能对照 source/ 快照
 - **可并存**：同一 GitHub 项目目录下多个 `*-study` 互不干扰，resume 时统一扫描
 
-> 全文出现的 `{study目录}` 均指 `{GitHub 项目目录}/{repo-name}-study/`。`{GitHub 项目目录}` 从 CLAUDE.md 配置读取（如 `/Users/jiashengwang/jacky-github`），不要硬编码。
+> 全文出现的 `{study目录}` 均指 `{GitHub 项目目录}/{repo-name}-study/`。`{GitHub 项目目录}` 从 CLAUDE.md 配置读取（如 `~/jacky-github`），不要硬编码。
 
 ## 整体流程
 

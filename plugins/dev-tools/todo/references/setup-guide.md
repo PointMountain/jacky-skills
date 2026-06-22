@@ -6,7 +6,7 @@
 
 ```bash
 # 链接到全局
-cd /Users/jiashengwang/jacky-github/jacky-skills
+cd ~/jacky-github/jacky-skills
 j-skills link todo
 
 # 安装到全局

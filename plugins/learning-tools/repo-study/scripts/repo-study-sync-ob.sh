@@ -16,8 +16,8 @@
 set -euo pipefail
 
 # ============ 配置 ============
-OB_VAULT="/Users/jiashengwang/jacky-github/jacky-obsidian"
-STUDY_BASE="/Users/jiashengwang/jacky-github"
+OB_VAULT="${OB_VAULT:-$HOME/jacky-github/jacky-obsidian}"
+STUDY_BASE="${STUDY_BASE:-$HOME/jacky-github}"
 OB_OPEN_SOURCE="$OB_VAULT/wiki/open-source"
 
 # ============ 参数解析 ============

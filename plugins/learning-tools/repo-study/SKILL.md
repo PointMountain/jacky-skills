@@ -477,7 +477,7 @@ explorer/
 
 当用户使用 `/repo-study list` 时：
 
-1. 读取 CLAUDE.md 中的 `GitHub 项目目录` 配置（如 `/Users/jiashengwang/jacky-github`）
+1. 读取 CLAUDE.md 中的 `GitHub 项目目录` 配置（如 `~/jacky-github`）
 2. 扫描该目录下所有匹配 `*-study` 的子目录
 3. 对每个 study 目录，尝试读取 `.study-meta.json` 获取元数据
 4. 输出表格：

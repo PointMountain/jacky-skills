@@ -49,7 +49,7 @@ codex mcp list
 同时检查 server 二进制是否存在：
 
 ```bash
-ls -la /Users/jiashengwang/.pencil/mcp/cursor/out/mcp-server-darwin-arm64
+ls -la ~/.pencil/mcp/cursor/out/mcp-server-darwin-arm64
 ```
 
 如果任一失败，提示用户先完成 Pencil 安装与 MCP 配置，再继续使用 `generate`。

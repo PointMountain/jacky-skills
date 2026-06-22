@@ -256,7 +256,7 @@ npm login
 ### Step 3: 发布到 npm
 
 ```bash
-cd /Users/jiashengwang/jacky-github/jacky-skills-package
+cd ~/jacky-github/jacky-skills-package
 npm publish
 ```
 
@@ -311,7 +311,7 @@ npm update -g @wangjs-jacky/j-skills
 npm login
 
 # 2. 进入项目目录并发布
-cd /Users/jiashengwang/jacky-github/jacky-skills-package
+cd ~/jacky-github/jacky-skills-package
 npm publish
 ```
 
@@ -332,6 +332,12 @@ A: 确保使用 `j-skills link` 链接的软链接，而不是直接复制。
 **Q: 如何查看 skill 已安装到哪些环境？**
 A: 使用 `j-skills list --all --json` 查看完整安装信息。
 
+**Q: 删除了某个 skill 后，注册表 / 全局目录里残留了失效（broken）软链怎么清？**
+A: **不要用 `j-skills link --doctor`** —— 它通过交互式确认（clack 提示）修复，在**非 TTY 环境**（SSH heredoc、CI、管道）下会卡死或把选项乱选成 "No"。正确清理顺序：
+1. `j-skills uninstall <name> --global -y` —— 清掉 registry 条目与各环境安装记录（`-y` 跳过确认，可正常非交互执行）。
+2. 再手动删残留的 broken 软链：`rm ~/.claude/skills/<name>` 和 `rm ~/.j-skills/linked/<name>`。
+   > 注意：`uninstall` 不会删除「指向已删除源路径」的 broken 软链，所以第 2 步必须手动补。删前可用 `[ -L "$p" ] && [ ! -e "$p" ]` 确认确实是 broken 软链再 `rm`，避免误删有效链接。
+
 **Q: 支持哪些 agent？**
 A: 运行 `j-skills list --help` 查看完整列表，或参考官方文档。
 
@@ -350,14 +356,14 @@ A: 需要先执行 `npm login` 登录 npm 账号。
 |------|------|------|
 | 1️⃣ 登录 npm | `npm login` | 只需执行一次 |
 | 2️⃣ 更新版本 | 编辑 `package.json` | PATCH/MINOR/MAJOR |
-| 3️⃣ 发布 | `cd /Users/jiashengwang/jacky-github/jacky-skills-package && npm publish` | 发布到 npm |
+| 3️⃣ 发布 | `cd ~/jacky-github/jacky-skills-package && npm publish` | 发布到 npm |
 | 4️⃣ 更新本地 | `npm update -g @wangjs-jacky/j-skills` | 更新全局安装 |
 
 ### 快速命令
 
 ```bash
 # 一键发布流程
-cd /Users/jiashengwang/jacky-github/jacky-skills-package
+cd ~/jacky-github/jacky-skills-package
 npm login  # 如果已登录可跳过
 npm publish
 npm update -g @wangjs-jacky/j-skills

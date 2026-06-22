@@ -89,7 +89,7 @@ argument-hint: '[--all] [--yesterday|--today] [--project <path>] [--ticktick] [-
 
 脚本绝对路径：
 ```
-/Users/jiashengwang/jacky-github/jacky-skills/plugins/monitoring/cc-history/scripts/cc-history.py
+~/jacky-github/jacky-skills/plugins/monitoring/cc-history/scripts/cc-history.py
 ```
 
 ```bash

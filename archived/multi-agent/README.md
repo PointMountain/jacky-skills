@@ -14,7 +14,7 @@
 
 ```bash
 # 方式 1：链接到全局（开发模式）
-cd /Users/jiashengwang/jacky-github/jacky-skills
+cd ~/jacky-github/jacky-skills
 j-skills link multi-agent
 
 # 方式 2：安装到全局

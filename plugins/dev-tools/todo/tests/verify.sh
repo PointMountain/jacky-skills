@@ -23,7 +23,8 @@ else
   TEST_DIR="/tmp/todo-skill-verify-$$"
 fi
 
-SKILL_DIR="/Users/jiashengwang/jacky-github/jacky-skills/plugins/dev-tools/todo"
+# 从脚本自身位置推导（tests/ 的上级即 skill 根目录），不硬编码绝对路径
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 assert() {
   local desc="$1"
