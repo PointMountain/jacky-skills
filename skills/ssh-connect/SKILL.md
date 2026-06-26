@@ -47,14 +47,16 @@ argument-hint: '[主机别名] [--run "要在远程执行的命令"]'
 
 ## Phase 0 · 读经验（先验知识，最权威）
 
-进 skill **先读** `${CLAUDE_SKILL_DIR}/experience.local.md` 顶部的「主机清单」表——它是判断"用户说的那台机器是谁、怎么连"的第一来源。
+进 skill **先读**经验文件顶部的「主机清单」表——它是判断"用户说的那台机器是谁、怎么连"的第一来源。
+
+> ⚠️ **经验文件路径**：本 skill 装在 `~/.claude/skills/ssh-connect/`（j-skills 默认安装位置），故路径为 `$HOME/.claude/skills/ssh-connect/experience.local.md`。**绝不要用 `${CLAUDE_SKILL_DIR}`**——该变量在 Bash 工具环境里并不存在，会展开成空、把路径变成 `/experience.local.md`，导致读/写经验全部落空。若本 skill 实际装在别处，替换成其绝对路径即可。
 
 ```bash
-EXP="${CLAUDE_SKILL_DIR}/experience.local.md"
+EXP="$HOME/.claude/skills/ssh-connect/experience.local.md"
 [ -f "$EXP" ] && sed -n '1,80p' "$EXP" || echo "经验文件不存在 → 见 Phase 1 的「未登记主机」分支"
 ```
 
-读到的「主机清单」直接当先验：用户说"mac mini"→ 在清单里命中别名 `macmini`，拿到它的连接命令、网络节点名、已知备注。**不要每次都重新探测一台已登记的机器。**
+读到的「主机清单」直接当先验：用户说"mac mini"→ 在清单里命中对应别名，拿到它的连接命令、网络节点名、已知备注。**不要每次都重新探测一台已登记的机器。**
 
 ---
 
@@ -79,15 +81,21 @@ EXP="${CLAUDE_SKILL_DIR}/experience.local.md"
 连之前花两秒确认链路通，避免对着一台离线机器干等：
 
 ```bash
-ALIAS="<主机别名>"
+# ⚠ ALIAS / NODE 用 Phase 0 主机清单里的真实值替换，别照抄占位符执行
+ALIAS="myhost"      # ← 主机清单里的别名（即 ~/.ssh/config 的 Host 名）
+NODE="myhost-node"  # ← 该机的 Tailscale 节点名；非 Tailscale 机（公网IP/局域网直连）跳过 ①，直接做 ②
 
-# ① Tailscale 节点在不在线（远程机若是 Tailscale 节点）
-/Applications/Tailscale.app/Contents/MacOS/Tailscale status 2>/dev/null | grep -iE "$ALIAS|<节点名>" \
-  || tailscale status 2>/dev/null | grep -iE "<节点名>"
-#   行尾有 "active; direct ..." / "active; relay ..." = 在线；"-" 或 "offline" = 离线
+# ① Tailscale 在线预检（仅 Tailscale 节点适用 · 用退出码判定，不靠肉眼读输出）
+TS="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+command -v tailscale >/dev/null 2>&1 && TS="$(command -v tailscale)"
+if "$TS" status 2>/dev/null | grep -i "$NODE" | grep -qiE "active|direct|relay"; then
+  echo "✓ Tailscale: $NODE 在线"
+else
+  echo "· Tailscale: $NODE 未显示 active（idle/离线/或非 TS 机）——以 ② 实连为准"
+fi
 
-# ② 免密 SSH 一条命令验通（BatchMode 禁交互，5 秒超时）
-ssh -o BatchMode=yes -o ConnectTimeout=5 "$ALIAS" \
+# ② 免密 SSH 实连验通（authoritative · BatchMode 禁交互、新主机自动收 host key、5 秒超时）
+ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 "$ALIAS" \
   'echo "OK -> $(hostname) | $(whoami)"' 2>&1 | head -3
 ```
 - 返回 `OK -> ...` → 链路通，进 Phase 3。
@@ -100,7 +108,7 @@ ssh -o BatchMode=yes -o ConnectTimeout=5 "$ALIAS" \
 > ⚙️ **本 skill 的执行取向：充分权限、不设安全门。** 这些是操作者自己的、可信的远程机器——在其上执行命令（含写入 / 删除 / 部署 / 重启服务等）时**直接放手做，不必每步停下确认**。这是本 skill 的刻意设计，不是疏漏。（唯一例外见下方红线。）
 
 ```bash
-# 在远程执行单条/多条命令
+# ⚠ 下面 <别名>/<命令>/<远程仓库> 都是占位符——用主机清单里的真实别名、实际命令替换后再跑，勿照字面执行
 ssh <别名> '<命令>'
 ssh <别名> 'cd <远程仓库> && git pull && <构建/测试命令>'
 
@@ -113,7 +121,12 @@ ssh <别名> 'cd <远程仓库> && git pull && <构建/测试命令>'
 - 远程路径、代理、端口等"套路"优先查经验文件的「远端工作流」表，别重新摸索。
 - 跑完若学到新东西（新仓库路径、新服务端口、新坑）→ Phase 5 写回。
 
-**唯一红线（HARD GATE）**：会**对外产生不可逆后果**或**触碰账号/计费**的操作仍要先说明并征得同意——例如对远程机器之外的第三方服务发布/付费、删除无备份的他人数据、改动会影响其他人的共享资源。仅限于"用户自己机器内部"的命令才适用"放手跑"。
+**红线（HARD GATE）**：只有以下两类先停下说清楚、征得同意，其余照常放手跑——
+
+> **(A) 对外不可逆 / 账号计费 / 影响他人**：对远程机之外的第三方服务发布/付费、删无备份的他人数据、改动会影响其他人的共享资源。
+> **(B) 单机毁灭性操作**：即便在"用户自己机器内部"，凡**一条命令可不可逆地毁全场**的——`rm -rf` 无备份目录、磁盘/分区操作（`diskutil erase` / `mkfs` / `dd` 写盘）、覆盖系统级配置、关机/重启**正在服务的进程或整机**——也先停下确认再做。
+>
+> 这两类之外（日常读写、构建、部署、重启自有调试服务等）继续放手，不必每步确认。
 
 ---
 
@@ -135,7 +148,7 @@ ssh <别名> 'cd <远程仓库> && git pull && <构建/测试命令>'
 
 ## Phase 5 · 经验沉淀（仿 web-search 机制）
 
-经验存在 `${CLAUDE_SKILL_DIR}/experience.local.md`，**gitignored、不进仓库**（含真实 IP/别名，分享仓库时不泄露）。由你（LLM）自动维护。
+经验存在 `$HOME/.claude/skills/ssh-connect/experience.local.md`（同 Phase 0，**不要**用 `${CLAUDE_SKILL_DIR}`），**gitignored、不进仓库**（含真实 IP/别名，分享仓库时不泄露）。由你（LLM）自动维护。
 
 **写入规则**（只记"将来还用得上"的，不记一次性调试命令）：
 
@@ -148,14 +161,16 @@ ssh <别名> 'cd <远程仓库> && git pull && <构建/测试命令>'
 
 **不写**：按预期工作的常规 `ssh` 调用 / 未经验证的猜测 / 临时一次性命令。
 
+**写入前先确保目标表头存在**（表被精简/拿到空模板时自愈，避免把内容塞到文件尾巴）：
+
 ```bash
-# 首次跑后写 setup-completed 标记（抑制重复初始化提示）
-EXP="${CLAUDE_SKILL_DIR}/experience.local.md"
-if [ -f "$EXP" ] && ! grep -q "^setup-completed:" "$EXP"; then
-  TMP=$(mktemp)
-  { echo "setup-completed: $(date -u +%Y-%m-%dT%H:%M:%SZ)"; echo ""; cat "$EXP"; } > "$TMP"
-  mv "$TMP" "$EXP"
-fi
+EXP="$HOME/.claude/skills/ssh-connect/experience.local.md"
+ensure_section () {   # $1 = 形如 "## 主机清单" 的表头
+  grep -q "^$1$" "$EXP" 2>/dev/null || printf '\n%s\n' "$1" >> "$EXP"
+}
+# 例：登记一台新机器前
+ensure_section "## 主机清单"
+# 表头确保后，用 Edit/Write 在该表内插入新行（保持列对齐），别另起一段塞到文件尾
 ```
 
 ---
@@ -164,7 +179,7 @@ fi
 
 - [ ] Phase 0 已读 experience.local.md 的主机清单，认出了目标机器（已登记的没重复探测）
 - [ ] Phase 2 链路自检通过（Tailscale 在线 + 免密 SSH 验通），或连不上时走了 Phase 4 分层排查（未盲目重试）
-- [ ] 远程命令按"充分权限"放手执行；仅"对外不可逆/账号计费/影响他人共享资源"才停下征得同意
+- [ ] 远程命令按"充分权限"放手执行；仅 (A) 对外不可逆/账号计费/影响他人 与 (B) 单机毁灭性操作（rm -rf 无备份/磁盘/关机重启正在服务的进程或整机）才停下征得同意
 - [ ] 新学到的主机/坑/工作流已按规则写回 experience.local.md（未污染常规调用）
 - [ ] 真实连接信息只在 gitignored 的 experience.local.md 里，未写进会提交的 SKILL.md
 
