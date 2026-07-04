@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+.DS_Store
+video_notes/
+outputs/
+.cache/
+.deps/
+.scratch/
+*.mp4
+*.m4a
+*.mp3
+*.wav

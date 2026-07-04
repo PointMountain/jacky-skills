@@ -1,0 +1,14 @@
+{
+  "name": "youtube-study-note-skill",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "doctor": "node scripts/check-deps.mjs",
+    "prepare-video": "python3 scripts/video_tool.py prepare",
+    "analyze": "python3 scripts/video_tool.py analyze",
+    "render": "python3 scripts/video_tool.py render",
+    "run": "python3 scripts/video_tool.py run",
+    "test": "python3 -m unittest discover -s tests"
+  }
+}

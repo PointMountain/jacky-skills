@@ -1,0 +1,6 @@
+interface:
+  display_name: "YouTube Study Note"
+  short_description: "Private video course packs with transcript, chapter evidence, concept cards, keyframes, critique, quizzes, and built-in imagegen visuals."
+  default_prompt: "Use youtube-study-note to turn this video into a local course-style learning package with core concepts, chapter notes, source evidence, critical judgment, scored review questions, and original built-in imagegen PNGs."
+policy:
+  allow_implicit_invocation: true
