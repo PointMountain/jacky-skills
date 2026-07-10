@@ -1,0 +1,272 @@
+{
+  "schema_version": "1.0.0",
+  "policy": {
+    "probe_at_runtime": true,
+    "probe_must_be_side_effect_free": true,
+    "never_install_or_download_during_probe": true,
+    "never_persist_probe_results_here": true,
+    "fail_if_all_applicable_candidates_fail": true
+  },
+  "capabilities": [
+    {
+      "id": "environment_probe",
+      "applies_when": "always",
+      "candidates": [
+        {
+          "id": "node_runtime",
+          "probe": {
+            "kind": "local_command",
+            "argv": ["sh", "-lc", "command -v node >/dev/null && node --version"],
+            "success_exit_codes": [0],
+            "side_effect_free": true
+          },
+          "outputs": ["node_version"]
+        },
+        {
+          "id": "local_hyperframes_binary",
+          "probe": {
+            "kind": "local_command",
+            "argv": ["sh", "-lc", "if command -v hyperframes >/dev/null; then hyperframes --version; elif test -x ./node_modules/.bin/hyperframes; then ./node_modules/.bin/hyperframes --version; else exit 1; fi"],
+            "success_exit_codes": [0],
+            "side_effect_free": true
+          },
+          "outputs": ["hyperframes_version"]
+        }
+      ],
+      "fallback": "Record the missing local runtime. Installation or pinned package execution is a build action, never a probe, and follows the user's authorization boundary."
+    },
+    {
+      "id": "link_ingest",
+      "applies_when": "source.kind == 'url'",
+      "candidates": [
+        {
+          "id": "video_to_text",
+          "probe": {
+            "kind": "skill_catalog",
+            "names": ["video-to-text"],
+            "side_effect_free": true
+          },
+          "inputs": ["authorized_public_video_url"],
+          "outputs": ["local_media", "source_metadata"]
+        },
+        {
+          "id": "general_video",
+          "probe": {
+            "kind": "skill_catalog",
+            "names": ["general-video"],
+            "side_effect_free": true
+          },
+          "inputs": ["authorized_public_video_url"],
+          "outputs": ["local_media", "source_metadata"]
+        }
+      ],
+      "fallback": "Ask for a local authorized media file only when no installed ingestion capability can read the URL."
+    },
+    {
+      "id": "local_media_ingest",
+      "applies_when": "source.kind in ['local_file', 'url_after_download']",
+      "candidates": [
+        {
+          "id": "ffprobe",
+          "probe": {
+            "kind": "local_command",
+            "argv": ["sh", "-lc", "command -v ffprobe >/dev/null && ffprobe -version"],
+            "success_exit_codes": [0],
+            "side_effect_free": true
+          },
+          "inputs": ["local_media"],
+          "outputs": ["duration", "streams", "actual_media_sha256"]
+        }
+      ],
+      "fallback": "Stop as blocked because media identity and stream metadata are must-pass evidence."
+    },
+    {
+      "id": "local_transcription",
+      "applies_when": "local_media has audio or a paired authorized audio source exists",
+      "candidates": [
+        {
+          "id": "audio_to_subtitle",
+          "probe": {
+            "kind": "skill_catalog",
+            "names": ["video-processing:audio-to-subtitle", "audio-to-subtitle"],
+            "side_effect_free": true
+          },
+          "inputs": ["local_media"],
+          "outputs": ["timestamped_transcript"]
+        },
+        {
+          "id": "mlx_whisper_module",
+          "probe": {
+            "kind": "local_command",
+            "argv": ["python", "-B", "-c", "import importlib.util,sys;sys.exit(0 if importlib.util.find_spec('mlx_whisper') else 1)"],
+            "success_exit_codes": [0],
+            "side_effect_free": true
+          },
+          "inputs": ["local_audio"],
+          "outputs": ["timestamped_transcript"]
+        }
+      ],
+      "fallback": "Use another installed local ASR after an explicit runtime probe; never send private media to an undeclared remote service."
+    },
+    {
+      "id": "tutorial_reasoning",
+      "applies_when": "transcript and/or screen evidence is readable",
+      "candidates": [
+        {
+          "id": "current_agent_reasoning",
+          "probe": {
+            "kind": "built_in_capability",
+            "name": "current_agent_reasoning",
+            "side_effect_free": true
+          },
+          "inputs": ["timestamped_transcript", "screen_code_evidence"],
+          "outputs": ["method-spec.json"]
+        }
+      ],
+      "fallback": "Stop as blocked if claims cannot be tied to source ID, media hash, time range, cue, and real frame/code evidence."
+    },
+    {
+      "id": "motion_observation",
+      "applies_when": "local_media is readable",
+      "candidates": [
+        {
+          "id": "animate_prompt",
+          "probe": {
+            "kind": "skill_catalog",
+            "names": ["dev-tools:animate-prompt", "animate-prompt"],
+            "side_effect_free": true
+          },
+          "inputs": ["local_media"],
+          "outputs": ["coarse_frames", "dense_transition_frames", "motion-spec.json"]
+        },
+        {
+          "id": "ffmpeg_frame_sampling",
+          "probe": {
+            "kind": "local_command",
+            "argv": ["sh", "-lc", "command -v ffmpeg >/dev/null && ffmpeg -version"],
+            "success_exit_codes": [0],
+            "side_effect_free": true
+          },
+          "inputs": ["local_media", "time_ranges"],
+          "outputs": ["frames", "contact_sheets"]
+        }
+      ],
+      "fallback": "Use FFmpeg coarse-to-dense sampling and inspect the actual images; never infer motion from transcript alone."
+    },
+    {
+      "id": "asset_selection",
+      "applies_when": "composition requirements are known",
+      "candidates": [
+        {
+          "id": "media_use",
+          "probe": {
+            "kind": "skill_catalog",
+            "names": ["media-use"],
+            "side_effect_free": true
+          },
+          "inputs": ["composition_requirements", "authorized_assets"],
+          "outputs": ["asset_ledger", "logical_asset_map"]
+        },
+        {
+          "id": "original_fixture_only",
+          "probe": {
+            "kind": "policy_capability",
+            "name": "create_original_deterministic_fixtures",
+            "side_effect_free": true
+          },
+          "inputs": ["composition_requirements"],
+          "outputs": ["logical_asset_map"]
+        }
+      ],
+      "fallback": "Stop if neither authorized assets nor original fixtures can satisfy a clean-checkout render."
+    },
+    {
+      "id": "hyperframes_routing",
+      "applies_when": "demo scope is approved",
+      "candidates": [
+        {
+          "id": "hyperframes_skill_family",
+          "probe": {
+            "kind": "skill_catalog",
+            "names": ["hyperframes", "hyperframes-core", "hyperframes-creative", "hyperframes-animation", "hyperframes-cli"],
+            "minimum_matches": 1,
+            "side_effect_free": true
+          },
+          "inputs": ["method_spec", "motion_spec", "demo_scope"],
+          "outputs": ["selected_hyperframes_skills", "composition_source"]
+        }
+      ],
+      "fallback": "Stop before build and report the missing workflow; do not download packages merely to probe or synthesize an incompatible renderer."
+    },
+    {
+      "id": "hyperframes_validation",
+      "applies_when": "composition source exists",
+      "candidates": [
+        {
+          "id": "local_hyperframes_check_suite",
+          "probe": {
+            "kind": "local_binary_resolver",
+            "names": ["hyperframes", "./node_modules/.bin/hyperframes"],
+            "side_effect_free": true
+          },
+          "inputs": ["composition_source"],
+          "outputs": ["test_result", "lint_result", "validate_result", "inspect_result"]
+        }
+      ],
+      "fallback": "Stop before subjective review until project tests, lint, validate, and inspect are green."
+    },
+    {
+      "id": "video_render",
+      "applies_when": "verified composition source exists",
+      "candidates": [
+        {
+          "id": "local_hyperframes_render",
+          "probe": {
+            "kind": "local_binary_resolver",
+            "names": ["hyperframes", "./node_modules/.bin/hyperframes"],
+            "side_effect_free": true
+          },
+          "inputs": ["composition_source", "render_settings"],
+          "outputs": ["mp4", "render_sha256"]
+        }
+      ],
+      "fallback": "Stop as blocked; screenshots cannot replace the required full MP4."
+    },
+    {
+      "id": "continuous_video_review",
+      "applies_when": "candidate MP4 exists",
+      "candidates": [
+        {
+          "id": "ffmpeg_review_evidence",
+          "probe": {
+            "kind": "local_command",
+            "argv": ["sh", "-lc", "command -v ffmpeg >/dev/null && ffmpeg -version"],
+            "success_exit_codes": [0],
+            "side_effect_free": true
+          },
+          "inputs": ["mp4"],
+          "outputs": ["full_decode", "framemd5", "six_fps_watch_sheets", "dense_transition_strips"]
+        }
+      ],
+      "fallback": "Stop as blocked; sparse snapshots alone do not satisfy continuous review."
+    },
+    {
+      "id": "staged_privacy_audit",
+      "applies_when": "an explicit nonempty staged target set exists",
+      "candidates": [
+        {
+          "id": "bundled_audit_staged",
+          "probe": {
+            "kind": "local_command",
+            "argv": ["python", "scripts/audit_staged.py", "--help"],
+            "success_exit_codes": [0],
+            "side_effect_free": true
+          },
+          "inputs": ["explicit_pathspecs", "nonempty_git_index"],
+          "outputs": ["audit_json"]
+        }
+      ],
+      "fallback": "Do not commit until the bundled staged-files audit runs against the actual explicit target set."
+    }
+  ]
+}

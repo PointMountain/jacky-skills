@@ -1,0 +1,4 @@
+interface:
+  display_name: "HyperFrames Apprentice"
+  short_description: "从教学视频自主学习并产出可验证 HyperFrames Demo"
+  default_prompt: "Use $tutorial-to-hyperframes-demo to learn this tutorial and build a verified HyperFrames demo."
