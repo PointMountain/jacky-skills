@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "workflow_version": "1.1.0",
+  "workflow_version": "1.0.0",
   "stages": [
     {
       "id": "preflight",
@@ -89,34 +89,5 @@
       "capability_ids": ["staged_privacy_audit"],
       "next": null
     }
-  ],
-  "learning_extension": {
-    "contract_version": "1.0.0",
-    "contract_allowlist": ["1.0.0"],
-    "contract_sha256": "218e9249cc462c1371683395dbef94b85688902b411738925dcb8ca089f46e5f",
-    "extension_key": "learning_loop",
-    "required": true,
-    "selection": {
-      "path": "memory-selection.json",
-      "required_after_stage": "preflight"
-    },
-    "required_sidecars": [
-      {"path": "runtime-capabilities.json", "stage": "preflight", "trigger": "after_probe", "required_after_stage": "finalize"},
-      {"path": "decision-trace.json", "stage": "all", "trigger": "on_decision", "required_after_stage": "finalize"},
-      {"path": "skill-usage-manifest.json", "stage": "finalize", "trigger": "on_finalize", "required_after_stage": "finalize"},
-      {"path": "usage-ledger.json", "stage": "finalize", "trigger": "on_finalize", "required_after_stage": "finalize"},
-      {"path": "retrospective.json", "stage": "finalize", "trigger": "on_finalize", "required_after_stage": "finalize"}
-    ],
-    "variable_sidecars": [
-      {
-        "path_pattern": "usage-events/*.json",
-        "coverage": "completed_stage_workflow_capability",
-        "required_after_stage": "finalize"
-      }
-    ],
-    "post_run_optional_sidecars": [
-      {"path_pattern": "feedback-candidates/*.json", "trigger": "on_feedback", "descriptor_policy": "append_new_key_only"},
-      {"path_pattern": "promotion-receipts/*.json", "trigger": "on_promotion", "descriptor_policy": "append_new_key_only"}
-    ]
-  }
+  ]
 }

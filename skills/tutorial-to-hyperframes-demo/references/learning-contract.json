@@ -1,0 +1,143 @@
+{
+  "schema_version": "1.0.0",
+  "contract_version": "1.0.0",
+  "extension": {
+    "key": "learning_loop",
+    "required_fields": ["required", "state", "contract_version", "selection", "sidecars"],
+    "state_enum": ["collecting", "frozen", "backfilled"],
+    "selection_descriptor": {
+      "path": "memory-selection.json",
+      "fields": ["path", "sha256"],
+      "nullable_before": "preflight_completed"
+    },
+    "sidecars": {
+      "type": "object",
+      "key_equals_descriptor_path": true,
+      "descriptor_fields": ["path", "sha256"]
+    }
+  },
+  "artifacts": {
+    "required": {
+      "memory-selection.json": ["schema_version", "workflow_version", "run_id", "query", "selected", "rejected", "selection_snapshot", "selection_snapshot_sha256", "created_at"],
+      "runtime-capabilities.json": ["schema_version", "workflow_version", "run_id", "probed_at", "capabilities"],
+      "decision-trace.json": ["schema_version", "workflow_version", "run_id", "decisions"],
+      "skill-usage-manifest.json": ["schema_version", "workflow_version", "run_id", "entries"],
+      "usage-ledger.json": ["schema_version", "workflow_version", "run_id", "event_refs", "manifest"],
+      "retrospective.json": ["schema_version", "workflow_version", "run_id", "objective", "result", "skills_manifest_ref", "evidence", "findings"]
+    },
+    "variable_required": {
+      "path_pattern": "usage-events/*.json",
+      "coverage": "completed_stage_workflow_capability"
+    },
+    "post_run_optional": {
+      "feedback-candidates/*.json": ["schema_version", "workflow_version", "run_id", "candidate_id", "final_hash", "r2_hash", "evidence_refs", "applies_to", "destination", "received_at", "source", "claim", "next_validation"],
+      "promotion-receipts/*.json": ["schema_version", "workflow_version", "run_id", "promotion_id", "candidate_id", "destination", "evidence_refs", "source_candidate", "promoted_revision", "created_at"]
+    }
+  },
+  "usage_event": {
+    "common_required_fields": ["schema_version", "workflow_version", "run_id", "event_id", "kind", "stage", "capability_id", "actual_id", "purpose", "result", "capture_state", "evidence_refs", "recorded_at"],
+    "kind_enum": ["content", "skill", "tool"],
+    "capture_state_enum": ["captured", "missing", "degraded", "not_recorded"],
+    "result_enum": ["passed", "degraded", "failed", "not_recorded"],
+    "branches": {
+      "content": {
+        "required_fields": ["content_ref", "content_sha256"],
+        "execution_receipt": "forbidden"
+      },
+      "skill": {
+        "required_fields": ["version", "execution_receipt"],
+        "execution_receipt": "required_when_captured"
+      },
+      "tool": {
+        "required_fields": ["version", "execution_receipt"],
+        "execution_receipt": "required_when_captured"
+      }
+    }
+  },
+  "coverage": {
+    "scope": "completed_stage_workflow_capability",
+    "satisfied_by": ["captured_event", "explicit_coverage_event"],
+    "explicit_capture_states": ["missing", "degraded", "not_recorded"],
+    "silent_absence": "finalize_fails"
+  },
+  "skill_usage_manifest": {
+    "entry_required_fields": ["capability", "phase", "candidates_checked", "selected", "source", "revision", "mode", "inputs", "outputs", "result", "evidence_refs", "friction", "adjustment_candidate"],
+    "result_enum_ref": "usage_event.result_enum",
+    "passed_requires": ["actual_output_or_receipt"]
+  },
+  "retrospective": {
+    "required_fields": ["schema_version", "workflow_version", "run_id", "objective", "result", "skills_manifest_ref", "evidence", "findings"],
+    "result_enum": ["success", "success_with_residuals"],
+    "finding_required_fields": ["type", "claim", "evidence_refs", "applies_to", "destination_candidate", "status"],
+    "finding_type_enum": ["effective_pattern", "failure_root_cause", "environment_fact", "skill_friction"],
+    "destination_enum": ["reference", "local_memory", "error_memory", "skill_adjustment", "backlog"],
+    "status_enum": ["candidate"],
+    "without_evidence": {
+      "destination": "backlog",
+      "promotable": false
+    }
+  },
+  "candidates": {
+    "destination_enum": ["reference", "local_memory", "error_memory", "skill_adjustment", "backlog"],
+    "default_state": "candidate",
+    "no_evidence_destination": "backlog",
+    "post_run_paths": {
+      "feedback": "feedback-candidates/*.json",
+      "promotion_receipt": "promotion-receipts/*.json"
+    }
+  },
+  "selection_limits": {
+    "root_indexes": 1,
+    "topic_maps": 1,
+    "cross_domain_topic_maps": 2,
+    "memory_items_min": 0,
+    "memory_items_max": 3
+  },
+  "post_run_append_only": {
+    "allowed_states": ["frozen", "backfilled"],
+    "allowed_path_patterns": ["feedback-candidates/*.json", "promotion-receipts/*.json"],
+    "descriptor_target": "extensions.learning_loop.sidecars",
+    "operation": "add_new_key_only",
+    "run_mutation_allowlist": ["extensions.learning_loop.sidecars.<new-key>"],
+    "immutable_run_fields": [
+      "schema_version",
+      "workflow_version",
+      "workflow_sha256",
+      "run_id",
+      "status",
+      "current_stage",
+      "next_stage",
+      "completed_stages",
+      "invalidated_stages",
+      "source",
+      "artifacts",
+      "bindings",
+      "created_at",
+      "updated_at",
+      "extensions.learning_loop.required",
+      "extensions.learning_loop.state",
+      "extensions.learning_loop.contract_version",
+      "extensions.learning_loop.selection",
+      "extensions.learning_loop.sidecars.<existing-key>"
+    ],
+    "immutable_artifact_paths": [
+      "final.json",
+      "score-r2.json",
+      "memory-selection.json",
+      "runtime-capabilities.json",
+      "decision-trace.json",
+      "usage-events/*.json",
+      "retrospective.json",
+      "skill-usage-manifest.json",
+      "usage-ledger.json"
+    ]
+  },
+  "finalize": {
+    "write_order": ["skill-usage-manifest.json", "usage-ledger.json", "retrospective.json", "state=frozen"],
+    "state_transition": {
+      "from": "collecting",
+      "to": "frozen",
+      "atomic": true
+    }
+  }
+}

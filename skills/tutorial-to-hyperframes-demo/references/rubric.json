@@ -73,6 +73,12 @@
       }
     }
   ],
+  "learning_candidate_policy": {
+    "candidate_only_inputs": ["low_score", "r2_residual", "aesthetic_opinion", "single_failure"],
+    "default_destination": "backlog",
+    "never_activate_memory_directly": true,
+    "promotion_requires": ["evidence_refs", "revalidation"]
+  },
   "round_rules": {
     "r1": "Review the entire draft MP4 hash, identify timestamped issues, and choose exactly one highest-impact subjective top_fix.",
     "revise": "Change only top_fix.dimension and freeze already-correct dimensions; render a new MP4 hash.",

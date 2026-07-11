@@ -1,6 +1,9 @@
 {
   "schema_version": "1.0.0",
+  "registry_kind": "stable_capability_slots",
+  "runtime_state_destination": "runtime-capabilities.json",
   "policy": {
+    "default_candidate_mode": "ordered_fallback",
     "probe_at_runtime": true,
     "probe_must_be_side_effect_free": true,
     "never_install_or_download_during_probe": true,
@@ -11,25 +14,31 @@
     {
       "id": "environment_probe",
       "applies_when": "always",
+      "candidate_mode": "all",
+      "aggregate_result": "record_each_probe_without_short_circuit",
       "candidates": [
         {
           "id": "node_runtime",
+          "priority": 10,
           "probe": {
             "kind": "local_command",
             "argv": ["sh", "-lc", "command -v node >/dev/null && node --version"],
             "success_exit_codes": [0],
             "side_effect_free": true
           },
+          "fallback": "record_missing_and_continue",
           "outputs": ["node_version"]
         },
         {
           "id": "local_hyperframes_binary",
+          "priority": 20,
           "probe": {
             "kind": "local_command",
             "argv": ["sh", "-lc", "if command -v hyperframes >/dev/null; then hyperframes --version; elif test -x ./node_modules/.bin/hyperframes; then ./node_modules/.bin/hyperframes --version; else exit 1; fi"],
             "success_exit_codes": [0],
             "side_effect_free": true
           },
+          "fallback": "record_missing_and_continue",
           "outputs": ["hyperframes_version"]
         }
       ],
@@ -41,21 +50,25 @@
       "candidates": [
         {
           "id": "video_to_text",
+          "priority": 10,
           "probe": {
             "kind": "skill_catalog",
             "names": ["video-to-text"],
             "side_effect_free": true
           },
+          "fallback": "continue_to_next_candidate",
           "inputs": ["authorized_public_video_url"],
           "outputs": ["local_media", "source_metadata"]
         },
         {
           "id": "general_video",
+          "priority": 20,
           "probe": {
             "kind": "skill_catalog",
             "names": ["general-video"],
             "side_effect_free": true
           },
+          "fallback": "use_capability_fallback",
           "inputs": ["authorized_public_video_url"],
           "outputs": ["local_media", "source_metadata"]
         }
@@ -68,12 +81,14 @@
       "candidates": [
         {
           "id": "ffprobe",
+          "priority": 10,
           "probe": {
             "kind": "local_command",
             "argv": ["sh", "-lc", "command -v ffprobe >/dev/null && ffprobe -version"],
             "success_exit_codes": [0],
             "side_effect_free": true
           },
+          "fallback": "use_capability_fallback",
           "inputs": ["local_media"],
           "outputs": ["duration", "streams", "actual_media_sha256"]
         }
@@ -86,22 +101,26 @@
       "candidates": [
         {
           "id": "audio_to_subtitle",
+          "priority": 10,
           "probe": {
             "kind": "skill_catalog",
             "names": ["video-processing:audio-to-subtitle", "audio-to-subtitle"],
             "side_effect_free": true
           },
+          "fallback": "continue_to_next_candidate",
           "inputs": ["local_media"],
           "outputs": ["timestamped_transcript"]
         },
         {
           "id": "mlx_whisper_module",
+          "priority": 20,
           "probe": {
             "kind": "local_command",
             "argv": ["python", "-B", "-c", "import importlib.util,sys;sys.exit(0 if importlib.util.find_spec('mlx_whisper') else 1)"],
             "success_exit_codes": [0],
             "side_effect_free": true
           },
+          "fallback": "use_capability_fallback",
           "inputs": ["local_audio"],
           "outputs": ["timestamped_transcript"]
         }
@@ -114,11 +133,13 @@
       "candidates": [
         {
           "id": "current_agent_reasoning",
+          "priority": 10,
           "probe": {
             "kind": "built_in_capability",
             "name": "current_agent_reasoning",
             "side_effect_free": true
           },
+          "fallback": "use_capability_fallback",
           "inputs": ["timestamped_transcript", "screen_code_evidence"],
           "outputs": ["method-spec.json"]
         }
@@ -131,22 +152,26 @@
       "candidates": [
         {
           "id": "animate_prompt",
+          "priority": 10,
           "probe": {
             "kind": "skill_catalog",
             "names": ["dev-tools:animate-prompt", "animate-prompt"],
             "side_effect_free": true
           },
+          "fallback": "continue_to_next_candidate",
           "inputs": ["local_media"],
           "outputs": ["coarse_frames", "dense_transition_frames", "motion-spec.json"]
         },
         {
           "id": "ffmpeg_frame_sampling",
+          "priority": 20,
           "probe": {
             "kind": "local_command",
             "argv": ["sh", "-lc", "command -v ffmpeg >/dev/null && ffmpeg -version"],
             "success_exit_codes": [0],
             "side_effect_free": true
           },
+          "fallback": "use_capability_fallback",
           "inputs": ["local_media", "time_ranges"],
           "outputs": ["frames", "contact_sheets"]
         }
@@ -159,21 +184,25 @@
       "candidates": [
         {
           "id": "media_use",
+          "priority": 10,
           "probe": {
             "kind": "skill_catalog",
             "names": ["media-use"],
             "side_effect_free": true
           },
+          "fallback": "continue_to_next_candidate",
           "inputs": ["composition_requirements", "authorized_assets"],
           "outputs": ["asset_ledger", "logical_asset_map"]
         },
         {
           "id": "original_fixture_only",
+          "priority": 20,
           "probe": {
             "kind": "policy_capability",
             "name": "create_original_deterministic_fixtures",
             "side_effect_free": true
           },
+          "fallback": "use_capability_fallback",
           "inputs": ["composition_requirements"],
           "outputs": ["logical_asset_map"]
         }
@@ -186,12 +215,14 @@
       "candidates": [
         {
           "id": "hyperframes_skill_family",
+          "priority": 10,
           "probe": {
             "kind": "skill_catalog",
             "names": ["hyperframes", "hyperframes-core", "hyperframes-creative", "hyperframes-animation", "hyperframes-cli"],
             "minimum_matches": 1,
             "side_effect_free": true
           },
+          "fallback": "use_capability_fallback",
           "inputs": ["method_spec", "motion_spec", "demo_scope"],
           "outputs": ["selected_hyperframes_skills", "composition_source"]
         }
@@ -204,11 +235,13 @@
       "candidates": [
         {
           "id": "local_hyperframes_check_suite",
+          "priority": 10,
           "probe": {
             "kind": "local_binary_resolver",
             "names": ["hyperframes", "./node_modules/.bin/hyperframes"],
             "side_effect_free": true
           },
+          "fallback": "use_capability_fallback",
           "inputs": ["composition_source"],
           "outputs": ["test_result", "lint_result", "validate_result", "inspect_result"]
         }
@@ -221,11 +254,13 @@
       "candidates": [
         {
           "id": "local_hyperframes_render",
+          "priority": 10,
           "probe": {
             "kind": "local_binary_resolver",
             "names": ["hyperframes", "./node_modules/.bin/hyperframes"],
             "side_effect_free": true
           },
+          "fallback": "use_capability_fallback",
           "inputs": ["composition_source", "render_settings"],
           "outputs": ["mp4", "render_sha256"]
         }
@@ -238,12 +273,14 @@
       "candidates": [
         {
           "id": "ffmpeg_review_evidence",
+          "priority": 10,
           "probe": {
             "kind": "local_command",
             "argv": ["sh", "-lc", "command -v ffmpeg >/dev/null && ffmpeg -version"],
             "success_exit_codes": [0],
             "side_effect_free": true
           },
+          "fallback": "use_capability_fallback",
           "inputs": ["mp4"],
           "outputs": ["full_decode", "framemd5", "six_fps_watch_sheets", "dense_transition_strips"]
         }
@@ -256,12 +293,14 @@
       "candidates": [
         {
           "id": "bundled_audit_staged",
+          "priority": 10,
           "probe": {
             "kind": "local_command",
             "argv": ["python", "scripts/audit_staged.py", "--help"],
             "success_exit_codes": [0],
             "side_effect_free": true
           },
+          "fallback": "use_capability_fallback",
           "inputs": ["explicit_pathspecs", "nonempty_git_index"],
           "outputs": ["audit_json"]
         }

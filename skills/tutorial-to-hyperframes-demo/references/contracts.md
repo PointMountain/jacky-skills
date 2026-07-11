@@ -6,13 +6,14 @@
 
 1. [共同规则](#共同规则)
 2. [run.json](#runjson)
-3. [阶段 hash 链](#阶段-hash-链)
-4. [基础阶段](#基础阶段)
-5. [方法与动效](#方法与动效)
-6. [素材规划与构建](#素材规划与构建)
-7. [验证与评分](#验证与评分)
-8. [最终指针](#最终指针)
-9. [隐私边界](#隐私边界)
+3. [Learning extension 指针](#learning-extension-指针)
+4. [阶段 hash 链](#阶段-hash-链)
+5. [基础阶段](#基础阶段)
+6. [方法与动效](#方法与动效)
+7. [素材规划与构建](#素材规划与构建)
+8. [验证与评分](#验证与评分)
+9. [最终指针](#最终指针)
+10. [隐私边界](#隐私边界)
 
 ## 共同规则
 
@@ -76,6 +77,17 @@ URL 摄取前必须使用下面的状态，不能把 locator hash 复制到媒�
 ```
 
 允许的状态：`running`、`blocked`、`failed`、`completed`、`completed_with_residuals`。完成状态必须包含全部阶段，且 `next_stage` 为 `null`。
+
+## Learning extension 指针
+
+Workflow `1.1.0` 在 `run.json.extensions.learning_loop` 保存 learning sidecar 的描述符；legacy `1.0.0` core run 不要求该 extension。所有 sidecar 仍属于被忽略的私有 run，不进入 Demo 或可分享 Skill 内容。
+
+- 机器字段和有限枚举以 [`learning-contract.json`](learning-contract.json) 为准。
+- Resolver 只接受 workflow 显式 allowlist 中的 contract 版本，读取 `learning-contracts/<version>.json` 并重算其字节 hash；声明版本、声明 hash 或冻结文件任一不一致都失败关闭。
+- 写入时机、证据语义、冻结与 post-run 边界以 [`learning-loop.md`](learning-loop.md) 为准。
+- Validator 必须按 run 声明的 workflow 版本选择冻结契约，重算 descriptor hash、验证 run-relative containment，并交叉核对 selection、stage/capability coverage、manifest、ledger 与 final/R2 证据。
+- `frozen`/`backfilled` 冻结 selection、已有 descriptor、核心 learning artifact 与 final；post-run 只允许把 feedback/promotion 的新 descriptor 追加到 sidecars object，不能覆盖旧 key、改 state 或改冻结工件。
+- Learning extension 失败只使扩展校验失败，不改写 core 阶段 hash 链，也不触发 core invalidation。
 
 ## 阶段 hash 链
 
