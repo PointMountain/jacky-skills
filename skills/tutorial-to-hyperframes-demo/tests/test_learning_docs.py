@@ -127,6 +127,14 @@ def parse_shallow_yaml(text: str) -> dict[str, dict[str, str]]:
 
 
 class LearningDocsTests(unittest.TestCase):
+    def test_runtime_capabilities_and_execution_receipts_have_one_machine_shape(self) -> None:
+        text = LEARNING_LOOP.read_text(encoding="utf-8")
+        self.assertIn("capabilities{}", text)
+        self.assertNotIn("capabilities[]", text)
+        self.assertIn("probes[]", text)
+        self.assertIn("receipt_type=execution", text)
+        self.assertIn("RFC3339", text)
+
     def test_skill_is_a_thin_map_and_all_markdown_targets_exist(self) -> None:
         text = SKILL_MD.read_text(encoding="utf-8")
         self.assertLessEqual(len(text.splitlines()), 200)

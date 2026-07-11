@@ -492,6 +492,30 @@ def secure_run_relative(run_dir: Path, value: str, *, must_exist: bool) -> Path:
         os.close(descriptor)
 
 
+def ensure_secure_existing_directory(path: Path) -> Path:
+    """确认绝对目录链无 symlink，并返回不经 resolve 的绝对规范路径。"""
+
+    absolute = _absolute_path(Path(path))
+    descriptor = _open_absolute_directory(absolute, create=False)
+    os.close(descriptor)
+    return absolute
+
+
+def read_stable_file_bytes(path: Path) -> bytes:
+    """用同一次 nofollow fd 读取稳定单链接普通文件字节。"""
+
+    directory_fd, leaf, absolute = _open_parent_directory(Path(path), create=False)
+    try:
+        content = _read_after_link_window(
+            directory_fd, leaf, label=f"稳定文件 {absolute}"
+        )
+        if content is None:
+            raise FileNotFoundError(absolute)
+        return content
+    finally:
+        os.close(directory_fd)
+
+
 def reject_private_payload(value: Any) -> None:
     """递归拒绝不应进入长期 memory 或公开工件的路径与凭证。"""
 
@@ -540,7 +564,26 @@ def atomic_write_json(path: Path, value: dict[str, Any]) -> None:
             os.close(directory_fd)
 
 
-def write_immutable_or_adopt(path: Path, value: dict[str, Any]) -> None:
+def secure_unlink_file(path: Path) -> bool:
+    """用锚定父目录的 dir_fd 删除单链接普通文件并 fsync。"""
+
+    directory_fd, leaf, _ = _open_parent_directory(Path(path), create=False)
+    try:
+        entry = _lstat_entry(directory_fd, leaf)
+        if entry is None:
+            return False
+        _reject_non_regular_or_symlink(entry, "待清理文件")
+        if entry.st_nlink != 1:
+            raise ValueError("待清理文件必须是单链接普通文件")
+        os.unlink(leaf, dir_fd=directory_fd)
+        _fsync_directory(directory_fd)
+        return True
+    finally:
+        os.close(directory_fd)
+
+
+def write_immutable_or_adopt(path: Path, value: dict[str, Any]) -> bool:
+    """写入不可变 JSON；本进程创建返回 True，采用既有字节返回 False。"""
     if type(value) is not dict:
         raise TypeError("JSON 文件顶层必须是对象")
     content = canonical_json_bytes(value)
@@ -552,7 +595,7 @@ def write_immutable_or_adopt(path: Path, value: dict[str, Any]) -> None:
         )
         if existing is not None:
             if existing == content:
-                return
+                return False
             raise FileExistsError(f"不可变 JSON 已存在且内容不同：{absolute}")
 
         temp_name = _create_temp_file(directory_fd, leaf, content)
@@ -578,13 +621,14 @@ def write_immutable_or_adopt(path: Path, value: dict[str, Any]) -> None:
                     f"不可变 JSON 已被并发占用：{absolute}"
                 ) from error
             if winner == content:
-                return
+                return False
             raise FileExistsError(
                 f"不可变 JSON 已被并发写入不同内容：{absolute}"
             )
 
         _unlink_and_fsync(directory_fd, temp_name)
         temp_name = None
+        return True
     finally:
         try:
             if temp_name is not None:

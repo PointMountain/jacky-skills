@@ -19,7 +19,7 @@
   "artifacts": {
     "required": {
       "memory-selection.json": ["schema_version", "workflow_version", "run_id", "query", "selected", "rejected", "selection_snapshot", "selection_snapshot_sha256", "created_at"],
-      "runtime-capabilities.json": ["schema_version", "workflow_version", "run_id", "probed_at", "capabilities"],
+      "runtime-capabilities.json": ["schema_version", "workflow_version", "run_id", "registry_version", "registry_sha256", "probed_at", "capabilities"],
       "decision-trace.json": ["schema_version", "workflow_version", "run_id", "decisions"],
       "skill-usage-manifest.json": ["schema_version", "workflow_version", "run_id", "entries"],
       "usage-ledger.json": ["schema_version", "workflow_version", "run_id", "event_refs", "manifest"],
@@ -52,6 +52,32 @@
         "required_fields": ["version", "execution_receipt"],
         "execution_receipt": "required_when_captured"
       }
+    }
+  },
+  "runtime_capabilities": {
+    "capabilities_type": "object_by_capability_id",
+    "status_enum": ["available", "degraded", "missing"],
+    "probe_field": "probes",
+    "probe_required_fields": ["candidate_id", "result", "evidence_refs"],
+    "probe_result_enum": ["passed", "degraded", "failed", "missing"],
+    "ordered_fallback_selected_type": "string_or_null",
+    "all_selected_type": "array",
+    "all_requires_every_candidate": true,
+    "fallback_policy": "must_match_registry_candidate_fallback_or_null_when_available",
+    "checked_at": "rfc3339_timezone_aware"
+  },
+  "execution_receipt": {
+    "required_fields": ["receipt_type", "command", "exit_code", "executed_at"],
+    "receipt_type": "execution",
+    "command": "nonempty_string_array",
+    "exit_code": "integer_not_boolean",
+    "executed_at": "rfc3339_timezone_aware",
+    "optional_reference_fields": ["stdout", "stderr", "target"],
+    "optional_reference_policy": "real_file_and_sha256",
+    "result_binding": {
+      "passed": "exit_code_zero",
+      "failed": "exit_code_nonzero",
+      "degraded": "cannot_support_manifest_passed"
     }
   },
   "coverage": {

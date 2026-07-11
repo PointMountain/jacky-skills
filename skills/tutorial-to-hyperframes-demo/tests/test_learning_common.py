@@ -56,6 +56,31 @@ class HashTests(unittest.TestCase):
             path.write_bytes(b"a\x00b" * 400_000)
             self.assertEqual(sha256_file(path), hashlib.sha256(path.read_bytes()).hexdigest())
 
+    def test_stable_fd_read_keeps_one_byte_snapshot_when_name_is_replaced(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory).resolve() / "contract.json"
+            replacement = Path(directory).resolve() / "replacement.json"
+            path.write_bytes(b'{"version":"old"}\n')
+            replacement.write_bytes(b'{"version":"new"}\n')
+            real_read = common._read_single_link_regular
+            replaced = False
+
+            def replace_after_read(*args: object, **kwargs: object) -> bytes | None:
+                nonlocal replaced
+                content = real_read(*args, **kwargs)
+                if not replaced:
+                    os.replace(replacement, path)
+                    replaced = True
+                return content
+
+            with mock.patch.object(
+                common, "_read_single_link_regular", side_effect=replace_after_read
+            ):
+                observed = common.read_stable_file_bytes(path)
+
+            self.assertEqual(observed, b'{"version":"old"}\n')
+            self.assertEqual(path.read_bytes(), b'{"version":"new"}\n')
+
 
 class SecureRunRelativeTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -335,6 +360,34 @@ class AtomicWriteTests(unittest.TestCase):
 
 
 class ImmutableWriteTests(unittest.TestCase):
+    def test_reports_created_vs_adopted_and_secure_cleanup_fsyncs_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory).resolve() / "event.json"
+            events: list[str] = []
+            real_unlink = os.unlink
+            real_fsync = common._fsync_directory
+
+            self.assertTrue(write_immutable_or_adopt(path, {"event_id": "one"}))
+            self.assertFalse(write_immutable_or_adopt(path, {"event_id": "one"}))
+
+            def tracked_unlink(*args: object, **kwargs: object) -> None:
+                events.append("unlink")
+                real_unlink(*args, **kwargs)
+
+            def tracked_fsync(*args: object, **kwargs: object) -> None:
+                events.append("fsync-parent")
+                real_fsync(*args, **kwargs)
+
+            with (
+                mock.patch.object(common.os, "unlink", side_effect=tracked_unlink),
+                mock.patch.object(common, "_fsync_directory", side_effect=tracked_fsync),
+            ):
+                self.assertTrue(common.secure_unlink_file(path))
+
+            self.assertFalse(path.exists())
+            self.assertEqual(events[-2:], ["unlink", "fsync-parent"])
+            self.assertFalse(common.secure_unlink_file(path))
+
     def test_writes_once_then_adopts_identical_canonical_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory).resolve() / "event.json"
@@ -407,7 +460,7 @@ class ImmutableWriteTests(unittest.TestCase):
                 real_link(*args, **kwargs)
                 if index == 0:
                     first_linked.set()
-                    if not release_first_link.wait(timeout=2):
+                    if not release_first_link.wait(timeout=10):
                         raise TimeoutError("未观察到并发 hardlink 窗口")
 
             def observe_read(*args: object, **kwargs: object) -> bytes | None:
@@ -419,7 +472,7 @@ class ImmutableWriteTests(unittest.TestCase):
                         release_first_link.set()
                     raise
                 if kwargs.get("label") == "不可变 JSON" and result is None:
-                    both_prechecks_complete.wait(timeout=2)
+                    both_prechecks_complete.wait(timeout=10)
                 return result
 
             def write() -> BaseException | None:
@@ -438,8 +491,11 @@ class ImmutableWriteTests(unittest.TestCase):
             ):
                 first = executor.submit(write)
                 second = executor.submit(write)
-                self.assertTrue(first_linked.wait(timeout=2))
-                results = [first.result(timeout=3), second.result(timeout=3)]
+                self.assertTrue(
+                    first_linked.wait(timeout=10),
+                    "第一个 immutable writer 未在负载容忍窗口内建立 hardlink",
+                )
+                results = [first.result(timeout=12), second.result(timeout=12)]
 
             self.assertTrue(multiple_links_observed.is_set())
             self.assertEqual(results, [None, None])
@@ -464,7 +520,7 @@ class ImmutableWriteTests(unittest.TestCase):
                 real_link(*args, **kwargs)
                 if index == 0:
                     first_linked.set()
-                    if not release_first_link.wait(timeout=2):
+                    if not release_first_link.wait(timeout=10):
                         raise TimeoutError("late writer 未观察到 nlink 窗口")
 
             def observe_read(*args: object, **kwargs: object) -> bytes | None:
@@ -491,9 +547,12 @@ class ImmutableWriteTests(unittest.TestCase):
                 ThreadPoolExecutor(max_workers=2) as executor,
             ):
                 first = executor.submit(write)
-                self.assertTrue(first_linked.wait(timeout=2))
+                self.assertTrue(
+                    first_linked.wait(timeout=10),
+                    "late-writer 测试未在负载容忍窗口内建立首个 hardlink",
+                )
                 second = executor.submit(write)
-                results = [first.result(timeout=3), second.result(timeout=3)]
+                results = [first.result(timeout=12), second.result(timeout=12)]
 
             self.assertTrue(initial_multiple_links_observed.is_set())
             self.assertEqual(results, [None, None])

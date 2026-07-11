@@ -18,6 +18,7 @@ V11 = REFERENCES / "workflows" / "1.1.0.json"
 LEARNING_CONTRACT = REFERENCES / "learning-contract.json"
 FROZEN_LEARNING_CONTRACT = REFERENCES / "learning-contracts" / "1.0.0.json"
 CAPABILITIES = REFERENCES / "capabilities.json"
+FROZEN_CAPABILITIES = REFERENCES / "capability-registries" / "1.0.0.json"
 RUBRIC = REFERENCES / "rubric.json"
 INIT_RUN = SKILL_ROOT / "scripts" / "init_run.py"
 
@@ -61,6 +62,7 @@ class LearningContractTests(unittest.TestCase):
             LEARNING_CONTRACT,
             FROZEN_LEARNING_CONTRACT,
             CAPABILITIES,
+            FROZEN_CAPABILITIES,
             RUBRIC,
         ):
             with self.subTest(path=path.name):
@@ -214,6 +216,36 @@ class LearningContractTests(unittest.TestCase):
         for kind in ("skill", "tool"):
             self.assertEqual(branches[kind]["required_fields"], ["version", "execution_receipt"])
             self.assertEqual(branches[kind]["execution_receipt"], "required_when_captured")
+
+    def test_runtime_capability_and_execution_receipt_schemas_are_machine_bounded(self) -> None:
+        contract = self.load_json(LEARNING_CONTRACT)
+        runtime = contract["runtime_capabilities"]
+        self.assertEqual(runtime["capabilities_type"], "object_by_capability_id")
+        self.assertEqual(
+            set(runtime["status_enum"]), {"available", "degraded", "missing"}
+        )
+        self.assertEqual(
+            set(runtime["probe_result_enum"]), {"passed", "degraded", "failed", "missing"}
+        )
+        self.assertEqual(runtime["probe_field"], "probes")
+        self.assertEqual(runtime["ordered_fallback_selected_type"], "string_or_null")
+        self.assertEqual(runtime["all_selected_type"], "array")
+        self.assertTrue(runtime["all_requires_every_candidate"])
+
+        receipt = contract["execution_receipt"]
+        self.assertEqual(
+            receipt["required_fields"],
+            ["receipt_type", "command", "exit_code", "executed_at"],
+        )
+        self.assertEqual(receipt["receipt_type"], "execution")
+        self.assertEqual(receipt["command"], "nonempty_string_array")
+        self.assertEqual(receipt["exit_code"], "integer_not_boolean")
+        self.assertEqual(receipt["executed_at"], "rfc3339_timezone_aware")
+        self.assertEqual(
+            set(receipt["optional_reference_fields"]), {"stdout", "stderr", "target"}
+        )
+        self.assertEqual(receipt["result_binding"]["passed"], "exit_code_zero")
+        self.assertEqual(receipt["result_binding"]["failed"], "exit_code_nonzero")
 
     def test_retrospective_contract_is_complete_without_inventing_review_rules(self) -> None:
         contract = self.load_json(LEARNING_CONTRACT)
@@ -491,6 +523,17 @@ class LearningContractTests(unittest.TestCase):
             return set()
 
         self.assertFalse(forbidden_runtime_keys & walk_keys(registry))
+
+    def test_capability_registry_is_frozen_and_hash_pinned_by_v11(self) -> None:
+        self.assertEqual(CAPABILITIES.read_bytes(), FROZEN_CAPABILITIES.read_bytes())
+        registry = self.load_json(FROZEN_CAPABILITIES)
+        self.assertEqual(registry["registry_version"], "1.0.0")
+        extension = self.load_json(V11)["learning_extension"]
+        self.assertEqual(extension["capability_registry_version"], "1.0.0")
+        self.assertEqual(
+            extension["capability_registry_sha256"],
+            hashlib.sha256(FROZEN_CAPABILITIES.read_bytes()).hexdigest(),
+        )
 
     def test_low_scores_and_r2_residuals_are_candidate_only(self) -> None:
         rubric = self.load_json(RUBRIC)

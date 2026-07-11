@@ -63,7 +63,7 @@ Phase 0 先读取长期层 root index；存在相关项时最多读取一张主�
 | 相对路径 | 必需字段 |
 |---|---|
 | `memory-selection.json` | schema_version, workflow_version, run_id, query, selected[], rejected[], selection_snapshot, selection_snapshot_sha256, created_at |
-| `runtime-capabilities.json` | schema_version, workflow_version, run_id, probed_at, capabilities[] |
+| `runtime-capabilities.json` | schema_version, workflow_version, run_id, registry_version, registry_sha256, probed_at, capabilities{} |
 | `decision-trace.json` | schema_version, workflow_version, run_id, decisions[] |
 | `usage-events/*.json` | schema_version, workflow_version, run_id, event_id, kind, stage, capability_id, actual_id, purpose, result, capture_state, evidence_refs[], recorded_at |
 | `skill-usage-manifest.json` | schema_version, workflow_version, run_id, entries[] |
@@ -153,6 +153,10 @@ Validator 必须确认 selection/sidecar 文件真实存在且为普通文件，
 | `tool` | `version`, `execution_receipt.path`, `execution_receipt.sha256` | `required_when_captured` |
 
 `content` 记录本轮实际读取的 source/artifact，只绑定真实 run-relative ref 和脚本重算的内容 hash，不要求工具 receipt。`skill`/`tool` 在 `captured` 时绑定可得版本与受信 execution receipt；版本不可得时保留 `null`，不能从当前环境猜测历史版本。
+
+`runtime-capabilities.json` 的 `capabilities{}` 以 capability ID 为 key。每项统一使用 `probes[]`，probe 包含 registry candidate ID、有限 `result` 和真实 evidence refs。`ordered_fallback` 按 registry 优先级记录已探测前缀并选择第一个通过或可降级候选；`all` 模式必须覆盖全部候选，`selected` 是所有通过候选的数组。`status`、`selected` 与 `fallback` 必须能由 probe 结果和 registry fallback 机械推导。
+
+Execution receipt 本身必须是 JSON 对象，至少包含 `receipt_type=execution`、非空字符串数组 `command`、非布尔整数 `exit_code` 和带时区的 RFC3339 `executed_at`。可选 `stdout`、`stderr`、`target` 出现时必须是可重算 hash 的真实引用。`passed` 只接受 `exit_code=0`，`failed` 只接受非零；`degraded` receipt 不能支撑 manifest 的 `passed`。
 
 ## Usage coverage
 

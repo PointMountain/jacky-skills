@@ -17,6 +17,15 @@ INIT_RUN = SKILL_ROOT / "scripts" / "init_run.py"
 VALIDATE_RUN = SKILL_ROOT / "scripts" / "validate_run.py"
 AUDIT_STAGED = SKILL_ROOT / "scripts" / "audit_staged.py"
 WORKFLOW_PATH = SKILL_ROOT / "references" / "workflow.json"
+CAPABILITY_REGISTRY = (
+    SKILL_ROOT / "references" / "capability-registries" / "1.0.0.json"
+)
+CAPABILITY_CANDIDATES = {
+    entry["id"]: [candidate["id"] for candidate in entry["candidates"]]
+    for entry in json.loads(CAPABILITY_REGISTRY.read_text(encoding="utf-8"))[
+        "capabilities"
+    ]
+}
 RUBRIC_PATH = SKILL_ROOT / "references" / "rubric.json"
 DIMENSIONS = [
     item["id"]
@@ -796,6 +805,11 @@ class ValidateRunTests(CliTestCase):
             "workflow_version": "1.1.0",
             "run_id": "valid-run",
         }
+        decision_evidence = {
+            "transcript": self.run_dir / "transcript.json",
+            "plan_demo": self.run_dir / "asset-plan.json",
+            "revise": self.run_dir / "score-r1.json",
+        }
         payloads = {
             "memory-selection.json": {
                 **identity,
@@ -808,15 +822,41 @@ class ValidateRunTests(CliTestCase):
             },
             "runtime-capabilities.json": {
                 **identity,
+                "registry_version": "1.0.0",
+                "registry_sha256": self.digest(CAPABILITY_REGISTRY),
                 "probed_at": "2026-07-11T00:00:00Z",
                 "capabilities": {},
             },
-            "decision-trace.json": {**identity, "decisions": []},
-            "skill-usage-manifest.json": {**identity, "entries": []},
+            "decision-trace.json": {
+                **identity,
+                "decisions": [
+                    {
+                        "decision_id": f"decision-{index}",
+                        "stage": stage,
+                        "observation": f"{stage} 已有可定位事实",
+                        "evidence_refs": [self.run_ref(decision_evidence[stage])],
+                        "decision": "继续当前受限方案",
+                        "action": "执行下一阶段",
+                        "validation": "由后续工件验证",
+                        "error": None,
+                        "root_cause": None,
+                        "next_rule": "保持证据边界",
+                        "recorded_at": f"2026-07-11T00:00:0{index}Z",
+                    }
+                    for index, stage in enumerate(("transcript", "plan_demo", "revise"))
+                ],
+            },
+            "skill-usage-manifest.json": {
+                **identity,
+                "entries": [],
+                "bindings": self.learning_core_bindings(),
+            },
             "usage-ledger.json": {
                 **identity,
-                "event_refs": ["usage-events/event-001.json"],
+                "event_refs": [],
                 "manifest": {},
+                "entries": {"content": [], "skill": [], "tool": []},
+                "bindings": self.learning_core_bindings(),
             },
             "retrospective.json": {
                 **identity,
@@ -825,6 +865,7 @@ class ValidateRunTests(CliTestCase):
                 "skills_manifest_ref": "skill-usage-manifest.json",
                 "evidence": [],
                 "findings": [],
+                "bindings": self.learning_core_bindings(),
             },
             "usage-events/event-001.json": {
                 **identity,
@@ -836,30 +877,108 @@ class ValidateRunTests(CliTestCase):
                 "purpose": "验证使用事件最低结构",
                 "result": "passed",
                 "capture_state": "captured",
-                "evidence_refs": ["preflight.json"],
+                "evidence_refs": [self.run_ref(self.run_dir / "preflight.json")],
                 "recorded_at": "2026-07-11T00:00:00Z",
                 "content_ref": "preflight.json",
-                "content_sha256": "f" * 64,
+                "content_sha256": self.digest(self.run_dir / "preflight.json"),
             },
         }
         return payloads[name]
 
+    def learning_core_bindings(self) -> dict:
+        run = self.run_json("valid-run")
+        return {
+            "source_media_sha256": run["source"]["media_sha256"],
+            **{
+                stage: {
+                    "path": run["artifacts"][stage]["path"],
+                    "sha256": run["artifacts"][stage]["sha256"],
+                }
+                for stage in ("build", "review_r1", "review_r2", "finalize")
+            },
+        }
+
     def add_structural_learning_sidecars(self) -> None:
         run = self.run_json("valid-run")
+        workflow = json.loads(WORKFLOW_PATH.read_text(encoding="utf-8"))
+        pairs = [
+            (stage["id"], capability)
+            for stage in workflow["stages"]
+            for capability in stage["capability_ids"]
+        ]
+        event_names = ["usage-events/event-001.json"]
+        for index, (stage, capability) in enumerate(pairs[1:], start=2):
+            name = f"usage-events/event-{index:03d}.json"
+            event_names.append(name)
+            self.learning_payloads_override = getattr(
+                self, "learning_payloads_override", {}
+            )
+            self.learning_payloads_override[name] = {
+                "schema_version": "1.0.0",
+                "workflow_version": "1.1.0",
+                "run_id": "valid-run",
+                "event_id": f"event-{index:03d}",
+                "kind": "tool",
+                "stage": stage,
+                "capability_id": capability,
+                "actual_id": CAPABILITY_CANDIDATES[capability][0],
+                "purpose": "明确记录 coverage",
+                "result": "not_recorded",
+                "capture_state": "not_recorded",
+                "evidence_refs": [],
+                "recorded_at": "2026-07-11T00:00:00Z",
+                "version": None,
+                "execution_receipt": None,
+            }
         sidecar_names = [
             "runtime-capabilities.json",
             "decision-trace.json",
             "skill-usage-manifest.json",
+            *event_names,
             "usage-ledger.json",
             "retrospective.json",
-            "usage-events/event-001.json",
         ]
         descriptors = {}
         for name in ["memory-selection.json", *sidecar_names]:
             path = self.run_dir / name
             path.parent.mkdir(parents=True, exist_ok=True)
+            if name == "usage-ledger.json":
+                ledger = self.learning_payload(name)
+                ledger["event_refs"] = [
+                    {
+                        "path": event_name,
+                        "sha256": self.digest(self.run_dir / event_name),
+                    }
+                    for event_name in event_names
+                ]
+                ledger["manifest"] = {
+                    "path": "skill-usage-manifest.json",
+                    "sha256": self.digest(self.run_dir / "skill-usage-manifest.json"),
+                }
+                for event_name in event_names:
+                    event = json.loads(
+                        (self.run_dir / event_name).read_text(encoding="utf-8")
+                    )
+                    ledger["entries"][event["kind"]].append(
+                        {
+                            "event_id": event["event_id"],
+                            "event_ref": event_name,
+                            "stage": event["stage"],
+                            "capability_id": event["capability_id"],
+                            "actual_id": event["actual_id"],
+                            "result": event["result"],
+                            "capture_state": event["capture_state"],
+                            "evidence_refs": event["evidence_refs"],
+                        }
+                    )
+                payload = ledger
+            else:
+                overrides = getattr(self, "learning_payloads_override", {})
+                payload = (
+                    overrides[name] if name in overrides else self.learning_payload(name)
+                )
             path.write_text(
-                json.dumps(self.learning_payload(name), ensure_ascii=False) + "\n",
+                json.dumps(payload, ensure_ascii=False) + "\n",
                 encoding="utf-8",
             )
             descriptor = {"path": name, "sha256": self.digest(path)}

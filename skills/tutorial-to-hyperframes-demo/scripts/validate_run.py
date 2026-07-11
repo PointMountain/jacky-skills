@@ -17,6 +17,11 @@ import sys
 from typing import Any, Callable
 
 from init_run import atomic_write_json
+from learning_common import (
+    ensure_secure_existing_directory,
+    read_stable_file_bytes,
+    reject_private_payload,
+)
 
 
 STAGES = [
@@ -76,9 +81,10 @@ SUPPORTED_WORKFLOWS = {
 SUPPORTED_LEARNING_CONTRACTS = {
     "1.0.0": {
         "path": SKILL_ROOT / "references" / "learning-contracts" / "1.0.0.json",
-        "sha256": "e333654ef5ac2582f19f5ee9e5b90dd11b9a3b9f8d6c783283840d56bf1196e7",
+        "sha256": "1d7e76d5a74c1afbea83cee933a16bfbc301ba51d481fe991c66e5ec542b9c50",
     },
 }
+CAPABILITY_REGISTRIES_ROOT = SKILL_ROOT / "references" / "capability-registries"
 RUBRIC_PATH = SKILL_ROOT / "references" / "rubric.json"
 REQUIRED_VERIFICATION_LOGS = {
     "tests",
@@ -105,6 +111,10 @@ def file_hash(path: Path) -> str:
     return digest.hexdigest()
 
 
+def stable_file_hash(path: Path) -> str:
+    return hashlib.sha256(read_stable_file_bytes(path)).hexdigest()
+
+
 def load_object(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -117,12 +127,37 @@ def load_object(path: Path) -> dict[str, Any]:
     return value
 
 
+def load_stable_object(path: Path) -> tuple[dict[str, Any], str]:
+    try:
+        content = read_stable_file_bytes(path)
+        value = json.loads(content.decode("utf-8"))
+    except FileNotFoundError as error:
+        raise ValidationFailure(f"文件不存在：{path}") from error
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValidationFailure(f"JSON 稳定读取失败：{path}: {error}") from error
+    if not isinstance(value, dict):
+        raise ValidationFailure(f"JSON 顶层必须是对象：{path}")
+    return value, hashlib.sha256(content).hexdigest()
+
+
 def is_hash(value: Any) -> bool:
     return isinstance(value, str) and bool(HASH_RE.fullmatch(value))
 
 
 def is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def valid_rfc3339(value: Any) -> bool:
+    if not isinstance(value, str) or not re.search(r"(?:Z|[+-]\d{2}:\d{2})$", value):
+        return False
+    try:
+        parsed = datetime.fromisoformat(
+            value[:-1] + "+00:00" if value.endswith("Z") else value
+        )
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() is not None
 
 
 def validate_identifier(value: str, label: str) -> None:
@@ -145,14 +180,15 @@ class Validator:
         validate_identifier(run_id, "run-id")
         self.repo = repo.resolve()
         self.run_id = run_id
-        self.runs_root = (self.repo / ".learning" / "runs").resolve()
-        self.run_dir = (self.runs_root / run_id).resolve()
+        self.runs_root = self.repo / ".learning" / "runs"
+        self.run_dir = self.runs_root / run_id
         try:
-            relative_run = self.run_dir.relative_to(self.runs_root)
-        except ValueError as error:
-            raise ValidationFailure("run-id 逃逸 .learning/runs") from error
-        if len(relative_run.parts) != 1 or relative_run.name != run_id:
-            raise ValidationFailure("run-id 必须直接位于 .learning/runs 下")
+            ensure_secure_existing_directory(self.runs_root)
+            ensure_secure_existing_directory(self.run_dir)
+        except (FileNotFoundError, OSError, ValueError) as error:
+            raise ValidationFailure(
+                ".learning/runs/run 目录链不存在或包含 symlink"
+            ) from error
         self.run_path = self.run_dir / "run.json"
         self.ffprobe_mode = ffprobe_mode
         self.core_only = core_only
@@ -162,7 +198,7 @@ class Validator:
         self.invalid_index: int | None = None
         self.contents: dict[str, dict[str, Any]] = {}
         # run 本身决定要解析哪一份冻结契约；未知版本绝不能回退到 current。
-        self.run = load_object(self.run_path)
+        self.run, _ = load_stable_object(self.run_path)
         raw_workflow_version = self.run.get("workflow_version")
         self.workflow_version = (
             raw_workflow_version if isinstance(raw_workflow_version, str) else None
@@ -176,8 +212,7 @@ class Validator:
                 f"run.workflow_version 不受支持：{raw_workflow_version!r}"
             )
         else:
-            self.workflow = load_object(self.workflow_path)
-            self.workflow_hash = file_hash(self.workflow_path)
+            self.workflow, self.workflow_hash = load_stable_object(self.workflow_path)
         self.rubric = load_object(RUBRIC_PATH)
         self.dimension_weights = self.load_dimension_weights()
         self.threshold = self.rubric.get("threshold")
@@ -195,6 +230,11 @@ class Validator:
         self.transcript_source_id: str | None = None
         self.transcript_cues: dict[str, dict[str, Any]] = {}
         self.build_target_hash: str | None = None
+        self.learning_contents: dict[str, dict[str, Any]] = {}
+        self.learning_file_bytes: dict[Path, bytes] = {}
+        self.learning_registry: dict[str, Any] | None = None
+        self.learning_registry_version: str | None = None
+        self.learning_registry_hash: str | None = None
 
     def load_dimension_weights(self) -> dict[str, float]:
         dimensions = self.rubric.get("subjective_dimensions")
@@ -1691,7 +1731,14 @@ class Validator:
         if not path.is_file() or path.stat().st_size == 0:
             self.error(f"{context} 指向的文件不存在或为空：{path_value}")
             return path
-        if is_hash(declared_hash) and file_hash(path) != declared_hash:
+        try:
+            content = self.learning_file_bytes.setdefault(
+                path, read_stable_file_bytes(path)
+            )
+        except (FileNotFoundError, OSError, ValueError) as error:
+            self.error(f"{context} 无法稳定读取：{error}")
+            return path
+        if is_hash(declared_hash) and hashlib.sha256(content).hexdigest() != declared_hash:
             self.error(f"{context} 内容 hash 与 sha256 不一致")
         return path
 
@@ -1701,8 +1748,15 @@ class Validator:
         if path is None or not path.is_file() or path.stat().st_size == 0:
             return None
         try:
-            return load_object(path)
-        except ValidationFailure as error:
+            content = self.learning_file_bytes.get(path)
+            if content is None:
+                content = read_stable_file_bytes(path)
+                self.learning_file_bytes[path] = content
+            value = json.loads(content.decode("utf-8"))
+            if not isinstance(value, dict):
+                raise ValidationFailure(f"JSON 顶层必须是对象：{path}")
+            return value
+        except (ValidationFailure, UnicodeDecodeError, json.JSONDecodeError, OSError, ValueError) as error:
             self.error(f"{context} 必须是 JSON 对象：{error}")
             return None
 
@@ -1782,6 +1836,16 @@ class Validator:
         value = self.load_learning_object(path, context)
         if value is None:
             return
+        try:
+            reject_private_payload(value)
+        except (TypeError, ValueError) as error:
+            self.error(f"{context} 包含私有或敏感 payload：{error}")
+        if path is not None:
+            try:
+                relative = path.relative_to(self.run_dir).as_posix()
+            except ValueError:
+                relative = context
+            self.learning_contents[relative] = value
         if kind != "usage_event":
             self.validate_learning_identity(
                 value, required_fields, contract, context
@@ -1816,6 +1880,788 @@ class Validator:
                     self.error(
                         f"{context} 缺少 kind required fields：{', '.join(missing)}"
                     )
+
+    def learning_capability_matrix(self) -> dict[str, set[str]]:
+        source = self.run.get("source")
+        source_kind = source.get("kind") if isinstance(source, dict) else None
+        matrix: dict[str, set[str]] = {}
+        stages = self.workflow.get("stages")
+        if not isinstance(stages, list):
+            self.error("learning workflow stages 必须是数组")
+            return matrix
+        for item in stages:
+            if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+                self.error("learning workflow stage 结构非法")
+                continue
+            raw_capabilities = item.get("capability_ids")
+            if not isinstance(raw_capabilities, list) or any(
+                not isinstance(value, str) for value in raw_capabilities
+            ):
+                self.error(f"learning workflow {item.get('id')} capability_ids 非法")
+                continue
+            capabilities = set(raw_capabilities)
+            conditional = item.get("conditional_capabilities", [])
+            if not isinstance(conditional, list):
+                self.error(
+                    f"learning workflow {item.get('id')} conditional_capabilities 非法"
+                )
+                conditional = []
+            for condition in conditional:
+                if not isinstance(condition, dict):
+                    self.error("learning conditional capability 必须是对象")
+                    continue
+                if (
+                    condition.get("when") == "source.kind == 'url'"
+                    and source_kind == "url"
+                    and isinstance(condition.get("capability_id"), str)
+                ):
+                    capabilities.add(condition["capability_id"])
+            matrix[item["id"]] = capabilities
+        return matrix
+
+    def load_pinned_capability_registry(self) -> dict[str, Any] | None:
+        if self.learning_registry is not None:
+            return self.learning_registry
+        extension = self.workflow.get("learning_extension")
+        if not isinstance(extension, dict):
+            self.error("workflow learning_extension 缺失 capability registry pin")
+            return None
+        version = extension.get("capability_registry_version")
+        expected_hash = extension.get("capability_registry_sha256")
+        if not isinstance(version, str) or not is_hash(expected_hash):
+            self.error("workflow capability registry pin 非法")
+            return None
+        path = CAPABILITY_REGISTRIES_ROOT / f"{version}.json"
+        try:
+            registry, actual_hash = load_stable_object(path)
+        except ValidationFailure as error:
+            self.error(str(error))
+            return None
+        if actual_hash != expected_hash or registry.get("registry_version") != version:
+            self.error("frozen capability registry 与 workflow pin 不一致")
+            return None
+        self.learning_registry = registry
+        self.learning_registry_version = version
+        self.learning_registry_hash = actual_hash
+        return registry
+
+    def validate_nested_learning_ref(
+        self, reference: Any, context: str
+    ) -> Path | None:
+        if not isinstance(reference, dict):
+            self.error(f"{context} 必须是包含 path/sha256 的证据对象")
+            return None
+        path_value = reference.get("path")
+        path = self.learning_path(path_value, f"{context}.path")
+        declared_hash = reference.get("sha256")
+        if not is_hash(declared_hash):
+            self.error(f"{context}.sha256 必须是 SHA-256")
+        if path is None:
+            return None
+        if not path.is_file() or path.stat().st_size == 0:
+            self.error(f"{context} 指向的 evidence 不存在或为空：{path_value}")
+            return path
+        try:
+            content = self.learning_file_bytes.setdefault(
+                path, read_stable_file_bytes(path)
+            )
+        except (FileNotFoundError, OSError, ValueError) as error:
+            self.error(f"{context} 无法稳定读取：{error}")
+            return path
+        if is_hash(declared_hash) and hashlib.sha256(content).hexdigest() != declared_hash:
+            self.error(f"{context} evidence hash 不一致")
+        return path
+
+    def validate_learning_refs(self, value: Any, context: str) -> list[Path]:
+        if not isinstance(value, list):
+            self.error(f"{context} 必须是 evidence descriptor 数组")
+            return []
+        paths: list[Path] = []
+        seen: set[str] = set()
+        for index, item in enumerate(value):
+            if isinstance(item, dict) and isinstance(item.get("path"), str):
+                if item["path"] in seen:
+                    self.error(f"{context} 不得重复引用 {item['path']!r}")
+                seen.add(item["path"])
+            path = self.validate_nested_learning_ref(item, f"{context}[{index}]")
+            if path is not None:
+                paths.append(path)
+        return paths
+
+    def validate_learning_bindings(self, value: Any, context: str) -> None:
+        if not isinstance(value, dict):
+            self.error(f"{context}.bindings 必须是对象")
+            return
+        source = self.run.get("source")
+        expected_media = source.get("media_sha256") if isinstance(source, dict) else None
+        if value.get("source_media_sha256") != expected_media:
+            self.error(f"{context}.bindings source hash 与当前 run 不一致")
+        artifacts = self.run.get("artifacts")
+        for stage in ("build", "review_r1", "review_r2", "finalize"):
+            descriptor = artifacts.get(stage) if isinstance(artifacts, dict) else None
+            actual = value.get(stage)
+            if not isinstance(descriptor, dict):
+                # 核心校验已报告该问题；这里仍保持学习错误不绑定核心失效阶段。
+                continue
+            expected = {
+                "path": descriptor.get("path"),
+                "sha256": descriptor.get("sha256"),
+            }
+            if actual != expected:
+                self.error(f"{context}.bindings 未绑定当前 {stage} descriptor")
+
+    def validate_runtime_capabilities_deep(self) -> None:
+        value = self.learning_contents.get("runtime-capabilities.json")
+        if not isinstance(value, dict):
+            return
+        capabilities = value.get("capabilities")
+        if not isinstance(capabilities, dict):
+            self.error("runtime-capabilities.capabilities 必须是对象")
+            return
+        registry_payload = self.load_pinned_capability_registry()
+        if not isinstance(registry_payload, dict):
+            return
+        policy = registry_payload.get("policy")
+        default_mode = policy.get("default_candidate_mode") if isinstance(policy, dict) else None
+        registry = {
+            item.get("id"): {
+                "mode": item.get("candidate_mode", default_mode),
+                "candidates": sorted(
+                    item.get("candidates", []), key=lambda candidate: candidate.get("priority", 0)
+                ),
+            }
+            for item in registry_payload.get("capabilities", [])
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        if (
+            value.get("registry_version") != self.learning_registry_version
+            or value.get("registry_sha256") != self.learning_registry_hash
+        ):
+            self.error("runtime-capabilities registry pin 与 workflow 不一致")
+        for capability_id, item in capabilities.items():
+            context = f"runtime-capabilities.capabilities[{capability_id!r}]"
+            if capability_id not in registry or not isinstance(item, dict):
+                self.error(f"{context} 不在 capability registry 或不是对象")
+                continue
+            registry_entry = registry[capability_id]
+            candidates = registry_entry["candidates"]
+            candidate_ids = [candidate.get("id") for candidate in candidates]
+            probes = item.get("probes")
+            if not isinstance(probes, list) or not probes:
+                self.error(f"{context}.probes 必须是非空数组")
+                continue
+            probe_ids: list[Any] = []
+            for index, probe in enumerate(probes):
+                probe_context = f"{context}.probes[{index}]"
+                if not isinstance(probe, dict):
+                    self.error(f"{probe_context} 必须是对象")
+                    continue
+                probe_ids.append(probe.get("candidate_id"))
+                if probe.get("candidate_id") not in candidate_ids:
+                    self.error(f"{probe_context}.candidate_id 不在 registry")
+                if probe.get("result") not in {"passed", "degraded", "failed", "missing"}:
+                    self.error(f"{probe_context}.result 非法")
+                if not self.validate_learning_refs(
+                    probe.get("evidence_refs"), f"{probe_context}.evidence_refs"
+                ):
+                    self.error(f"{probe_context} 缺少真实 evidence")
+            mode = registry_entry["mode"]
+            if item.get("candidate_mode") != mode:
+                self.error(f"{context}.candidate_mode 与 registry 不一致")
+            passed = [
+                probe.get("candidate_id")
+                for probe in probes
+                if isinstance(probe, dict) and probe.get("result") == "passed"
+            ]
+            if mode == "all":
+                if probe_ids != candidate_ids:
+                    self.error(f"{context} all 模式必须覆盖全部候选")
+                if len(passed) == len(candidate_ids):
+                    expected = ("available", passed, None)
+                elif passed or any(
+                    isinstance(probe, dict) and probe.get("result") == "degraded"
+                    for probe in probes
+                ):
+                    expected = ("degraded", passed, candidates[-1].get("fallback"))
+                else:
+                    expected = ("missing", [], candidates[-1].get("fallback"))
+            else:
+                if probe_ids != candidate_ids[: len(probe_ids)]:
+                    self.error(f"{context} ordered_fallback 必须是有序前缀")
+                passed_probe = next(
+                    (probe for probe in probes if isinstance(probe, dict) and probe.get("result") == "passed"),
+                    None,
+                )
+                if passed_probe is not None:
+                    expected = ("available", passed_probe.get("candidate_id"), None)
+                else:
+                    degraded = next(
+                        (probe for probe in probes if isinstance(probe, dict) and probe.get("result") == "degraded"),
+                        None,
+                    )
+                    if degraded is not None:
+                        selected = degraded.get("candidate_id")
+                        fallback = next(
+                            candidate.get("fallback")
+                            for candidate in candidates
+                            if candidate.get("id") == selected
+                        )
+                        expected = ("degraded", selected, fallback)
+                    else:
+                        if len(probes) != len(candidates):
+                            self.error(
+                                f"{context} ordered_fallback missing requires all candidates probed"
+                            )
+                        expected = ("missing", None, candidates[len(probes) - 1].get("fallback"))
+            if (item.get("status"), item.get("selected"), item.get("fallback")) != expected:
+                self.error(f"{context} status/selected/fallback 与 probes 不一致")
+            if not valid_rfc3339(item.get("checked_at")):
+                self.error(f"{context}.checked_at 不是带时区 RFC3339")
+
+    def validate_decision_trace_deep(self, completed_all: bool) -> None:
+        value = self.learning_contents.get("decision-trace.json")
+        if not isinstance(value, dict):
+            return
+        decisions = value.get("decisions")
+        if not isinstance(decisions, list):
+            self.error("decision-trace.decisions 必须是数组")
+            return
+        matrix = self.learning_capability_matrix()
+        seen: set[str] = set()
+        decision_stages: set[str] = set()
+        required = {
+            "decision_id",
+            "stage",
+            "observation",
+            "evidence_refs",
+            "decision",
+            "action",
+            "validation",
+            "error",
+            "root_cause",
+            "next_rule",
+            "recorded_at",
+        }
+        for index, item in enumerate(decisions):
+            context = f"decision-trace.decisions[{index}]"
+            if not isinstance(item, dict):
+                self.error(f"{context} 必须是对象")
+                continue
+            missing = sorted(required - item.keys())
+            if missing:
+                self.error(f"{context} 事实链缺少：{', '.join(missing)}")
+            decision_id = item.get("decision_id")
+            if not isinstance(decision_id, str) or decision_id in seen:
+                self.error(f"{context}.decision_id 非法或重复")
+            else:
+                seen.add(decision_id)
+            stage = item.get("stage")
+            if stage not in matrix:
+                self.error(f"{context}.stage 不在 workflow")
+            elif isinstance(stage, str):
+                decision_stages.add(stage)
+            refs = self.validate_learning_refs(
+                item.get("evidence_refs"), f"{context}.evidence_refs"
+            )
+            for field in ("observation", "decision", "action", "validation", "next_rule"):
+                if not isinstance(item.get(field), str) or not item[field].strip():
+                    self.error(f"{context}.{field} 必须是非空字符串")
+            for field in ("error", "root_cause"):
+                field_value = item.get(field)
+                if field_value is not None and (
+                    not isinstance(field_value, str) or not field_value.strip()
+                ):
+                    self.error(f"{context}.{field} 只能是 null 或非空字符串")
+            if item.get("root_cause") is not None and not refs:
+                self.error(f"{context} 无 evidence 的 root_cause 必须为 null")
+            if not valid_rfc3339(item.get("recorded_at")):
+                self.error(f"{context}.recorded_at 不是带时区 RFC3339")
+            core_stages: tuple[str, ...] = ()
+            if stage in {"transcript", "learn_method"}:
+                core_stages = ("transcript", "learn_method")
+            elif stage == "plan_demo":
+                core_stages = ("learn_method", "observe_motion", "plan_demo")
+            elif stage == "revise":
+                core_stages = ("review_r1",)
+            artifacts = self.run.get("artifacts")
+            allowed = {
+                (descriptor.get("path"), descriptor.get("sha256"))
+                for core_stage in core_stages
+                for descriptor in [
+                    artifacts.get(core_stage) if isinstance(artifacts, dict) else None
+                ]
+                if isinstance(descriptor, dict)
+            }
+            raw_refs = item.get("evidence_refs")
+            actual = {
+                (reference.get("path"), reference.get("sha256"))
+                for reference in (raw_refs if isinstance(raw_refs, list) else [])
+                if isinstance(reference, dict)
+            }
+            if core_stages and not (allowed & actual):
+                self.error(f"{context} evidence 未绑定合理 core artifact")
+        ordered = sorted(
+            (
+                item
+                for item in decisions
+                if isinstance(item, dict)
+            ),
+            key=lambda item: (
+                STAGES.index(item.get("stage")) if item.get("stage") in STAGES else len(STAGES),
+                str(item.get("recorded_at")),
+                str(item.get("decision_id")),
+            ),
+        )
+        if ordered != decisions:
+            self.error("decision-trace.decisions 必须按 stage/time/id 稳定排序")
+        if completed_all:
+            missing_points: list[str] = []
+            if not ({"transcript", "learn_method"} & decision_stages):
+                missing_points.append("extraction")
+            if "plan_demo" not in decision_stages:
+                missing_points.append("plan_demo")
+            if "revise" not in decision_stages:
+                missing_points.append("R1-to-revise")
+            if missing_points:
+                self.error(
+                    "decision trace 缺少审计判断点：" + ", ".join(missing_points)
+                )
+
+    def validate_usage_event_deep(
+        self,
+        relative: str,
+        value: dict[str, Any],
+        matrix: dict[str, set[str]],
+    ) -> None:
+        context = f"usage event {relative}"
+        event_id = value.get("event_id")
+        if not isinstance(event_id, str) or relative != f"usage-events/{event_id}.json":
+            self.error(f"{context}.event_id 与文件名不一致")
+        stage = value.get("stage")
+        capability_id = value.get("capability_id")
+        if stage not in matrix or capability_id not in matrix.get(stage, set()):
+            self.error(f"{context} stage/capability 不适用于当前 workflow")
+        if stage not in self.completed:
+            self.error(f"{context}.stage 尚未完成")
+        refs = self.validate_learning_refs(
+            value.get("evidence_refs"), f"{context}.evidence_refs"
+        )
+        capture_state = value.get("capture_state")
+        result = value.get("result")
+        if value.get("kind") not in {"content", "skill", "tool"}:
+            self.error(f"{context}.kind 非法")
+        if capture_state not in {"captured", "missing", "degraded", "not_recorded"}:
+            self.error(f"{context}.capture_state 非法")
+        if result not in {"passed", "degraded", "failed", "not_recorded"}:
+            self.error(f"{context}.result 非法")
+        for field in ("actual_id", "purpose"):
+            if not isinstance(value.get(field), str) or not value[field].strip():
+                self.error(f"{context}.{field} 必须是非空字符串")
+        if capture_state != "captured" and result == "passed":
+            self.error(f"{context} coverage event 不能声明 passed")
+        if capture_state == "captured" and result == "not_recorded":
+            self.error(f"{context} captured 不能声明 not_recorded")
+        if result == "passed" and not refs:
+            self.error(f"{context} passed 缺少真实 evidence")
+        kind = value.get("kind")
+        if kind == "content":
+            content_ref = value.get("content_ref")
+            content_path = self.learning_path(content_ref, f"{context}.content_ref")
+            if content_path is None or not content_path.is_file():
+                self.error(f"{context}.content_ref 不存在")
+            elif value.get("content_sha256") != stable_file_hash(content_path):
+                self.error(f"{context}.content_sha256 与真实内容不一致")
+            if value.get("execution_receipt") is not None:
+                self.error(f"{context} content 禁止 execution_receipt")
+        elif kind in {"skill", "tool"}:
+            if "version" not in value or "execution_receipt" not in value:
+                self.error(f"{context} 缺少显式 version/execution_receipt")
+            registry_payload = self.load_pinned_capability_registry()
+            registry_entries = (
+                registry_payload.get("capabilities", [])
+                if isinstance(registry_payload, dict)
+                else []
+            )
+            candidates = {
+                candidate.get("id")
+                for entry in registry_entries
+                if isinstance(entry, dict) and entry.get("id") == capability_id
+                for candidate in entry.get("candidates", [])
+                if isinstance(candidate, dict)
+            }
+            if value.get("actual_id") not in candidates:
+                self.error(f"{context}.actual_id 不在 capability registry")
+            version = value.get("version")
+            if version is None and not (
+                result == "not_recorded"
+                or capture_state in {"missing", "not_recorded"}
+            ):
+                self.error(f"{context}.version 仅可在 not_recorded/missing 时为 null")
+            elif version is not None and (
+                not isinstance(version, str) or not version.strip()
+            ):
+                self.error(f"{context}.version 必须是非空字符串或 null")
+            receipt = value.get("execution_receipt")
+            if capture_state == "captured" and receipt is None:
+                self.error(f"{context} captured skill/tool 缺少 execution receipt")
+            if receipt is not None:
+                self.validate_execution_receipt_deep(
+                    receipt, result, f"{context}.execution_receipt"
+                )
+        if not valid_rfc3339(value.get("recorded_at")):
+            self.error(f"{context}.recorded_at 不是带时区 RFC3339")
+
+    def validate_execution_receipt_deep(
+        self, reference: Any, result: Any, context: str
+    ) -> None:
+        path = self.validate_nested_learning_ref(reference, context)
+        if path is None or not path.is_file():
+            return
+        try:
+            content = self.learning_file_bytes.get(path)
+            if content is None:
+                content = read_stable_file_bytes(path)
+                self.learning_file_bytes[path] = content
+            receipt = json.loads(content.decode("utf-8"))
+            if not isinstance(receipt, dict):
+                raise ValidationFailure(f"JSON 顶层必须是对象：{path}")
+        except (ValidationFailure, UnicodeDecodeError, json.JSONDecodeError, OSError, ValueError) as error:
+            self.error(f"{context} 不是合法 execution receipt：{error}")
+            return
+        try:
+            reject_private_payload(receipt)
+        except (TypeError, ValueError) as error:
+            self.error(f"{context} 包含私有或敏感数据：{error}")
+        required = {"receipt_type", "command", "exit_code", "executed_at"}
+        missing = sorted(required - receipt.keys())
+        if missing:
+            self.error(f"{context} 缺少：{', '.join(missing)}")
+        if receipt.get("receipt_type") != "execution":
+            self.error(f"{context}.receipt_type 必须为 execution")
+        command = receipt.get("command")
+        if not isinstance(command, list) or not command or any(
+            not isinstance(item, str) or not item.strip() for item in command
+        ):
+            self.error(f"{context}.command 必须是非空字符串数组")
+        exit_code = receipt.get("exit_code")
+        if type(exit_code) is not int:
+            self.error(f"{context}.exit_code 必须是非布尔整数")
+        if not valid_rfc3339(receipt.get("executed_at")):
+            self.error(f"{context}.executed_at 不是带时区 RFC3339")
+        if result == "passed" and exit_code != 0:
+            self.error(f"{context}.exit_code 必须为 0 才能支撑 passed")
+        if result == "failed" and exit_code == 0:
+            self.error(f"{context}.exit_code 必须非零才能支撑 failed")
+        for optional in ("stdout", "stderr", "target"):
+            if optional in receipt:
+                self.validate_nested_learning_ref(
+                    receipt[optional], f"{context}.{optional}"
+                )
+
+    def validate_manifest_deep(
+        self,
+        value: dict[str, Any],
+        events: list[tuple[str, dict[str, Any]]],
+        matrix: dict[str, set[str]],
+    ) -> None:
+        entries = value.get("entries")
+        if not isinstance(entries, list):
+            self.error("skill usage manifest.entries 必须是数组")
+            return
+        required = {
+            "capability",
+            "phase",
+            "candidates_checked",
+            "selected",
+            "source",
+            "revision",
+            "mode",
+            "inputs",
+            "outputs",
+            "result",
+            "evidence_refs",
+            "friction",
+            "adjustment_candidate",
+        }
+        registry_payload = self.load_pinned_capability_registry()
+        if not isinstance(registry_payload, dict):
+            return
+        registry = {
+            entry.get("id"): {
+                candidate.get("id")
+                for candidate in entry.get("candidates", [])
+                if isinstance(candidate, dict) and isinstance(candidate.get("id"), str)
+            }
+            for entry in registry_payload.get("capabilities", [])
+            if isinstance(entry, dict) and isinstance(entry.get("id"), str)
+        }
+        for index, item in enumerate(entries):
+            context = f"skill usage manifest.entries[{index}]"
+            if not isinstance(item, dict):
+                self.error(f"{context} 必须是对象")
+                continue
+            missing = sorted(required - item.keys())
+            if missing:
+                self.error(f"{context} 缺少 contract 字段：{', '.join(missing)}")
+            phase = item.get("phase")
+            capability = item.get("capability")
+            if phase not in matrix or capability not in matrix.get(phase, set()):
+                self.error(f"{context} phase/capability 不适用于 workflow")
+            candidates = item.get("candidates_checked")
+            if not isinstance(candidates, list) or any(
+                candidate not in registry.get(capability, set())
+                for candidate in candidates
+            ):
+                self.error(f"{context}.candidates_checked 不在 capability registry")
+            selected = item.get("selected")
+            if selected is not None and selected not in registry.get(capability, set()):
+                self.error(f"{context}.selected 不在 capability registry")
+            if isinstance(candidates, list) and selected not in candidates:
+                self.error(f"{context}.selected 必须属于 candidates_checked")
+            if item.get("result") not in {"passed", "degraded", "failed", "not_recorded"}:
+                self.error(f"{context}.result 非法")
+            for field in ("source", "mode"):
+                if not isinstance(item.get(field), str) or not item[field].strip():
+                    self.error(f"{context}.{field} 必须是非空字符串")
+            refs = self.validate_learning_refs(
+                item.get("evidence_refs"), f"{context}.evidence_refs"
+            )
+            outputs = self.validate_learning_refs(
+                item.get("outputs"), f"{context}.outputs"
+            )
+            matching_events = [
+                event
+                for _, event in events
+                if event.get("stage") == phase
+                and event.get("capability_id") == capability
+                and event.get("capture_state") == "captured"
+                and event.get("result") == "passed"
+                and event.get("actual_id") == selected
+                and event.get("execution_receipt") is not None
+            ]
+            matching_receipt = bool(matching_events)
+            if item.get("result") == "passed" and not refs:
+                self.error(f"{context} passed 缺少 evidence")
+            if item.get("result") == "passed" and not matching_receipt:
+                self.error(f"{context} passed selected 缺少匹配 captured+passed usage")
+            if item.get("result") == "passed" and not outputs:
+                self.error(f"{context} passed 缺少真实 output")
+            revision = item.get("revision")
+            if item.get("result") == "passed" and (
+                not isinstance(revision, str)
+                or not revision.strip()
+                or any(event.get("version") != revision for event in matching_events)
+            ):
+                self.error(f"{context}.revision 未匹配 usage version")
+        passed_usage_keys = {
+            (
+                event.get("stage"),
+                event.get("capability_id"),
+                event.get("actual_id"),
+                event.get("version"),
+            )
+            for _, event in events
+            if event.get("kind") in {"skill", "tool"}
+            and event.get("capture_state") == "captured"
+            and event.get("result") == "passed"
+        }
+        passed_manifest_keys = [
+            (
+                item.get("phase"),
+                item.get("capability"),
+                item.get("selected"),
+                item.get("revision"),
+            )
+            for item in entries
+            if isinstance(item, dict) and item.get("result") == "passed"
+        ]
+        try:
+            unique_manifest_keys = set(passed_manifest_keys)
+        except TypeError:
+            unique_manifest_keys = set()
+            self.error("passed manifest projection keys 必须是字符串字段")
+        if len(passed_manifest_keys) != len(unique_manifest_keys):
+            self.error("duplicate passed manifest projection entry")
+        if unique_manifest_keys != passed_usage_keys:
+            self.error(
+                "passed manifest projection must exactly equal captured passed usage keys"
+            )
+        self.validate_learning_bindings(value.get("bindings"), "skill usage manifest")
+
+    def validate_ledger_deep(
+        self,
+        value: dict[str, Any],
+        events: list[tuple[str, dict[str, Any]]],
+        manifest_path: Path | None,
+    ) -> None:
+        refs = value.get("event_refs")
+        if not isinstance(refs, list):
+            self.error("usage ledger.event_refs 必须是 descriptor 数组")
+            refs = []
+        ref_paths: set[str] = set()
+        for index, item in enumerate(refs):
+            path = self.validate_nested_learning_ref(
+                item, f"usage ledger.event_refs[{index}]"
+            )
+            if isinstance(item, dict) and isinstance(item.get("path"), str):
+                ref_paths.add(item["path"])
+            if path is not None and path.parent.name != "usage-events":
+                self.error("usage ledger.event_refs 只能指向 usage-events")
+        event_paths = {relative for relative, _ in events}
+        if ref_paths != event_paths:
+            self.error("usage ledger.event_refs 与 immutable usage events 不一致")
+        manifest = value.get("manifest")
+        resolved_manifest = self.validate_nested_learning_ref(
+            manifest, "usage ledger.manifest"
+        )
+        if (
+            resolved_manifest is not None
+            and manifest_path is not None
+            and resolved_manifest != manifest_path
+        ):
+            self.error("usage ledger.manifest 未绑定 skill usage manifest")
+        entries = value.get("entries")
+        if not isinstance(entries, dict):
+            self.error("usage ledger.entries 必须从实际 events 分组")
+        else:
+            listed = {
+                item.get("event_ref")
+                for group in entries.values()
+                if isinstance(group, list)
+                for item in group
+                if isinstance(item, dict)
+            }
+            if listed != event_paths:
+                self.error("usage ledger.entries 与实际 immutable events 不一致")
+            expected_entries = {kind: [] for kind in ("content", "skill", "tool")}
+            for relative, event in events:
+                kind = event.get("kind")
+                if kind not in expected_entries:
+                    continue
+                expected_entries[kind].append(
+                    {
+                        "event_id": event.get("event_id"),
+                        "event_ref": relative,
+                        "stage": event.get("stage"),
+                        "capability_id": event.get("capability_id"),
+                        "actual_id": event.get("actual_id"),
+                        "result": event.get("result"),
+                        "capture_state": event.get("capture_state"),
+                        "evidence_refs": event.get("evidence_refs"),
+                    }
+                )
+            if entries != expected_entries:
+                self.error("usage ledger.entries 不是实际 immutable events 的确定性聚合")
+        self.validate_learning_bindings(value.get("bindings"), "usage ledger")
+
+    def validate_retrospective_deep(self, value: dict[str, Any]) -> None:
+        if not isinstance(value.get("objective"), str) or not value["objective"].strip():
+            self.error("retrospective.objective 必须是非空字符串")
+        if value.get("result") not in {"success", "success_with_residuals"}:
+            self.error("retrospective.result 非法")
+        if value.get("skills_manifest_ref") != "skill-usage-manifest.json":
+            self.error("retrospective.skills_manifest_ref 非法")
+        self.validate_learning_refs(value.get("evidence"), "retrospective.evidence")
+        findings = value.get("findings")
+        if not isinstance(findings, list):
+            self.error("retrospective.findings 必须是数组")
+            findings = []
+        for index, item in enumerate(findings):
+            context = f"retrospective.findings[{index}]"
+            if not isinstance(item, dict):
+                self.error(f"{context} 必须是对象")
+                continue
+            refs = self.validate_learning_refs(
+                item.get("evidence_refs"), f"{context}.evidence_refs"
+            )
+            if item.get("type") not in {
+                "effective_pattern",
+                "failure_root_cause",
+                "environment_fact",
+                "skill_friction",
+            }:
+                self.error(f"{context}.type 非法")
+            if not isinstance(item.get("claim"), str) or not item["claim"].strip():
+                self.error(f"{context}.claim 必须是非空字符串")
+            applies_to = item.get("applies_to")
+            if not isinstance(applies_to, list) or not applies_to or any(
+                not isinstance(scope, str) or not scope.strip() for scope in applies_to
+            ):
+                self.error(f"{context}.applies_to 必须是非空字符串数组")
+            basis = item.get("basis")
+            if basis is not None and basis not in {
+                "observed",
+                "reviewer_feedback",
+                "user_instruction",
+                "guess",
+                "aesthetic_opinion",
+                "residual",
+            }:
+                self.error(f"{context}.basis 非法")
+            destination = item.get("destination_candidate")
+            if destination not in {
+                "reference",
+                "local_memory",
+                "error_memory",
+                "skill_adjustment",
+                "backlog",
+            }:
+                self.error(f"{context}.destination_candidate 非法")
+            if item.get("status") != "candidate":
+                self.error(f"{context}.status 必须为 candidate")
+            if (
+                not refs
+                or basis in {"guess", "aesthetic_opinion", "residual"}
+            ) and destination != "backlog":
+                self.error(f"{context} 无证据、猜测、审美或 residual 只能 backlog")
+        self.validate_learning_bindings(value.get("bindings"), "retrospective")
+
+    def validate_learning_semantics_deep(self, completed_all: bool) -> None:
+        matrix = self.learning_capability_matrix()
+        self.validate_runtime_capabilities_deep()
+        self.validate_decision_trace_deep(completed_all)
+        events = sorted(
+            (
+                (relative, value)
+                for relative, value in self.learning_contents.items()
+                if relative.startswith("usage-events/")
+            ),
+            key=lambda item: item[0],
+        )
+        for relative, event in events:
+            self.validate_usage_event_deep(relative, event, matrix)
+        if completed_all:
+            required = {
+                (stage, capability)
+                for stage in self.completed
+                for capability in matrix.get(stage, set())
+            }
+            covered = {
+                (event.get("stage"), event.get("capability_id"))
+                for _, event in events
+                if event.get("capture_state")
+                in {"captured", "missing", "degraded", "not_recorded"}
+            }
+            missing = sorted(required - covered)
+            if missing:
+                self.error(
+                    "learning usage coverage 缺少："
+                    + ", ".join(f"{stage}:{capability}" for stage, capability in missing)
+                )
+        manifest = self.learning_contents.get("skill-usage-manifest.json")
+        manifest_path = (
+            self.run_dir / "skill-usage-manifest.json"
+            if isinstance(manifest, dict)
+            else None
+        )
+        if isinstance(manifest, dict):
+            self.validate_manifest_deep(manifest, events, matrix)
+        ledger = self.learning_contents.get("usage-ledger.json")
+        if isinstance(ledger, dict):
+            self.validate_ledger_deep(ledger, events, manifest_path)
+        retrospective = self.learning_contents.get("retrospective.json")
+        if isinstance(retrospective, dict):
+            self.validate_retrospective_deep(retrospective)
 
     def validate_learning_extension(self, completed: list[str]) -> None:
         if self.core_only:
@@ -1869,10 +2715,9 @@ class Validator:
                 contract = None
                 contract_path = None
             else:
-                actual_contract_hash = file_hash(contract_path)
+                contract, actual_contract_hash = load_stable_object(contract_path)
                 if actual_contract_hash != pinned_contract_hash:
                     self.error("learning contract 实际 hash 与固定 allowlist 不一致")
-                contract = load_object(contract_path)
         if isinstance(contract, dict):
             if contract.get("contract_version") != contract_version:
                 self.error("learning contract 文件版本与 extension 不一致")
@@ -1968,6 +2813,25 @@ class Validator:
                 f"run.extensions.learning_loop.sidecars[{key!r}]",
             )
 
+        usage_directory = self.run_dir / "usage-events"
+        actual_usage_events: set[str] = set()
+        if usage_directory.exists():
+            if usage_directory.is_symlink() or not usage_directory.is_dir():
+                self.error("usage-events 必须是无 symlink 的普通目录")
+            else:
+                for path in usage_directory.iterdir():
+                    if path.is_symlink() or not path.is_file():
+                        self.error("usage-events 只允许单层普通 JSON 文件")
+                    elif path.suffix == ".json" and path.stem:
+                        actual_usage_events.add(f"usage-events/{path.name}")
+        descriptor_usage_events = set(recognized_usage_events)
+        if actual_usage_events != descriptor_usage_events:
+            self.error(
+                "usage-events 与 descriptors 必须 exact-set；"
+                f"orphan={sorted(actual_usage_events - descriptor_usage_events)} "
+                f"dangling={sorted(descriptor_usage_events - actual_usage_events)}"
+            )
+
         completed_all = completed == STAGES
         if not completed_all:
             if self.workflow_version == "1.0.0":
@@ -2007,6 +2871,7 @@ class Validator:
 
         if not recognized_usage_events:
             self.error("完成态 learning_loop.sidecars 缺少 usage-events/*.json coverage")
+        self.validate_learning_semantics_deep(completed_all)
 
     def validate(self) -> dict[str, Any]:
         completed = self.validate_state()
