@@ -38,7 +38,8 @@ if event == "PostToolUse" and data.get("tool_name") == "Skill":
 elif event == "UserPromptSubmit":
     prompt = (data.get("prompt") or "").lstrip()
     if prompt.startswith("/"):
-        m = re.match(r"/([A-Za-z0-9_:\-]+)", prompt)
+        # 斜杠命令必须在命令名后结束或跟空白，避免把 /Users/... 路径记成 Users。
+        m = re.match(r"/([A-Za-z0-9_:\-]+)(?=$|\s)", prompt)
         if m:
             cmd = m.group(1)
             # 过滤 Claude Code 内置命令，只统计真正的 skill / slash command
