@@ -30,7 +30,7 @@ jobs:
         run: python scripts/audit_skills.py --scan-shared-content
 
       - name: 验证 youtube-study-note
-        run: python -m unittest discover -s skills/youtube-study-note/tests -p 'test_*.py' -v
+        run: python -m unittest discover -s plugins/learning-tools/youtube-study-note/tests -p 'test_*.py' -v
 
       - name: 验证 todo
         run: bash plugins/dev-tools/todo/tests/verify.sh
@@ -61,4 +61,4 @@ jobs:
           node-version: "18"
 
       - name: 运行 browser-control 测试
-        run: node --test plugins/dev-tools/browser-control/tests/*.test.mjs
+        run: node --test plugins/dev-tools/browser-control/tests/routing-contract.test.mjs plugins/dev-tools/browser-control/tests/usage-ledger.test.mjs

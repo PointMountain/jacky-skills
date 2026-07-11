@@ -15,7 +15,7 @@ LEGACY_LINK_SCRIPT = (
 
 
 class JSkillsDocumentationContractTests(unittest.TestCase):
-    def test_documents_only_options_supported_by_v010(self) -> None:
+    def test_documents_only_supported_options(self) -> None:
         combined = J_SKILLS_DOC + "\n" + LINK_ALL_DOC
         for unsupported in (
             "--all-env",
@@ -28,8 +28,7 @@ class JSkillsDocumentationContractTests(unittest.TestCase):
                 self.assertNotIn(unsupported, combined)
 
     def test_uses_the_installed_package_name_and_real_bulk_entrypoint(self) -> None:
-        self.assertIn("npm install -g j-skills", J_SKILLS_DOC)
-        self.assertNotIn("@wangjs-jacky/j-skills", J_SKILLS_DOC)
+        self.assertIn("npm install -g @wangjs-jacky/j-skills", J_SKILLS_DOC)
         self.assertIn("./install.sh", LINK_ALL_DOC)
         self.assertNotIn("./link-all.sh", LINK_ALL_DOC)
 

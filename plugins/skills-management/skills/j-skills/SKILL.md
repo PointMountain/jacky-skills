@@ -1,6 +1,6 @@
 ---
 name: j-skills
-description: "管理 Agent Skills 的 j-skills CLI 操作指南，基于本机已安装的 0.1.0 命令面。当用户要链接本地 Skill、安装到 Claude Code/Codex/Cursor 等环境、卸载、查看安装状态或管理 registry 时使用。"
+description: "管理 Agent Skills 的 j-skills CLI 操作指南，基于本机已安装的 0.4.4 命令面。当用户要链接本地 Skill、安装到 Claude Code/Codex/Cursor 等环境、卸载、查看安装状态或管理 registry 时使用。"
 ---
 
 # j-skills
@@ -18,7 +18,7 @@ description: "管理 Agent Skills 的 j-skills CLI 操作指南，基于本机�
 ## 安装 CLI
 
 ```bash
-npm install -g j-skills
+npm install -g @wangjs-jacky/j-skills@latest --registry=https://registry.npmjs.org/
 j-skills --version
 ```
 
@@ -86,6 +86,17 @@ j-skills config:registries
 j-skills config:use name
 ```
 
+## CLI 发布流程
+
+`@wangjs-jacky/j-skills` 已改为 GitHub Actions 自动发布。修改 CLI 源码后，不要在本机执行 `npm publish`。
+
+1. 只更新 `jacky-skills-package/packages/cli/package.json` 的版本号。
+2. 提交并推送到 `main`。
+3. 创建并推送匹配版本号的 `v*` tag，例如 `v0.4.4`。
+4. 等待 `.github/workflows/publish.yml` 自动测试、typecheck、build、校验 CLI 自报版本，并通过 npm Trusted Publishing / OIDC 发布。
+
+`packages/cli/src/index.ts` 从 `package.json` 读取版本号，禁止再写死 `const VERSION = 'x.y.z'`。2026-07-12 已验证 CI 可发布 `@wangjs-jacky/j-skills@0.4.4`；后续不需要本机 `npm login`、不需要长期 `NPM_TOKEN`。
+
 ## 标准流程
 
 ```bash
@@ -109,3 +120,4 @@ j-skills list skill-name --json
 - 同名冲突：对比 registry 路径与期望目录，不自动覆盖。
 - 安装后未生效：用 `j-skills list skill-name --json` 检查目标环境路径，必要时重启 Agent 会话。
 - 参数不确定：运行 `j-skills <command> --help`，不从旧文档猜测。
+- `npm publish` 报 `ENEEDAUTH`：不要在本机发布。检查是否已推送匹配 `packages/cli/package.json` 的 `v*` tag，并查看 GitHub Actions 的 Publish j-skills to npm workflow。

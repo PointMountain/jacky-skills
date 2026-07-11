@@ -113,8 +113,7 @@ test("插件清单、README 与 CI 暴露 browser-control", async () => {
     assert.match(workflow, new RegExp(runner));
   }
   assert.match(workflow, /node-version:\s*["']?18["']?/);
-  assert.match(
-    workflow,
-    /node --test plugins\/dev-tools\/browser-control\/tests\/\*\.test\.mjs/,
-  );
+  assert.match(workflow, /node --test/);
+  assert.match(workflow, /plugins\/dev-tools\/browser-control\/tests\/routing-contract\.test\.mjs/);
+  assert.match(workflow, /plugins\/dev-tools\/browser-control\/tests\/usage-ledger\.test\.mjs/);
 });
