@@ -50,6 +50,22 @@ class VideoToolTests(unittest.TestCase):
             frame_plan = json.loads((run_out / "frame_plan.json").read_text(encoding="utf-8"))
             self.assertTrue(any(source_url in item["timestamp_link"] for item in frame_plan))
 
+    def test_merge_tree_with_existing_target_subdirs(self) -> None:
+        # 回归：目标目录已有同名子目录时，递归 merge 后不能对 child 重复 rmdir
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp) / "src"
+            dst = Path(tmp) / "dst"
+            (src / "chapters").mkdir(parents=True)
+            (src / "chapters" / "a.md").write_text("new", encoding="utf-8")
+            (src / "logs").mkdir()
+            (dst / "chapters").mkdir(parents=True)
+            (dst / "chapters" / "b.md").write_text("old", encoding="utf-8")
+            video_tool.merge_tree(src, dst)
+            self.assertFalse(src.exists())
+            self.assertEqual((dst / "chapters" / "a.md").read_text(encoding="utf-8"), "new")
+            self.assertEqual((dst / "chapters" / "b.md").read_text(encoding="utf-8"), "old")
+            self.assertTrue((dst / "logs").is_dir())
+
     def test_prepare_without_out_rehomes_package_to_title_folder(self) -> None:
         old_root = video_tool.DEFAULT_NOTES_ROOT
         source_url = "https://www.youtube.com/watch?v=tCfmxMX5WaU&list=abc"

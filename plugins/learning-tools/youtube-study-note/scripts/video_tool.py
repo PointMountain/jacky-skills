@@ -224,8 +224,8 @@ def merge_tree(src: Path, dst: Path) -> None:
     for child in src.iterdir():
         target = dst / child.name
         if child.is_dir() and target.exists() and target.is_dir():
+            # merge_tree 递归结束时已自行 rmdir(src)，此处不能再删一次
             merge_tree(child, target)
-            child.rmdir()
         elif target.exists():
             if child.is_file():
                 shutil.copy2(child, target)
