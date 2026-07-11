@@ -96,3 +96,7 @@ j-skills uninstall <name> -g  # 卸载
 | Bug 修复 | **PATCH** | 1.0.0 → 1.0.1 |
 
 详见 `/github-repo-publish` skill。
+
+## Durable 执行约定
+
+当用户要求以 **Durable** 模式执行任务时，先读取 [`docs/durable.md`](docs/durable.md)，并按其中定义的无人值守长任务约定执行。
