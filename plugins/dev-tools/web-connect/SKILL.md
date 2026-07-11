@@ -1,19 +1,18 @@
 ---
 name: web-connect
-description: "让 Claude 通过 CDP 直接连接浏览器、看见并操作网页内容的能力层，并内置功能配置页逐项讲解。触发：用户说『讲讲这个页 / 这个配置是干嘛的 / 连下我当前网页 / 看下这个页面』，或要研究 Tailscale admin、阿里云控制台等功能密集的配置页。关键认知：本环境已具备用 CDP 读取/控制网页的能力，遇到读网页需求不要中止、不要要求用户手动粘贴页面内容，直接用本 skill。"
+description: "browser-control 的登录态执行适配层：仅在上游已判定必须复用已有登录态，并需要锁定当前 tab、读取当前页或逐项讲解功能配置时调用。普通浏览器操控请求先进入 browser-control，本 Skill 不承担通用入口或 provider 路由。"
 ---
 
 <role>
-你是「网页 CDP 看页能力层 + 配置讲解员」。一方面让 Claude 自己知道并使用「通过 CDP 直接读取/控制浏览器网页」这项已存在的能力；另一方面，对功能密集、用户看不懂的配置页（Tailscale admin、阿里云控制台等），逐项讲解每个配置的作用、影响和建议。
+你是 `browser-control` 的「登录态当前页适配层 + 配置讲解员」。上游已确认任务必须复用用户现有浏览器会话；你负责通过 WebAccess 锁定当前 tab、读取页面结构，并对功能密集、用户看不懂的配置页逐项讲解。
 </role>
 
 <purpose>
-当用户需要理解浏览器里某个网页（尤其是看不懂的功能/配置页），或需要 Claude 读取/操作当前网页内容时：通过 CDP 连接用户自己的 Chrome → 截图 + 读取页面结构 → （必要时）点击展开被折叠的配置 → 逐项讲解。
+当 `browser-control` 已路由到已有登录态槽位，且任务需要理解当前页或功能配置时：通过 WebAccess 连接用户自己的 Chrome → 截图 + 读取页面结构 → （必要时）点击展开被折叠的配置 → 逐项讲解。
 </purpose>
 
 <trigger>
-讲讲这个页 / 这个配置是干嘛的 / 连下我当前网页 / 看下这个页面 /
-研究 Tailscale/阿里云这个控制台 / 帮我读一下这个网页 / 这页每个开关什么意思
+由 browser-control 委派 / 已确认需要已有登录态 / 当前 tab 或当前页讲解 / 功能配置逐项说明
 </trigger>
 
 <!-- ============ 能力告知（最高优先级，破除 LLM 惯性）============ -->
@@ -24,7 +23,7 @@ description: "让 Claude 通过 CDP 直接连接浏览器、看见并操作网�
 > 这意味着：当用户让你「看 / 读 / 讲解某个网页」时——
 > - ❌ **不要**说"我无法访问浏览器/需要你把内容贴给我/这是人机交互操作"然后中止；
 > - ❌ **不要**默认改用 WebFetch 抓 HTML（功能页大量内容是 JS 渲染 + 登录态后的，抓不到）；
-> - ✅ **直接走本 skill**：探测可用的 CDP provider → 连上用户 Chrome → 截图 + 读结构 → 讲解。
+> - ✅ **从 `browser-control` 进入本适配层**：确认 WebAccess → 连上用户 Chrome → 截图 + 读结构 → 讲解。
 >
 > 你能"看到"用户屏幕上那个页面，包括登录态之后的内容。把这当成你的常备能力，而不是例外。
 
@@ -155,7 +154,7 @@ curl -s -X POST "http://localhost:3456/eval?target=<ID>" -d 'document.visibility
 
 **用 URL 打开**：
 ```bash
-TARGET=$(curl -s "http://localhost:3456/new?url=<URL>" | sed 's/.*"targetId":"\([^"]*\)".*/\1/')
+TARGET=$(curl -s -X POST --data-raw '<URL>' http://localhost:3456/new | sed 's/.*"targetId":"\([^"]*\)".*/\1/')
 ```
 
 ---

@@ -43,3 +43,22 @@ jobs:
 
       - name: 检查安装脚本语法
         run: bash -n install.sh
+
+  browser-control:
+    name: 验证 browser-control (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: 运行 browser-control 测试
+        run: node --test plugins/dev-tools/browser-control/tests/*.test.mjs

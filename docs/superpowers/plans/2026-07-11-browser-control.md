@@ -32,8 +32,8 @@
 - `plugins/dev-tools/web-connect/SKILL.md`：收紧为登录态/当前页/配置讲解执行层；修复 `/new` POST body。
 - `plugins/dev-tools/web-connect/references/providers.md`：同步 WebAccess 2.5.3 `/new` 与 `/navigate` 方法。
 - `plugins/dev-tools/web-search/SKILL.md`：Layer 4 委派 `browser-control`，不再自行选择浏览器 provider。
-- `plugins/dev-tools/.claude-plugin/plugin.json`：增加 Skill，版本升级到 `2.6.0`。
-- `.claude-plugin/marketplace.json`：同步 DevTools `2.6.0`。
+- `plugins/dev-tools/.claude-plugin/plugin.json`：增加 Skill；实施时发现当前 Git 基线已是 `2.6.0`，因此按新增 Skill 升 MINOR 到 `2.7.0`。
+- `.claude-plugin/marketplace.json`：同步 DevTools `2.7.0`。
 - `README.md`：同步版本和 Skill 列表。
 - `.github/workflows/validate.yml`：增加三平台 Node 18+ 账本测试 job。
 
@@ -383,14 +383,14 @@ Expected: 新 Skill 已存在但 manifest/README 尚未声明，因此分发一�
 
 - [ ] **Step 2: 更新 DevTools 清单**
 
-- version: `2.6.0`；
+- version: `2.7.0`；
 - skills 添加 `./browser-control/`；
 - description 增加浏览器操控语义。
 
 - [ ] **Step 3: 同步根 marketplace 与 README**
 
-- marketplace DevTools version `2.6.0`；
-- README DevTools 行 version `2.6.0`；
+- marketplace DevTools version `2.7.0`；
+- README DevTools 行 version `2.7.0`；
 - Skills 列表增加 `browser-control`。
 
 - [ ] **Step 4: 增加独立 Node CI job**

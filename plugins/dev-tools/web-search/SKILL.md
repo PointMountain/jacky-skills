@@ -268,25 +268,13 @@ python3 -c "from ddgs import DDGS; [print(r['title'], r['date']) for r in DDGS()
 - 静态页 → `mcp__web_reader` 先试，慢再换 `WebFetch`
 - GitHub 文件 → `mcp__zread__read_file`（不用 clone）
 
-## 5. Layer 4：浏览器兜底（CDP）
+## 5. Layer 4：浏览器任务委派
 
-进入条件：
-- Layer 1 OpenCLI 命令报需要登录但当前未登录
-- Layer 3 全部读取失败（SPA + 登录 / 反爬 / 复杂交互）
+进入条件：Layer 1/3 已证明需要真实浏览器交互，例如必须复用登录会话、反爬阻断或需要点击操作。
 
-### 5.1 两种 CDP 入口的 Trade-off
+只委派 `browser-control`，同时传递搜索目标、已尝试工具、失败事实，以及是否已知需要复用已有登录态。由 `browser-control` 以登录态为第一路由键选择能力槽位并记录证据；本 Skill 不自行比较或选择 CDP provider。
 
-| 维度 | `opencli browser` | `/web-access` CDP |
-|------|------------------|-------------------|
-| 定位 | OpenCLI 内置浏览器子命令 | 通用 CDP 直连 |
-| 启动 | OpenCLI daemon 自动管理 | 需 Chrome 远程调试 + cdp-proxy |
-| 适合 | 已装 OpenCLI 时的首选 | 临时一次性交互 / 需要更精细控制 |
-| 反检测 | 依赖 daemon 设置 | 内置 Port Guard |
-| 学习成本 | 低 | 高 |
-
-**默认建议**：已装 OpenCLI → `opencli browser navigate/click/extract`；否则用 `/web-access`。
-
-详细 API 参考各自 skill 文档，本 skill 只做入口决策。
+页面是 SPA 或需要 JS 渲染本身不代表需要 WebAccess。若公开页面已能在 Layer 3 读取，就留在 Layer 3；确需浏览器时仍由 `browser-control` 判断登录态。
 
 ## 6. /web-search setup 命令（一次性配置）
 
@@ -405,7 +393,7 @@ fi
 ## 7. 硬约束
 
 - 禁止首选 `mcp__web-search-prime` 做通用搜索（配额有限）
-- 禁止用 `mcp__web_reader` 读已知 SPA（直接 Layer 4）
+- 禁止用 `mcp__web_reader` 读已知 SPA（按 Layer 3 选择支持 JS 的读取器；需交互再委派 Layer 4）
 - 一个工具失败立即升级，不在同一工具反复重试
 - Layer 1 命中 OpenCLI 时禁止跳 Layer 3（domain-specific 永远更准）
 - 子 Agent 任务分发用「获取/了解/调研」等中性词，避免暗示特定工具
@@ -447,5 +435,5 @@ fi
 | Tavily 在编程问答比 WebSearch 命中率高 | 2026-05-11 | 编程概念解释 |
 
 ## 失败模式
-| web_reader 读小红书返回空 | 2026-05-11 | 改用 Layer 4 opencli browser |
+| web_reader 读取动态页面返回空 | 2026-05-11 | 先换 Layer 3 读取器；确需交互则委派 Layer 4 browser-control |
 ```

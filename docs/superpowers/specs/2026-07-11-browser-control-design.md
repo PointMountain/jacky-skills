@@ -327,8 +327,8 @@ AI 在 `init` 与 `finalize` 之间直接阅读和编辑 Markdown。校验器允
 
 新增 Skill 属于 DevTools Plugin 的 MINOR 变更：
 
-- `plugins/dev-tools/.claude-plugin/plugin.json`: 添加 `./browser-control/`，版本 `2.5.2 -> 2.6.0`；
-- 根 `.claude-plugin/marketplace.json`: 同步 `2.6.0`；
+- `plugins/dev-tools/.claude-plugin/plugin.json`: 添加 `./browser-control/`；实施时当前 Git 基线已是 `2.6.0`，按新增 Skill 升 MINOR 到 `2.7.0`；
+- 根 `.claude-plugin/marketplace.json`: 同步 `2.7.0`；
 - 根 `README.md`: 同步版本和 Skill 清单；
 - `web-connect/SKILL.md`: 收紧触发边界，并修复与当前 WebAccess API 不一致的旧导航请求；
 - `web-search/SKILL.md`: 浏览器升级路径委派 `browser-control`；

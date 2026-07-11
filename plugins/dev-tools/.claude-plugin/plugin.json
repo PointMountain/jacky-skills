@@ -1,7 +1,7 @@
 {
   "name": "dev-tools",
-  "version": "2.6.0",
-  "description": "核心开发工具集 - 发布、任务管理、联网、效率审计",
+  "version": "2.7.0",
+  "description": "核心开发工具集 - 发布、任务管理、联网、浏览器操控、效率审计",
   "author": {
     "name": "Jacky Wang",
     "email": "wangjs.jacky@gmail.com",
@@ -21,6 +21,7 @@
     "./efficiency-audit/",
     "./todo/",
     "./web-search/",
+    "./browser-control/",
     "./animate-prompt/",
     "./web-connect/",
     "./remote-dev-sync/",

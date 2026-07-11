@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI 浏览器操控"
+  short_description: "按登录态选择浏览器能力，并记录实际路由结果与复盘经验"
+  default_prompt: "使用 $browser-control 选择合适的浏览器能力并完成这个网页任务。"

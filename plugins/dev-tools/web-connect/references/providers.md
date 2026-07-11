@@ -1,6 +1,6 @@
 # Provider 接入参考
 
-web-connect 是**能力层**，不绑定具体工具。本文件定义"能用 CDP 读/控网页"的**能力契约**，并给出各 provider 的精确接入命令。SKILL.md 主流程默认走 web-access；用别的 provider 或需要一次性配置/安装引导时读这里。
+web-connect 是 `browser-control` 登录态槽位下的当前页/配置讲解适配层。本文件定义它所需的 CDP **能力契约**，并给出 provider 的精确接入命令。主流程默认走 WebAccess；需要接入细节或一次性配置时读这里。
 
 ---
 
@@ -67,8 +67,8 @@ node "$WEB_ACCESS_SKILL_DIR/scripts/check-deps.mjs"
 |------|------|-------------|------|
 | `/health` | GET | — | `{status,connected,sessions,chromePort}` |
 | `/targets` | GET | — | `[{targetId,title,url,type}]`（**无 active 字段**）|
-| `/new` | GET | `?url=` | `{targetId}` |
-| `/navigate` | GET | `?target=&url=` | `{frameId,loaderId}` |
+| `/new` | POST | body=URL | `{targetId}` |
+| `/navigate` | POST | `?target=` + body=URL | `{frameId,loaderId}` |
 | `/back` | GET | `?target=` | `{ok}` |
 | `/info` | GET | `?target=` | `{title,url,ready}` |
 | `/eval` | POST | `?target=` + body=JS | `{value}` / `{error}` |
