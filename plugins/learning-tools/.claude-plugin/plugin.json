@@ -1,6 +1,6 @@
 {
   "name": "learning-tools",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "学习工具集 - 仓库学习、文档本地化与调研分析",
   "author": {
     "name": "Jacky Wang",
@@ -20,6 +20,7 @@
   "skills": [
     "./learn-repo/",
     "./repo-study/",
-    "./doc-to-tutorial/"
+    "./doc-to-tutorial/",
+    "./youtube-study-note/"
   ]
 }

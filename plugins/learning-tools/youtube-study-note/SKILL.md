@@ -1,9 +1,9 @@
 ---
 name: youtube-study-note
 license: MIT
-description: Analyze YouTube or local videos for private learning notes: transcript-first summarization, timestamped evidence, authorized keyframe extraction with yt-dlp/ffmpeg, adversarial viewpoint analysis, and original local hand-drawn explainer visuals. Trigger when user asks to summarize, study, extract notes, capture key frames, critique viewpoints, or create visual learning reports from a video. Also trigger for Chinese requests like YouTube 学习笔记, 视频学习报告, 总结这个视频, 提取视频重点, 生成课程式笔记, 关键帧截图, 观点反驳, 小黑手绘图.
+description: "Analyze YouTube or local videos for private learning notes: transcript-first summarization, timestamped evidence, authorized keyframe extraction with yt-dlp/ffmpeg, adversarial viewpoint analysis, and original local hand-drawn explainer visuals. Trigger when user asks to summarize, study, extract notes, capture key frames, critique viewpoints, or create visual learning reports from a video."
 metadata:
-  author: "wangjs-jacky"
+  author: "dragon"
   version: "0.1.0"
 ---
 
@@ -65,8 +65,6 @@ Before running tools, check local dependencies:
 ```bash
 node "<skill-dir>/scripts/check-deps.mjs"
 ```
-
-On Apple Silicon Macs, make sure `node` resolves to an ARM64 Node.js 20+ binary. If the preflight shows `/usr/local/bin/node`, `darwin x64`, or Node.js 14/16/18, fix `PATH` first instead of continuing with Rosetta.
 
 Required:
 - macOS Apple Silicon recommended

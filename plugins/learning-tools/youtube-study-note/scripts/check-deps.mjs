@@ -16,22 +16,11 @@ function which(bin) {
   return run('zsh', ['-lc', `command -v ${bin}`]);
 }
 
-function shellQuote(value) {
-  return `'${String(value).replace(/'/g, "'\\''")}'`;
-}
-
 function version(cmd, args = ['--version']) {
   const w = which(cmd);
   if (!w.ok) return { ok: false, value: null };
-  const r = run('zsh', ['-lc', `${cmd} ${args.map(shellQuote).join(' ')}`]);
+  const r = run('zsh', ['-lc', `${cmd} ${args.map((arg) => `'${arg.replace(/'/g, "'\\''")}'`).join(' ')}`]);
   return { ok: r.ok, value: (r.stdout || r.stderr || '').split('\n')[0] };
-}
-
-function binaryArch(path) {
-  if (!path) return null;
-  const r = run('file', [path]);
-  if (!r.ok) return null;
-  return r.stdout;
 }
 
 const required = [];
@@ -43,24 +32,9 @@ if (os.platform() !== 'darwin' || os.arch() !== 'arm64') {
   optional.push('Recommended environment is macOS Apple Silicon (darwin arm64). Current platform can still run non-MLX parts.');
 }
 
-const shellNodePath = which('node');
-const nodeBinary = process.execPath;
-const nodeArch = binaryArch(nodeBinary);
 const nodeMajor = Number(process.versions.node.split('.')[0]);
 console.log(`Node.js: ${process.version}`);
-console.log(`node path: ${nodeBinary}`);
-if (shellNodePath.ok && shellNodePath.stdout !== nodeBinary) {
-  console.log(`shell node path: ${shellNodePath.stdout}`);
-}
-if (nodeArch) console.log(`node binary: ${nodeArch}`);
-const isMacIntelNode = os.platform() === 'darwin' && (os.arch() !== 'arm64' || /x86_64/.test(nodeArch || ''));
-if (nodeMajor < 20 || isMacIntelNode) {
-  const fixes = [];
-  if (nodeMajor < 20) fixes.push('Node.js 20+ is required.');
-  if (isMacIntelNode) fixes.push('Current node appears to be Intel/Rosetta; use an ARM64 Node binary.');
-  fixes.push('On Apple Silicon, prefer /opt/homebrew/bin/node or an arm64 nvm Node, and put that path before /usr/local/bin.');
-  required.push(fixes.join(' '));
-}
+if (nodeMajor < 20) required.push('Node.js 20+ is required. Install via: brew install node');
 
 for (const bin of ['python3', 'ffmpeg', 'ffprobe']) {
   const v = version(bin, bin.startsWith('ff') ? ['-version'] : ['--version']);

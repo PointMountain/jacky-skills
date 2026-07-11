@@ -3960,7 +3960,7 @@ def cmd_image(args: argparse.Namespace) -> None:
         if "=" in asset:
             asset_id, source_value = asset.split("=", 1)
         else:
-            raise SystemExit("--asset must use id=/absolute/path.png, for example: --asset sketch_map_01=/Users/me/.codex/generated_images/.../image.png")
+            raise SystemExit("--asset must use id=/absolute/path.png, for example: --asset sketch_map_01=~/generated_images/example/image.png")
         asset_id = slugify(asset_id, "image")
         source_path = Path(source_value).expanduser().resolve()
         if not source_path.exists():
