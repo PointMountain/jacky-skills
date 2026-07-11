@@ -462,10 +462,10 @@ class LearningDocsTests(unittest.TestCase):
             actual,
             {
                 "interface": {
-                    "display_name": "HyperFrames Apprentice",
-                    "short_description": "从教程自主学习、复盘并产出可验证 HyperFrames Demo",
+                    "display_name": "Self Learning · HyperFrames",
+                    "short_description": "从教学素材学习并产出可验证 HyperFrames Demo",
                     "default_prompt": (
-                        "Use $tutorial-to-hyperframes-demo to learn this tutorial, "
+                        "Use $self-learning-hyperframes to learn this tutorial, "
                         "build a verified HyperFrames demo, and record its evidence-backed "
                         "learning ledger."
                     ),

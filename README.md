@@ -38,7 +38,6 @@
 | Skill | Skill | Skill |
 |-------|-------|-------|
 | crafted-web | spec-debate | topic-debate |
-| tutorial-to-hyperframes-demo | | |
 
 ## Harness Ops Skills
 
@@ -59,6 +58,7 @@
 `labs/` 用于验证尚未稳定的新型 Skill 和轻量 Workflow，不计入正式独立 Skill。当前实验包括：
 
 - [web-flow](./labs/web-flow)：渐进串联网站调研、原型、设计、实现、评审与部署。
+- [self-learning](./labs/self-learning)：让 AI 从视频、文章或主题自主学习、扩展调研并生成可验证产物。
 
 ## 兼容性边界
 
@@ -164,7 +164,8 @@ jacky-skills/
 │   ├── opencli-ops/
 │   └── hyperframes-ops/
 ├── labs/                      # 实验性 Skill 与轻量 Workflow（预览版）
-│   └── web-flow/
+│   ├── web-flow/
+│   └── self-learning/
 ├── archived/                  # 不参与安装的历史归档
 ├── .github/workflows/validate.yml
 ├── scripts/audit_skills.py   # 统一审计入口

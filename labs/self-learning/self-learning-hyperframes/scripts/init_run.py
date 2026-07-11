@@ -30,15 +30,25 @@ PRIVATE_IGNORE_RULES = {
     "runs": "/.learning/runs/",
     "lock": "/.learning.lock",
 }
-PRIVATE_IGNORE_BLOCK_BEGIN = "# >>> tutorial-to-hyperframes-demo private state >>>"
-PRIVATE_IGNORE_BLOCK_END = "# <<< tutorial-to-hyperframes-demo private state <<<"
+PRIVATE_IGNORE_BLOCK_BEGIN = "# >>> self-learning-hyperframes private state >>>"
+PRIVATE_IGNORE_BLOCK_END = "# <<< self-learning-hyperframes private state <<<"
+LEGACY_PRIVATE_IGNORE_BLOCK_BEGIN = (
+    "# >>> tutorial-to-hyperframes-demo private state >>>"
+)
+LEGACY_PRIVATE_IGNORE_BLOCK_END = "# <<< tutorial-to-hyperframes-demo private state <<<"
 LEGACY_PRIVATE_IGNORE_COMMENT = "# tutorial-to-hyperframes-demo 私有运行状态"
-NESTED_IGNORE_BLOCK_BEGIN = "# >>> tutorial-to-hyperframes-demo private runs >>>"
-NESTED_IGNORE_BLOCK_END = "# <<< tutorial-to-hyperframes-demo private runs <<<"
+NESTED_IGNORE_BLOCK_BEGIN = "# >>> self-learning-hyperframes private runs >>>"
+NESTED_IGNORE_BLOCK_END = "# <<< self-learning-hyperframes private runs <<<"
+LEGACY_NESTED_IGNORE_BLOCK_BEGIN = (
+    "# >>> tutorial-to-hyperframes-demo private runs >>>"
+)
+LEGACY_NESTED_IGNORE_BLOCK_END = (
+    "# <<< tutorial-to-hyperframes-demo private runs <<<"
+)
 NESTED_RUNS_IGNORE_RULE = "/runs/"
 BIND_INTENT_NAME = "binding-intent.json"
 BIND_OWNER_NAME = "binding-owner.json"
-FAULT_ENV = "TUTORIAL_TO_HYPERFRAMES_FAULT"
+FAULT_ENV = "SELF_LEARNING_HYPERFRAMES_FAULT"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = SKILL_ROOT / "references" / "workflows" / f"{WORKFLOW_VERSION}.json"
 
@@ -152,39 +162,81 @@ def git_ignores(git_repository: Path, candidate: Path) -> bool:
     raise ContractError(f"无法检查 Git ignore：{detail}")
 
 
-def rewrite_authoritative_ignore_block(
+def render_authoritative_ignore_content(
+    existing: str,
+    *,
+    path: Path,
+    rules: tuple[str, ...],
+    block_begin: str,
+    block_end: str,
+    legacy_comments: tuple[str, ...] = (),
+    legacy_blocks: tuple[tuple[str, str], ...] = (),
+) -> str:
+    """纯解析并渲染唯一权威 block；任何未知受管内容都 fail closed。"""
+
+    retained: list[str] = []
+    managed_blocks = {block_begin: block_end, **dict(legacy_blocks)}
+    managed_ends = set(managed_blocks.values())
+    expected_block_end: str | None = None
+    protected_rules = set(rules)
+    for line in existing.splitlines():
+        if expected_block_end is not None:
+            if line == expected_block_end:
+                expected_block_end = None
+            elif line in managed_blocks or line in managed_ends:
+                raise ContractError(
+                    f"非 Git 目录的 {path} 含未闭合私有保护 block"
+                )
+            elif line and line not in protected_rules:
+                raise ContractError(
+                    f"非 Git 目录的 {path} 私有保护 block 含未知内容：{line}"
+                )
+            continue
+        if line in managed_blocks:
+            expected_block_end = managed_blocks[line]
+            continue
+        if line in managed_ends:
+            raise ContractError(f"非 Git 目录的 {path} 含未闭合私有保护 block")
+        if line in protected_rules or line in legacy_comments:
+            continue
+        retained.append(line)
+    if expected_block_end is not None:
+        raise ContractError(f"非 Git 目录的 {path} 含未闭合私有保护 block")
+
+    base = "\n".join(retained).rstrip()
+    block = "\n".join([block_begin, *rules, block_end])
+    return f"{base}\n\n{block}\n" if base else f"{block}\n"
+
+
+def prepare_authoritative_ignore_block(
     path: Path,
     *,
     rules: tuple[str, ...],
     block_begin: str,
     block_end: str,
     legacy_comments: tuple[str, ...] = (),
-) -> None:
-    """保留用户规则，将唯一权威保护 block 幂等移动到当前层末尾。"""
+    legacy_blocks: tuple[tuple[str, str], ...] = (),
+) -> str:
+    """读取并验证普通文件，然后无副作用地产生目标内容。"""
 
     if path.is_symlink() or (path.exists() and not path.is_file()):
         raise ContractError(f"非 Git 目录的 {path} 必须是普通文件")
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
-    retained: list[str] = []
-    inside_managed_block = False
-    protected_rules = set(rules)
-    for line in existing.splitlines():
-        if line == block_begin:
-            inside_managed_block = True
-            continue
-        if inside_managed_block:
-            if line == block_end:
-                inside_managed_block = False
-            continue
-        if line in protected_rules or line in legacy_comments:
-            continue
-        retained.append(line)
-    if inside_managed_block:
-        raise ContractError(f"非 Git 目录的 {path} 含未闭合私有保护 block")
+    return render_authoritative_ignore_content(
+        existing,
+        path=path,
+        rules=rules,
+        block_begin=block_begin,
+        block_end=block_end,
+        legacy_comments=legacy_comments,
+        legacy_blocks=legacy_blocks,
+    )
 
-    base = "\n".join(retained).rstrip()
-    block = "\n".join([block_begin, *rules, block_end])
-    updated = f"{base}\n\n{block}\n" if base else f"{block}\n"
+
+def write_authoritative_ignore_content(path: Path, updated: str) -> None:
+    """在全部预检完成后原子写入已渲染内容。"""
+
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
     if updated == existing:
         return
     fd, temp_name = tempfile.mkstemp(prefix=".gitignore.", dir=path.parent)
@@ -205,27 +257,42 @@ def rewrite_authoritative_ignore_block(
 def bootstrap_non_git_ignore(repo: Path) -> None:
     """为临时非 Git 目录预置未来 git init 后仍生效的隐私保护。"""
 
-    rewrite_authoritative_ignore_block(
-        repo / ".gitignore",
+    root_ignore = repo / ".gitignore"
+    root_updated = prepare_authoritative_ignore_block(
+        root_ignore,
         rules=tuple(PRIVATE_IGNORE_RULES.values()),
         block_begin=PRIVATE_IGNORE_BLOCK_BEGIN,
         block_end=PRIVATE_IGNORE_BLOCK_END,
         legacy_comments=(LEGACY_PRIVATE_IGNORE_COMMENT,),
+        legacy_blocks=(
+            (LEGACY_PRIVATE_IGNORE_BLOCK_BEGIN, LEGACY_PRIVATE_IGNORE_BLOCK_END),
+        ),
     )
 
     learning = repo / ".learning"
-    if not learning.exists():
-        return
-    if learning.is_symlink() or not learning.is_dir():
-        raise ContractError("非 Git 目录的 .learning 必须是普通目录")
-    nested_ignore = learning / ".gitignore"
-    if nested_ignore.exists() or nested_ignore.is_symlink():
-        rewrite_authoritative_ignore_block(
-            nested_ignore,
-            rules=(NESTED_RUNS_IGNORE_RULE,),
-            block_begin=NESTED_IGNORE_BLOCK_BEGIN,
-            block_end=NESTED_IGNORE_BLOCK_END,
-        )
+    nested_prepared: tuple[Path, str] | None = None
+    if learning.exists():
+        if learning.is_symlink() or not learning.is_dir():
+            raise ContractError("非 Git 目录的 .learning 必须是普通目录")
+        nested_ignore = learning / ".gitignore"
+        if nested_ignore.exists() or nested_ignore.is_symlink():
+            nested_updated = prepare_authoritative_ignore_block(
+                nested_ignore,
+                rules=(NESTED_RUNS_IGNORE_RULE,),
+                block_begin=NESTED_IGNORE_BLOCK_BEGIN,
+                block_end=NESTED_IGNORE_BLOCK_END,
+                legacy_blocks=(
+                    (
+                        LEGACY_NESTED_IGNORE_BLOCK_BEGIN,
+                        LEGACY_NESTED_IGNORE_BLOCK_END,
+                    ),
+                ),
+            )
+            nested_prepared = (nested_ignore, nested_updated)
+
+    write_authoritative_ignore_content(root_ignore, root_updated)
+    if nested_prepared is not None:
+        write_authoritative_ignore_content(*nested_prepared)
 
 
 def ensure_private_state_protected(repo: Path, run_id: str) -> str:

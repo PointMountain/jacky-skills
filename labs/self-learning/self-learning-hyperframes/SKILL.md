@@ -1,9 +1,9 @@
 ---
-name: tutorial-to-hyperframes-demo
-description: 自主学习本地教学音视频或公开视频链接，把教程讲授的方法、可观察动效和屏幕代码转成有证据、可恢复、可渲染的 HyperFrames Demo，并记录实际使用的内容、Skills、工具与可复用经验。用于从教程复刻方法、在案例仓库增加独立 Demo、用本地素材替换示例、连续观看并修正成片，或执行无人值守的批量视频学习任务。
+name: self-learning-hyperframes
+description: 作为 self-learning 的 HyperFrames 产出能力，自主学习本地教学音视频或公开视频链接，把教程讲授的方法、可观察动效和屏幕代码转成有证据、可恢复、可渲染的 HyperFrames Demo，并记录实际使用的内容、Skills、工具与可复用经验。仅在 self-learning 调用，或用户明确要求从教学素材制作 HyperFrames Demo 时使用；普通学习任务不要单独触发。
 ---
 
-# Tutorial to HyperFrames Demo
+# Self Learning · HyperFrames
 
 把自己当作会看、会验证、会复盘的学习者。忠实复现教程教授的因果机制与时间关系，不追求逐像素复制，也不要把“看起来像”当成学会。
 

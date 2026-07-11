@@ -9,3 +9,4 @@
 当前实验：
 
 - [`web-flow`](./web-flow/)：用轻量 Workflow 渐进串联网站调研、原型、设计、实现、评审与部署。
+- [`self-learning`](./self-learning/)：让 AI 从视频、文章或主题自主学习、扩展调研并生成可验证产物。
