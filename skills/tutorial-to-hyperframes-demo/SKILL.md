@@ -73,7 +73,7 @@ python "$SKILL_ROOT/scripts/validate_run.py" \
 - 本地转录：调用 `audio-to-subtitle`；必要时用本地 FFmpeg 抽音频并切换已安装的本地 ASR。
 - 动效观察：调用 `animate-prompt`，并亲自查看实际帧；字幕不能替代视觉证据。
 - 素材：调用 `media-use --adopt` 复用已有资产账本。先从构图推导画幅，海报优先竖图，滑动相册才通常需要横图。
-- 创作：先读官方 `hyperframes` 路由，再按需使用 core、creative、animation 与 CLI 能力。环境故障才调用 `hyperframes-harness`，不要把环境排障写回本工作流。
+- 创作：先读官方 `hyperframes` 路由，再按需使用 core、creative、animation 与 CLI 能力。最佳实践、环境故障或本机适配问题才调用 `hyperframes-ops`，不要把这些经验写回本工作流。
 - 验证：调用 HyperFrames lint、validate、inspect、snapshot 和 render；最终 MP4 用 ffprobe 和 SHA-256 证明。
 
 只探测当前机器的真实状态。把探测结果留在本次 run 或 `runtime.local.json`，不要改写共享能力表为“当前已安装”。

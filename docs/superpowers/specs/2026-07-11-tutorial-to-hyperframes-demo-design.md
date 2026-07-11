@@ -44,7 +44,7 @@
 - 本机代理、Node、FFmpeg、浏览器与字体排障；
 - 通用视频模板。
 
-这些能力分别调用现有 `video-to-text`、`audio-to-subtitle`、`animate-prompt`、`media-use`、官方 `hyperframes` 系列和 `hyperframes-harness`。运行时先探测真实可用性，失败时按能力注册表降级，不能静默跳过阶段。
+这些能力分别调用现有 `video-to-text`、`audio-to-subtitle`、`animate-prompt`、`media-use`、官方 `hyperframes` 系列和 `hyperframes-ops`。运行时先探测真实可用性，失败时按能力注册表降级，不能静默跳过阶段。
 
 ## 总体架构
 

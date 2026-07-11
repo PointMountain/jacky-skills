@@ -30,6 +30,18 @@
 | [troubleshooting](./plugins/troubleshooting) | 🔍 | 1.1.0 | 故障排查 | agent-browser-troubleshooting, cli-tool-troubleshooting, tauri-troubleshooting |
 | [skills-management](./plugins/skills-management) | 📦 | 1.0.1 | Skills 管理 | j-skills, link-all-skills |
 
+## Harness Ops Skills
+
+`harness/` 保存工程、工具和第三方 Skills 的长期经验层。具体 Skill 统一使用 `<target>-ops` 命名：`harness` 表示稳定的读取、验证和写回框架，`ops`（Operations）表示目标对象的运行、维护、适配和持续改进。
+
+| Skill | 对象 | 主要职责 |
+|-------|------|----------|
+| [happy-ops](./harness/happy-ops) | Happy/Paws 自托管工程 | 拓扑理解、运行维护、故障路由和复盘经验 |
+| [opencli-ops](./harness/opencli-ops) | OpenCLI | 站点配方、adapter 缺口、浏览器兜底和本机实测经验 |
+| [hyperframes-ops](./harness/hyperframes-ops) | HyperFrames 官方 Skills | 最佳实践、复杂能力组合、本机水土不服和环境兼容性 |
+
+每个 Ops Skill 的 `SKILL.md` 保存可分享协议，gitignored 的 `experience.local.md` 保存本机路径、代理、版本、拓扑和验证记录。创建新的 harness skill 时，默认放到 `harness/<target>-ops/`；详细规范见 [`harness/CLAUDE.md`](./harness/CLAUDE.md)。
+
 ---
 
 ## 快速开始

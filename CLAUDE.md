@@ -21,10 +21,26 @@ jacky-skills/
 │       │   └── plugin.json      # Plugin 元数据（含版本号）
 │       └── <skill-name>/
 │           └── SKILL.md         # Skill 定义文件
-└── skills/                      # 独立 Skills（无 Plugin）
-    └── <skill-name>/
+├── skills/                      # 独立 Skills（无 Plugin）
+│   └── <skill-name>/
+│       └── SKILL.md
+└── harness/                     # 长期经验 Ops Skills
+    ├── CLAUDE.md
+    └── <target>-ops/
         └── SKILL.md
 ```
+
+## Harness Ops 创建路由
+
+当用户说“创建 harness skill”“给某工程建 harness”或要求长期维护某个工程、工具、第三方 Skill 的本地经验时，必须先读取 [`harness/CLAUDE.md`](harness/CLAUDE.md)，并使用官方 `skill-creator` 创建到：
+
+```text
+harness/<target>-ops/
+```
+
+- `harness` 是仓库分类；具体 Skill 一律使用 `<target>-ops`，不再使用 `*-harness`。
+- `ops` 表示 Operations，覆盖运行维护、调试复盘、最佳实践、本机适配和第三方 Skill 水土不服经验。
+- 可分享规则进入 `SKILL.md`；本机路径、代理、拓扑和验证记录进入 gitignored 的 `experience.local.md`。
 
 ## j-skills 工作流程
 
