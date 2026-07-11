@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-11-web-flow-v3-design.md`
 
-**JS file budgets:** `state-contract.mjs` ≤ 375 行；`runtime-store.mjs` ≤ 325 行；`artifact-store.mjs`、`artifact-ledger.mjs`、`source-safety.mjs` 各 ≤ 300 行；`workflow-contract.mjs`、`review-contract.mjs`、`review-store.mjs`、`gate-contract.mjs`、`gate-store.mjs`、`deployment-contract.mjs` 各 ≤ 350 行；`validators.mjs` ≤ 350 行；CLI ≤ 250 行。逼近预算时按职责拆函数，不把业务判断塞进 CLI。
+**JS file budgets:** `state-contract.mjs` ≤ 375 行；`runtime-store.mjs` ≤ 325 行；`artifact-store.mjs`、`artifact-ledger.mjs`、`source-safety.mjs` 各 ≤ 300 行；`workflow-contract.mjs`、`review-contract.mjs`、`review-store.mjs`、`gate-contract.mjs`、`gate-store.mjs`、`deployment-contract.mjs`、`deployment-store.mjs` 各 ≤ 350 行；`validators.mjs` ≤ 350 行；CLI ≤ 250 行。逼近预算时按职责拆函数，不把业务判断塞进 CLI。
 
 ---
 
@@ -94,19 +94,21 @@
 - Modify: `labs/web-flow/web-flow/scripts/lib/artifact-store.mjs`
 - Modify: `labs/web-flow/web-flow/scripts/web-flow-runtime.mjs`
 
-- [ ] 写 `review record` 失败测试：主观 round 仅 1/2；must-pass recheck 可多次且不占 round；event 绑定 rubric/review/artifact 的 path+实时 hash；review 文档禁止覆盖。
-- [ ] 写 `gate decisions` 失败测试：decision 文件序号递增并把 path/hash 写入事件；覆盖旧文件或文档漂移被拒绝。
-- [ ] 覆盖 `approved/revise/rejected/deferred/auto_approved/not_applicable`；rejected 进入待 cancelled finalization，deferred 进入 blocked+resume。
-- [ ] 写 must-pass 公共前置测试：attended 与 unattended 都不能放行 failed review；`auto_approved` 只允许 unattended；主观 residual 可显式接受。
-- [ ] 运行 `node --test --test-name-pattern='review record|gate decisions|must-pass' labs/web-flow/web-flow/tests/state-contract.test.mjs labs/web-flow/web-flow/tests/artifacts-paths.test.mjs`；预期新增测试失败。
-- [ ] 实现 `review record`、`gate decide` 窄命令；每次实时重算 artifact、rubric、review/gate Markdown hash。
-- [ ] 实现 gate revise 的 attempt 递增与 review round 重置；不支持 completed stage reopen。
-- [ ] 重跑同一命令；预期通过。
+- [x] 写 `review record` 失败测试：主观 round 仅 1/2；must-pass recheck 可多次且不占 round；event 绑定 rubric/review/artifact 的 path+实时 hash；review 文档禁止覆盖。
+- [x] 写 `gate decisions` 失败测试：decision 文件序号递增并把 path/hash 写入事件；覆盖旧文件或文档漂移被拒绝。
+- [x] 覆盖 `approved/revise/rejected/deferred/auto_approved/not_applicable`；rejected 进入待 cancelled finalization，deferred 进入 blocked+resume。
+- [x] 写 must-pass 公共前置测试：attended 与 unattended 都不能放行 failed review；`auto_approved` 只允许 unattended；主观 residual 可显式接受。
+- [x] 运行 `node --test --test-name-pattern='review record|gate decisions|must-pass' labs/web-flow/web-flow/tests/state-contract.test.mjs labs/web-flow/web-flow/tests/artifacts-paths.test.mjs`；预期新增测试失败。
+- [x] 实现 `review record`、`gate decide` 窄命令；每次实时重算 artifact、rubric、review/gate Markdown hash。
+- [x] 实现 gate revise 的 attempt 递增与 review round 重置；不支持 completed stage reopen。
+- [x] 重跑同一命令；预期通过。
 
 ### Task 6：部署消费点合同
 
 **Files:**
 - Create: `labs/web-flow/web-flow/tests/deployment-contract.test.mjs`
+- Create: `labs/web-flow/web-flow/scripts/lib/deployment-contract.mjs`
+- Create: `labs/web-flow/web-flow/scripts/lib/deployment-store.mjs`
 - Modify: `labs/web-flow/web-flow/scripts/lib/state-contract.mjs`
 - Modify: `labs/web-flow/web-flow/scripts/lib/runtime-store.mjs`
 - Modify: `labs/web-flow/web-flow/scripts/lib/artifact-store.mjs`
