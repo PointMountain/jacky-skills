@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# install.sh — 一键链接并安装 jacky-skills 中的全部活跃 Skill
+# install.sh — 链接并安装 jacky-skills 中的活跃 Skill
 #
 # 用法：
 #   curl -fsSL https://raw.githubusercontent.com/wangjs-jacky/jacky-skills/main/install.sh | bash
-#   J_SKILLS_ENVS=claude-code,codex,cursor ./install.sh
+#   ./install.sh --all
+#   ./install.sh --skill youtube-study-note
+#   ./install.sh --plugin dev-tools
+#   J_SKILLS_ENVS=claude-code,codex,cursor ./install.sh --all
 
 set -euo pipefail
 
@@ -14,8 +17,27 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 REPO_URL="${JACKY_SKILLS_REPO_URL:-https://github.com/wangjs-jacky/jacky-skills.git}"
-REPO_DIR="${JACKY_SKILLS_REPO_DIR:-$HOME/jacky-github/jacky-skills}"
 INSTALL_ENVS="${J_SKILLS_ENVS:-claude-code,codex}"
+REQUIRED_J_SKILLS_VERSION="${J_SKILLS_VERSION:-0.1.0}"
+DEFAULT_REPO_DIR="$HOME/jacky-github/jacky-skills"
+SCRIPT_DIR=""
+USE_CURRENT_CHECKOUT=false
+SELECTOR_TYPE="all"
+SELECTOR_VALUE=""
+SELECTOR_SET=false
+
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+fi
+
+if [ -n "${JACKY_SKILLS_REPO_DIR:-}" ]; then
+    REPO_DIR="$JACKY_SKILLS_REPO_DIR"
+elif [ -n "$SCRIPT_DIR" ] && [ -e "$SCRIPT_DIR/.git" ]; then
+    REPO_DIR="$SCRIPT_DIR"
+    USE_CURRENT_CHECKOUT=true
+else
+    REPO_DIR="$DEFAULT_REPO_DIR"
+fi
 
 info() {
     echo -e "${BLUE}$*${NC}"
@@ -29,6 +51,64 @@ fail() {
     echo -e "${RED}错误: $*${NC}" >&2
     exit 1
 }
+
+usage() {
+    cat <<'EOF'
+用法：
+  ./install.sh [--all]
+  ./install.sh --skill <skill-name>
+  ./install.sh --plugin <plugin-name>
+
+选项：
+  --all              安装 plugins/、skills/、harness/ 下的全部活跃 Skill（默认）
+  --skill <name>     只安装指定 Skill
+  --plugin <name>    只安装指定 Plugin 中的 Skill
+  -h, --help         显示帮助
+
+环境变量：
+  J_SKILLS_ENVS               目标环境，默认 claude-code,codex
+  J_SKILLS_VERSION            要求的 j-skills 版本，默认 0.1.0
+  JACKY_SKILLS_REPO_DIR       显式指定仓库目录
+  JACKY_SKILLS_REPO_URL       curl 管道安装时使用的仓库地址
+EOF
+}
+
+set_selector() {
+    local type="$1"
+    local value="${2:-}"
+    if [ "$SELECTOR_SET" = true ]; then
+        fail "--all、--skill、--plugin 只能选择一个"
+    fi
+    SELECTOR_TYPE="$type"
+    SELECTOR_VALUE="$value"
+    SELECTOR_SET=true
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --all)
+            set_selector all
+            shift
+            ;;
+        --skill)
+            [ "$#" -ge 2 ] || fail "--skill 缺少名称"
+            set_selector skill "$2"
+            shift 2
+            ;;
+        --plugin)
+            [ "$#" -ge 2 ] || fail "--plugin 缺少名称"
+            set_selector plugin "$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            fail "未知参数：$1（使用 --help 查看帮助）"
+            ;;
+    esac
+done
 
 read_skill_name() {
     awk '
@@ -98,6 +178,35 @@ link_skill_dir() {
     return "$link_status"
 }
 
+find_all_skill_files() {
+    find "$REPO_DIR/plugins" "$REPO_DIR/skills" "$REPO_DIR/harness" \
+        -type d -name archived -prune -o \
+        -type f -name SKILL.md -print | sort
+}
+
+discover_skill_files() {
+    local skill_file
+    case "$SELECTOR_TYPE" in
+        all)
+            find_all_skill_files
+            ;;
+        skill)
+            while IFS= read -r skill_file; do
+                if [ "$(read_skill_name "$skill_file")" = "$SELECTOR_VALUE" ]; then
+                    printf '%s\n' "$skill_file"
+                fi
+            done < <(find_all_skill_files)
+            ;;
+        plugin)
+            local plugin_dir="$REPO_DIR/plugins/$SELECTOR_VALUE"
+            [ -d "$plugin_dir" ] || fail "Plugin 不存在：$SELECTOR_VALUE"
+            find "$plugin_dir" \
+                -type d -name archived -prune -o \
+                -type f -name SKILL.md -print | sort
+            ;;
+    esac
+}
+
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║         jacky-skills 一键安装（Claude Code + Codex）       ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
@@ -116,13 +225,21 @@ success "✓ Node.js $(node -v) ($(node -p 'process.arch'))"
 
 echo -e "${YELLOW}[2/5] 检查 j-skills CLI...${NC}"
 if ! command -v j-skills >/dev/null 2>&1; then
-    info "正在安装 j-skills CLI..."
-    npm install -g j-skills --no-audit --no-fund
+    info "正在安装 j-skills CLI ${REQUIRED_J_SKILLS_VERSION}..."
+    npm install -g "j-skills@$REQUIRED_J_SKILLS_VERSION" --no-audit --no-fund
 fi
-success "✓ $(j-skills --version)"
+
+J_SKILLS_VERSION_OUTPUT="$(j-skills --version 2>&1)"
+CURRENT_J_SKILLS_VERSION="$(printf '%s\n' "$J_SKILLS_VERSION_OUTPUT" | sed -nE 's/.*j-skills[/ ]([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' | head -1)"
+[ -n "$CURRENT_J_SKILLS_VERSION" ] || fail "无法识别 j-skills 版本：$J_SKILLS_VERSION_OUTPUT"
+[ "$CURRENT_J_SKILLS_VERSION" = "$REQUIRED_J_SKILLS_VERSION" ] || \
+    fail "需要 j-skills ${REQUIRED_J_SKILLS_VERSION}，当前为 ${CURRENT_J_SKILLS_VERSION}；请安装匹配版本或设置 J_SKILLS_VERSION"
+success "✓ j-skills $CURRENT_J_SKILLS_VERSION"
 
 echo -e "${YELLOW}[3/5] 克隆或更新仓库...${NC}"
-if [ -d "$REPO_DIR/.git" ]; then
+if [ "$USE_CURRENT_CHECKOUT" = true ]; then
+    success "✓ 使用当前 checkout：$REPO_DIR"
+elif [ -e "$REPO_DIR/.git" ]; then
     git -C "$REPO_DIR" pull --ff-only origin main
 elif [ -e "$REPO_DIR" ]; then
     fail "$REPO_DIR 已存在，但不是 Git 仓库"
@@ -132,11 +249,17 @@ else
 fi
 success "✓ 仓库已就绪：$REPO_DIR"
 
+SKILL_FILES=()
+while IFS= read -r skill_file; do
+    [ -n "$skill_file" ] && SKILL_FILES+=("$skill_file")
+done < <(discover_skill_files)
+[ "${#SKILL_FILES[@]}" -gt 0 ] || fail "没有找到匹配的 Skill：${SELECTOR_VALUE:-all}"
+
 echo -e "${YELLOW}[4/5] 链接活跃 Skills...${NC}"
 LINKED_SKILLS_JSON="$(j-skills link --list --json)"
 SKILL_COUNT=0
 
-while IFS= read -r skill_file; do
+for skill_file in "${SKILL_FILES[@]}"; do
     skill_dir="$(canonical_path "$(dirname "$skill_file")")"
     skill_name="$(read_skill_name "$skill_file")"
     [ -n "$skill_name" ] || fail "$skill_file 缺少有效的 frontmatter name"
@@ -150,7 +273,7 @@ while IFS= read -r skill_file; do
         fi
         canonical_filesystem_link="$(canonical_path "$filesystem_link")"
         if [ "$canonical_linked_path" = "$skill_dir" ] && [ "$canonical_filesystem_link" = "$skill_dir" ]; then
-            info "  跳过 $skill_name：已正确链接"
+            info "  跳过 ${skill_name}：已正确链接"
         else
             fail "链接冲突：$skill_name 的注册表或软链接目标不是 $skill_dir"
         fi
@@ -164,24 +287,16 @@ while IFS= read -r skill_file; do
     fi
 
     SKILL_COUNT=$((SKILL_COUNT + 1))
-done < <(
-    find "$REPO_DIR/plugins" "$REPO_DIR/skills" "$REPO_DIR/harness" \
-        -type d -name archived -prune -o \
-        -type f -name SKILL.md -print | sort
-)
+done
 success "✓ 已核对 $SKILL_COUNT 个 Skills 的链接"
 
 echo -e "${YELLOW}[5/5] 安装到 $INSTALL_ENVS...${NC}"
-while IFS= read -r skill_file; do
+for skill_file in "${SKILL_FILES[@]}"; do
     skill_name="$(read_skill_name "$skill_file")"
     [ -n "$skill_name" ] || fail "$skill_file 缺少有效的 frontmatter name"
     info "  安装：$skill_name"
     CI=1 j-skills install "$skill_name" -g --env "$INSTALL_ENVS"
-done < <(
-    find "$REPO_DIR/plugins" "$REPO_DIR/skills" "$REPO_DIR/harness" \
-        -type d -name archived -prune -o \
-        -type f -name SKILL.md -print | sort
-)
+done
 
 success "✓ 安装完成：$SKILL_COUNT 个 Skills → $INSTALL_ENVS"
 echo "仓库位置：$REPO_DIR"

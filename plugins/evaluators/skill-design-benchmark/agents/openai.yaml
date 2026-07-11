@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skill Design Benchmark"
+  short_description: "用证据评估 Agent Skill 的设计质量与上下文效率"
+  default_prompt: "使用 $skill-design-benchmark 基于证据评估这个仓库中的 Agent Skills。"

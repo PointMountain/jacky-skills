@@ -1,7 +1,6 @@
 ---
 name: animate-prompt
 description: "从动效视频/截图反推出可直接喂给 LLM 还原动效的 Prompt 描述词。重点在「看懂运动」和「对齐你的意图」，不是搬运帧。触发词：分析动效、animate prompt、生成动效描述、动效 Prompt、animation analysis、帮我写这个动效的描述、还原这个动画"
-argument-hint: '[视频文件路径 | 动画页面 URL | 截图目录]'
 ---
 
 <role>

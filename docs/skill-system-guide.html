@@ -278,6 +278,7 @@ footer b{color:var(--muted2)}.foot-tag{font-family:var(--mono);color:var(--green
         <span class="mc"><b>§01–03</b> 工程开发主线 · 流水线 / 沉淀·环境底座 / 发布矩阵</span>
         <span class="mc"><b>§04</b> Skill 怎么装 · 怎么分享（外部 skills.sh / 内部 git clone+软链）</span>
         <span class="mc"><b>§05</b> AI 内容生产 · PPT × 视频 × 图像</span>
+        <span class="mc"><b>§06</b> 前置依赖 · 新机器 Bootstrap（依赖矩阵 + 一键脚本）</span>
       </div>
     </div>
 
@@ -493,11 +494,11 @@ footer b{color:var(--muted2)}.foot-tag{font-family:var(--mono);color:var(--green
       <div class="note">管"代码在哪改、在哪跑"——不属于某个阶段,是整个工程的环境能力。<b>ssh-connect</b> 是连接底层(认机器+Tailscale 免密执行+把坑沉淀进 experience.local.md),<b>remote-dev-sync</b> 在其上做"远端改→本地跑"的同步工作流。</div>
       <div class="chain">
         <span class="pill env">ssh-connect<small>连远程机 · Tailscale+免密 · 经验沉淀(主机清单)</small></span>
-        <span class="cov w" style="margin-left:0">B− · 待修</span>
+        <span class="cov s" style="margin-left:0">已修 ✓</span>
         <span class="arr">→</span>
         <span class="pill env">remote-dev-sync<small>远端(算力强)改 → 本地 git pull 跑</small></span>
       </div>
-      <div class="chain" style="margin-top:7px"><span class="par" style="color:var(--red);opacity:.85">⚠ review 评 B−/68 · 已知 bug：<code style="font-family:var(--mono);color:#ff9aa4">${CLAUDE_SKILL_DIR}</code> 本环境未设 → 读/写经验文件全走空,经验沉淀暂失效。改锚 <code style="font-family:var(--mono);color:#ff9aa4">$HOME/.claude/skills/…</code> 即修 · 另有占位符可执行误用 / Tailscale 探测 ‖ 逻辑 / setup 标记悬空 待修</span></div>
+      <div class="chain" style="margin-top:7px"><span class="par" style="color:var(--green);opacity:.9">✓ 已修(2026-06-22 · 实测过)：经验沉淀改锚 <code style="font-family:var(--mono);color:#b8ffd9">$HOME/.claude/skills/…</code>(能读写) · 占位符标注 · Tailscale 退出码判定 · 表头自愈 —— 原 review B−/68 的 4 项必修已清。<span style="color:#b8ffd9">⚖️ #3 单机毁灭红线(rm -rf 无备份/磁盘/关机重启正在服务的进程)也已补入——日常照常放手,仅这几样停下确认。5 项全清。</span></span></div>
     </div>
   </section>
 
@@ -557,7 +558,7 @@ footer b{color:var(--muted2)}.foot-tag{font-family:var(--mono);color:var(--green
         <span class="pill cf">cloudflare-one</span><span class="par">·</span>
         <span class="pill cf">cloudflare-one-migrations</span>
       </div>
-      <div class="note">⚡ <b>官方出品,无需自己封装</b>:<code>cloudflare/skills</code> 仓库共 11 个 Agent Skill。作为<b>外部 skill,标准装法是 §04 的 skills.sh</b>:<code>npx skills add cloudflare/skills -g</code>;但本机 skills.sh 内部 clone 不走代理会失败,故改用<b>等效的 <code>git clone</code>(带代理)+ symlink</b>——仓库存 <code>jacky-github/cloudflare-skills</code>,可 <code>git pull</code> 更新。(另一官方入口:任意 wrangler 命令加 <code>--install-skills</code>。)本次发布正是 <code>wrangler</code> + <code>cloudflare</code> 两个 skill 覆盖的场景。</div>
+      <div class="note">⚡ <b>官方出品,无需自己封装</b>:<code>cloudflare/skills</code> 仓库共 11 个 Agent Skill,<b>已统一到 §04 的 skills.sh 管理</b>。标准联网装法 <code>npx skills add cloudflare/skills -g</code>;⚠ 本机 skills.sh 联网 clone GitHub 不稳(配了代理仍传输中断),故走<b>本地 clone 兜底</b>:先带代理 <code>git clone</code> 到 <code>jacky-github/cloudflare-skills</code>,再 <code>npx skills add &lt;本地路径&gt; -g</code>——<b>已纳入 skills.sh</b>(<code>list/update/remove</code> 可管),git pull 该 repo 后 <code>npx skills update</code> 更新。(另一官方入口:wrangler <code>--install-skills</code>。)本次发布正是 <code>wrangler</code> + <code>cloudflare</code> 两个 skill 覆盖的场景。</div>
     </div>
 
     <div class="ali-disco">
@@ -600,7 +601,7 @@ footer b{color:var(--muted2)}.foot-tag{font-family:var(--mono);color:var(--green
         <div class="who">别人/官方出的 · 约 100+ 个</div>
         <code>npx skills add &lt;owner/repo&gt; -g</code>
         <code>npx skills list / update / remove</code>
-        <div class="cmt"><b>Vercel 出的开放生态 CLI</b>,自动识别已装的各 AI 工具,默认 <b>symlink</b>(单一副本多 agent 复用,易 <code style="font-family:var(--mono);font-size:11px">update</code>)。⚠ 国内它内部 clone GitHub 不走代理会失败,需先 <code style="font-family:var(--mono);font-size:11px">export HTTPS_PROXY=http://127.0.0.1:10802</code>。发现目录:<b>skills.sh</b>。</div>
+        <div class="cmt"><b>Vercel 出的开放生态 CLI</b>,自动识别已装的各 AI 工具,默认 <b>symlink</b>(单一副本多 agent 复用,易 <code style="font-family:var(--mono);font-size:11px">update</code>)。⚠ 国内它联网 clone GitHub 不稳(配了 HTTPS_PROXY 仍可能传输中断);<b>稳妥兜底</b>=先带代理 <code style="font-family:var(--mono);font-size:11px">git clone</code> 到本地,再 <code style="font-family:var(--mono);font-size:11px">npx skills add &lt;本地路径&gt;</code>(从本地装·无网络依赖·Cloudflare 11 个即用此法)。发现目录:<b>skills.sh</b>。</div>
       </div>
       <div class="inst-card int">
         <h4>🛠️ 内部 Skill → git clone + 软链</h4>
@@ -738,6 +739,62 @@ footer b{color:var(--muted2)}.foot-tag{font-family:var(--mono);color:var(--green
     </div>
   </section>
 
+  <!-- §06 前置依赖 · 新机器 Bootstrap -->
+  <section>
+    <div class="sec-h"><span class="num">06</span><h2>前置依赖 · 新机器 Bootstrap</h2></div>
+    <p class="sec-sub">174 个 skill 里 <b style="color:var(--green)">97 个装上即用</b>(纯 prompt)、<b style="color:var(--amber)">77 个需配置</b>(外部 CLI/凭证/登录/文件)。下面是「换新机照着配」的依赖矩阵。状态:<b style="color:var(--green)">✓满足</b> / <b style="color:#ff9aa4">✗缺失</b> / <b style="color:#ffd27a">❓待确认</b>。逐项明细见仓库 <code style="font-family:var(--mono);font-size:11px">docs/新机器-skill-配置清单.md</code> + 一键脚本 <code style="font-family:var(--mono);font-size:11px">docs/bootstrap-new-machine.sh</code>。</p>
+
+    <div class="base-intro">三步走 · ① 搬 CLAUDE.md + 经验/配置文件 → ② 跑 bootstrap 装 CLI → ③ 补登录与真 token</div>
+
+    <div class="axis env">
+      <div class="axis-h"><span class="ic">🧰</span><h3>① 外部 CLI 工具</h3><span class="tag">brew / npm -g / pip</span></div>
+      <div class="note">已装的换机重装即可;<b style="color:#ff9aa4">红色 = 本机当前就缺</b>,bootstrap 脚本自动补非交互部分(已实测幂等)。</div>
+      <div class="chain">
+        <span class="cl">已装 ✓</span>
+        <span class="pill l1">✓ gh</span><span class="pill l1">✓ vercel</span><span class="pill l1">✓ opencli</span><span class="pill l1">✓ ffmpeg</span><span class="pill l1">✓ yt-dlp</span><span class="pill l1">✓ ossutil</span><span class="pill l1">✓ s</span><span class="pill l1">✓ docker</span><span class="pill l1">✓ mlx_whisper</span><span class="pill l1">✓ vsce</span><span class="pill l1">✓ tt</span><span class="pill l1">✓ video2text</span><span class="pill l1">✓ j-skills</span><span class="pill l1">✓ mcp2cli</span>
+      </div>
+      <div class="chain" style="margin-top:7px">
+        <span class="cl">缺失 ✗</span>
+        <span class="pill gap">✗ wrangler<small>npx 兜底</small></span><span class="pill gap">✗ aliyun<small>setup.sh</small></span><span class="pill gap">✗ ovsx<small>npx 兜底</small></span><span class="pill gap">✗ playwright-cli</span><span class="pill gap">✗ pipx</span><span class="pill gap">✗ agent-reach<small>+xhs/bili</small></span>
+      </div>
+      <div class="chain" style="margin-top:7px">
+        <span class="cl">需 build</span>
+        <span class="pill q">m3u8-dl<small>clone video-downloader → npm link</small></span>
+        <span class="par">·</span><span class="pill q">video2text whisper 模型<small>下载</small></span>
+      </div>
+    </div>
+
+    <div class="axis ob">
+      <div class="axis-h"><span class="ic">🔑</span><h3>② 凭证 / Token + 登录认证</h3><span class="tag">含网页验证</span></div>
+      <div class="note"><b>搬 <code>~/.claude/CLAUDE.md</code> 一步</b>,VSCE_PAT / OVSX_PAT / OBSIDIAN_REST_API_KEY + 一批配置变量瞬间满足;真凭证才需逐个申请。</div>
+      <div class="chain">
+        <span class="cl">真缺 ✗</span>
+        <span class="pill gap">✗ CLOUDFLARE_API_TOKEN<small>turnstile</small></span><span class="pill gap">✗ OPENAI_API_KEY</span><span class="pill gap">✗ FEISHU_APP_ID/SECRET</span><span class="pill gap">✗ AGENT_BROWSER_ENCRYPTION_KEY</span><span class="pill gap">✗ Groq key<small>agent-reach</small></span>
+      </div>
+      <div class="chain" style="margin-top:7px">
+        <span class="cl">登录</span>
+        <span class="pill l1">✓ gh<small>缺 workflow scope</small></span><span class="pill l1">✓ tt</span><span class="pill l1">✓ codex</span><span class="pill l1">✓ tailscale</span>
+        <span class="par">·</span>
+        <span class="pill q">❓ vercel<small>疑未登录</small></span><span class="pill q">❓ npm<small>token 可能过期</small></span><span class="pill q">❓ wrangler/CF</span><span class="pill gap">✗ aliyun configure</span>
+      </div>
+    </div>
+
+    <div class="axis env">
+      <div class="axis-h"><span class="ic">📦</span><h3>③ 换机随身带的文件</h3><span class="tag">登录态 / 经验</span></div>
+      <div class="note">人配过一次的状态,直接拷最省事;含内网/凭证的 <b>别进公开 git</b>。</div>
+      <div class="chain">
+        <span class="pill env">⭐ ~/.claude/CLAUDE.md<small>配置变量总源</small></span><span class="pill env">~/.claude.json<small>MCP 注册</small></span><span class="pill env">ob-router.json</span><span class="pill env">experience.local.md ×N<small>主机/Tavily/CDP</small></span><span class="pill env">~/.ssh/config + key</span><span class="pill env">~/.npmrc</span><span class="pill env">himalaya / audio2subtitle / tt-auto config</span>
+      </div>
+    </div>
+
+    <div class="axis" style="border:1px solid var(--red-line);background:linear-gradient(160deg,var(--red-dim),transparent 75%)">
+      <div class="axis-h"><span class="ic">🚫</span><h3 style="color:#ff9aa4">换机也跑不了 · 跳过</h3><span class="tag" style="color:var(--red);background:var(--red-dim);border:1px solid var(--red-line)">5 个</span></div>
+      <div class="chain">
+        <span class="pill gap">内部业务适配 / 定制测试工具<small>私有 registry/MCP</small></span><span class="pill gap">内部仓库同步工具<small>企业内网 Git</small></span><span class="pill gap">文档平台编辑器 / 读取器<small>需自建应用凭证</small></span><span class="pill gap">演示文稿生成工具<small>云沙箱专用</small></span>
+      </div>
+    </div>
+  </section>
+
   <footer>
     <div class="foot-tag">// 本版修正</div>
     照截图的"阶段表 + 底座"重构,且<b>每个 skill 的链路与机制都按 SKILL.md 实读校对</b>(不再凭一行描述硬归类):
@@ -746,10 +803,11 @@ footer b{color:var(--muted2)}.foot-tag{font-family:var(--mono);color:var(--green
     <span style="color:var(--amber)">// 持续补充中</span> — 本轮已补:前端设计子链(frontend-design/Pencil/Stitch/dsl/web-design-guidelines)、编码背景知识(best-practices 全家)、验证重做(e2e 提为核心、标注未用过的 skill、Test ID BDD 规划)。仍待填:e2e/db-query/api-test/commit-pr-desc 几个缺口的实际实现,以及更多领域能力。<br>
     <span style="color:var(--amber)">// 本轮新增</span> — <b>§03 发布矩阵</b>:Vercel ‖ Cloudflare ‖ 阿里云三朵云按「静态托管 / Serverless / 边缘 / 对象存储 / KV」五层对照。<b style="color:#ff9aa4">实测校正</b>:阿里云有<b>三套独立命令行</b>——<code style="font-family:var(--mono);color:#ffc0ad">ossutil</code> 传 OSS(arm64 已装已配 ✓,之前上传靠它)、<code style="font-family:var(--mono);color:#ffc0ad">s</code>/Serverless-Devs 管 FC(已装 ✓),<b>OSS/FC 早能用</b>;只有「命令行逛阿里云官方 skill 市场(agentexplorer)」才需补 <b>aliyun 统一 CLI(未装)</b>。<b style="color:var(--green)">Cloudflare(wrangler)已装,并完成首次 Pages 部署 ✓</b>。<br>
     <span style="color:var(--red)">// 系统变更</span> — task-*(workflow/memory/harness) 与 GSD 已因低频从系统移除;沉淀改由 Obsidian 轴接管,BDD 待用 Test ID 方案重做。<br>
-    <span style="color:var(--amber)">// 本轮新增</span> — <b>环境轴补 ssh-connect</b>:把"连远程机器(Tailscale+SSH 免密)+ 在其上放手执行命令"抽成独立连接底层,经验沉淀机制仿 web-search(<code style="font-family:var(--mono);color:var(--green)">experience.local.md</code> 主机清单/排查/远端套路,gitignored 不泄露内网),坐落在 remote-dev-sync 之下。真实主机信息从全局 CLAUDE.md 迁入该经验文件,CLAUDE.md 仅留指针。<b style="color:#ff9aa4">⚠ 随后 review(评 B−/68)发现</b>:<code style="font-family:var(--mono);color:#ff9aa4">${CLAUDE_SKILL_DIR}</code> 本环境未设 → 经验沉淀「读/写」当前<b style="color:#ff9aa4">全失效</b>,待改锚 <code style="font-family:var(--mono);color:#ff9aa4">$HOME/.claude/skills/…</code>(详见环境轴卡片标注)。<br>
-    <span style="color:var(--cf)">// 本轮新增</span> — <b style="color:#ffdb96">Cloudflare 已落地</b>:wrangler 装好 + 首个 Pages 部署成功(<code style="font-family:var(--mono);color:#ffdb96">skill-system-guide.pages.dev</code>);并发现「不必自己造轮子」——<b>官方 cloudflare/skills 共 11 个全装</b>(<code style="font-family:var(--mono);color:#ffdb96">git clone</code>→symlink 到 <code style="font-family:var(--mono);color:#ffdb96">~/.claude/skills</code>,仓库存 jacky-github/cloudflare-skills,可 git pull 更新)。§03 新增 <b style="color:#ffdb96">Cloudflare 官方 Skill 套件</b>块,与阿里云 skill 发现链对称。<br>
+    <span style="color:var(--amber)">// 本轮新增</span> — <b>环境轴补 ssh-connect</b>:把"连远程机器(Tailscale+SSH 免密)+ 在其上放手执行命令"抽成独立连接底层,经验沉淀机制仿 web-search(<code style="font-family:var(--mono);color:var(--green)">experience.local.md</code> 主机清单/排查/远端套路,gitignored 不泄露内网),坐落在 remote-dev-sync 之下。真实主机信息从全局 CLAUDE.md 迁入该经验文件,CLAUDE.md 仅留指针。<b style="color:#ff9aa4">⚠ review(B−/68)曾发现</b> <code style="font-family:var(--mono);color:#ff9aa4">${CLAUDE_SKILL_DIR}</code> 本环境未设致经验沉淀读/写失效;<b style="color:var(--green)">已于 2026-06-22 修复(实测过)</b>:改锚 <code style="font-family:var(--mono);color:#b8ffd9">$HOME/.claude/skills/…</code> + 占位符标注 + Tailscale 退出码判定 + 表头自愈,4 项必修已清;<b style="color:var(--green)">#3 单机毁灭红线(rm -rf 无备份/磁盘/关机重启正在服务的进程)亦已补入</b>——日常照常放手,仅这几样停下确认。5 项全清。<br>
+    <span style="color:var(--cf)">// 本轮新增</span> — <b style="color:#ffdb96">Cloudflare 已落地</b>:wrangler 装好 + 首个 Pages 部署成功(<code style="font-family:var(--mono);color:#ffdb96">skill-system-guide.pages.dev</code>);并发现「不必自己造轮子」——<b>官方 cloudflare/skills 共 11 个全装,已纳入 §04 的 skills.sh 管理</b>(联网 clone 不稳→<code style="font-family:var(--mono);color:#ffdb96">npx skills add &lt;本地 clone 路径&gt; -g</code>,git pull 后 <code style="font-family:var(--mono);color:#ffdb96">skills update</code> 更新)。§03 新增 <b style="color:#ffdb96">Cloudflare 官方 Skill 套件</b>块,与阿里云 skill 发现链对称。<br>
     <span style="color:var(--blue)">// 本轮新增</span> — <b style="color:#aeeeff">§04 Skill 安装与分发</b>:补齐「这些 skill 从哪来、怎么装、怎么给别人用」。两条路径——<b>外部 skill 用 Vercel 的 skills.sh</b>(<code style="font-family:var(--mono);color:#aeeeff">npx skills add owner/repo -g</code>,默认 symlink,国内需配 HTTPS_PROXY)、<b>自研 skill 用 git clone + 软链</b>(jacky-skills + j-skills,改源即生效);盘点了外部(Vercel/Superpowers/Cloudflare…约 100+)与内部(jacky-skills 按 plugin 分组约 60+)两批;分享方式=把内部 repo 推 GitHub,别人当外部 skill 一行装走。AI 内容生产顺延为 §05。<br>
-    <span style="color:var(--purp)">// 本轮新增</span> — <b style="color:#dcc7ff">§05 AI 内容生产</b> + 头部<b>「核心定位」框</b>(点明本页核心=梳理所有 skills、筛出真正有用可复用的 + 梳理 AI 工具)。三模块:<b>PPT</b>(ppt-generation / web-design-engineer / html-artifacts)、<b>视频</b>(<b style="color:#ffe09a">★ web-video-presentation</b> 网页录屏式·<b>来自 ConardLi/garden-skills</b>·实读校正「只有一种风格」→其实<b>内置 10 套主题 + Vite/React 模板</b> ‖ 代码渲染真 mp4:Remotion(React)/HyperFrames(HeyGen 开源·纯 HTML→无头浏览器抓帧→mp4·专为 agent) ‖ 采集处理:video-to-text/audio-to-subtitle/m3u8-dl/fix-neat-video/bilibili)、<b>图像</b>(gpt-image-2 / warm-doodle / fireworks-tech-graph)。
+    <span style="color:var(--purp)">// 本轮新增</span> — <b style="color:#dcc7ff">§05 AI 内容生产</b> + 头部<b>「核心定位」框</b>(点明本页核心=梳理所有 skills、筛出真正有用可复用的 + 梳理 AI 工具)。三模块:<b>PPT</b>(ppt-generation / web-design-engineer / html-artifacts)、<b>视频</b>(<b style="color:#ffe09a">★ web-video-presentation</b> 网页录屏式·<b>来自 ConardLi/garden-skills</b>·实读校正「只有一种风格」→其实<b>内置 10 套主题 + Vite/React 模板</b> ‖ 代码渲染真 mp4:Remotion(React)/HyperFrames(HeyGen 开源·纯 HTML→无头浏览器抓帧→mp4·专为 agent) ‖ 采集处理:video-to-text/audio-to-subtitle/m3u8-dl/fix-neat-video/bilibili)、<b>图像</b>(gpt-image-2 / warm-doodle / fireworks-tech-graph)。<br>
+    <span style="color:#ff9aa4">// 本轮新增</span> — <b style="color:#ff9aa4">§06 前置依赖 · 新机器 Bootstrap</b>:5 个 subagent 并行实读全部 174 个 SKILL.md → <b>97 装上即用 / 77 需配置</b>。按依赖归类矩阵(CLI/凭证/登录/搬文件/受限),每项带本机 ✓/✗/❓ 状态;配套 <code style="font-family:var(--mono);color:#ff9aa4">docs/新机器-skill-配置清单.md</code> + 幂等 <code style="font-family:var(--mono);color:#ff9aa4">bootstrap-new-machine.sh</code>(实测识别本机缺 wrangler/aliyun/ovsx/pipx)。
 
 </div>
 </body>

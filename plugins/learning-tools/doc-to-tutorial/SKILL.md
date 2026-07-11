@@ -46,7 +46,7 @@ create interactive tutorial
 
     <!-- 执行前检查点 -->
     <checkpoints>
-      <checkpoint order="1">依赖检查通过（gsd-creator-skills）</checkpoint>
+      <checkpoint order="1">Node.js、interactive-tutorial CLI 和框架路径检查通过</checkpoint>
       <checkpoint order="2">内容来源已确认</checkpoint>
       <checkpoint order="3">敏感信息已处理</checkpoint>
       <checkpoint order="4">教程元数据已收集</checkpoint>
@@ -66,9 +66,9 @@ create interactive tutorial
   <gsd:goal>将任意内容源转换为符合 interactive-tutorial 框架标准的交互式教程，并启动本地预览</gsd:goal>
 
   <gsd:phase name="dependency-check" order="0">
-    <gsd:step>检查 gsd-creator-skills 依赖是否已安装</gsd:step>
-    <gsd:step>若未安装，提示用户安装或确认跳过</gsd:step>
-    <gsd:checkpoint>依赖就绪或用户确认跳过</gsd:checkpoint>
+    <gsd:step>检查 Node.js、interactive-tutorial CLI 和 INTERACTIVE_TUTORIAL_FRAMEWORK_PATH</gsd:step>
+    <gsd:step>缺少运行时依赖时，给出对应安装或配置指引</gsd:step>
+    <gsd:checkpoint>运行时依赖和框架路径均已就绪</gsd:checkpoint>
   </gsd:phase>
 
   <gsd:phase name="collect-context" order="1">
@@ -125,14 +125,6 @@ npm install -g @wangjs-jacky/interactive-tutorial
 interactive-tutorial --version
 ```
 
-### 可选（推荐）
-
-- **gsd-creator-skills** - 用于参考 GSD 最佳实践
-
-```bash
-j-skills install gsd-creator-skills -g
-```
-
 ## 执行流程
 
 ### Phase 0: 依赖检查
@@ -142,17 +134,20 @@ j-skills install gsd-creator-skills -g
 **依赖列表**：
 | 依赖 | 类型 | 说明 |
 |------|------|------|
-| `gsd-creator-skills` | skill | GSD 风格参考标准 |
+| Node.js >= 18 | runtime | 运行教程工具 |
+| `interactive-tutorial` | CLI | 生成并预览教程 |
+| `INTERACTIVE_TUTORIAL_FRAMEWORK_PATH` | 配置 | 定位教程框架 |
 
 **步骤**：
-1. 检查 `gsd-creator-skills` 是否在全局 skills 目录中
-2. 若未安装，提示用户：`j-skills install gsd-creator-skills -g`
+1. 检查 `node --version` 和 `interactive-tutorial --version`
+2. 检查 `INTERACTIVE_TUTORIAL_FRAMEWORK_PATH` 是否指向有效目录
+3. 缺少依赖时，按“前置依赖”和“配置变量”章节完成安装或配置
 
 > 🛑 **Checkpoint** — 必须确认
 >
 > | 检查项 | 说明 |
 > |--------|------|
-> | ✅ 依赖就绪 | gsd-creator-skills 已安装或用户确认跳过 |
+> | ✅ 依赖就绪 | Node.js、CLI 和框架路径均可用 |
 
 ### Phase 1: 收集上下文
 
@@ -177,7 +172,7 @@ j-skills install gsd-creator-skills -g
 | 环境变量文件 | `.env`、`.env.local`、`.env.*` |
 | 依赖目录 | `node_modules/`、`vendor/` |
 | 版本控制 | `.git/`、`.svn/` |
-| 个人路径 | `/Users/xxx/`、`C:\Users\xxx\` |
+| 个人路径 | `$HOME/...`、`%USERPROFILE%\\...` |
 | 敏感信息 | credentials、secrets、passwords |
 
 **处理策略**：
@@ -323,7 +318,7 @@ interactive-tutorial serve /path/to/framework/content --tutorial my-tutorial --p
 <success_criteria>
 完成以下所有项目即视为任务成功：
 
-- [ ] **依赖检查**：gsd-creator-skills 已安装或用户确认跳过
+- [ ] **依赖检查**：Node.js、interactive-tutorial CLI 和框架路径均可用
 - [ ] **内容来源**：已识别并确认内容来源类型
 - [ ] **敏感信息**：已过滤或脱敏处理
 - [ ] **元数据收集**：教程标题、分类等信息已确认
@@ -344,7 +339,6 @@ interactive-tutorial serve /path/to/framework/content --tutorial my-tutorial --p
 | 安装 CLI | `npm install -g @wangjs-jacky/interactive-tutorial` |
 | 验证安装 | `interactive-tutorial --version` |
 | 启动预览 | `npm run tutorial:serve -- --tutorial <name> --port 5174 --open` |
-| 安装 GSD 参考 | `j-skills install gsd-creator-skills -g` |
 
 ### 输出位置
 

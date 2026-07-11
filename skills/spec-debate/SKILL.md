@@ -1,6 +1,6 @@
 ---
 name: spec-debate
-description: 让 Claude 与 Codex 对一份 spec 文档做匿名对抗辩论，由独立第三方裁判合成终稿。当用户想"辩论这份 spec"、"对抗评审 spec"、"让 Claude 和 Codex 辩论文档"、或输入 /spec-debate <路径.md> 时触发。产出 debate-log.md + spec.final.md，原文件零改动。
+description: 让 Claude 与 Codex 对一份 spec 文档做匿名对抗辩论，由独立第三方裁判合成终稿。当用户想"辩论这份 spec"、"对抗评审 spec"、"让 Claude 和 Codex 辩论文档"、或输入 /spec-debate [路径.md] 时触发。产出 debate-log.md + spec.final.md，原文件零改动。
 ---
 
 # spec-debate

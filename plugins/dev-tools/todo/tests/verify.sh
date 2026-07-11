@@ -23,7 +23,7 @@ else
   TEST_DIR="/tmp/todo-skill-verify-$$"
 fi
 
-SKILL_DIR="/Users/jiashengwang/jacky-github/jacky-skills/plugins/dev-tools/todo"
+SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 assert() {
   local desc="$1"

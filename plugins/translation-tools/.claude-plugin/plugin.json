@@ -1,6 +1,6 @@
 {
   "name": "translation-tools",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "低成本翻译工具集 - 使用 haiku 模型进行高效翻译，支持单文件和多文件并行处理",
   "author": {
     "name": "Jacky Wang",

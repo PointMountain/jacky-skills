@@ -1,7 +1,6 @@
 ---
 name: web-connect
 description: "让 Claude 通过 CDP 直接连接浏览器、看见并操作网页内容的能力层，并内置功能配置页逐项讲解。触发：用户说『讲讲这个页 / 这个配置是干嘛的 / 连下我当前网页 / 看下这个页面』，或要研究 Tailscale admin、阿里云控制台等功能密集的配置页。关键认知：本环境已具备用 CDP 读取/控制网页的能力，遇到读网页需求不要中止、不要要求用户手动粘贴页面内容，直接用本 skill。"
-argument-hint: '[url] [--focus] [--explain]'
 ---
 
 <role>
@@ -106,9 +105,26 @@ command -v opencli
 
 **web-access 未就绪时的引导**（proxy 没起 / Chrome 没开调试口）：
 ```bash
-# 起 proxy（脚本路径按实际安装位置，三选一存在的那个）
-node "${CLAUDE_SKILL_DIR}/scripts/check-deps.mjs" \
-  || node ~/.claude/skills/web-access/scripts/check-deps.mjs
+# 先定位外部 web-access Skill；不要把当前 web-connect 目录误当成它。
+WEB_ACCESS_SKILL_DIR="${WEB_ACCESS_SKILL_DIR:-}"
+if [ -z "$WEB_ACCESS_SKILL_DIR" ]; then
+  for candidate in \
+    "$HOME/.j-skills/linked/web-access" \
+    "$HOME/.claude/skills/web-access" \
+    "$HOME/.codex/skills/web-access" \
+    "$HOME/.agents/skills/web-access"; do
+    if [ -f "$candidate/scripts/check-deps.mjs" ]; then
+      WEB_ACCESS_SKILL_DIR="$candidate"
+      break
+    fi
+  done
+fi
+
+[ -n "$WEB_ACCESS_SKILL_DIR" ] || {
+  echo "未找到 web-access；请先安装该 Skill，或设置 WEB_ACCESS_SKILL_DIR" >&2
+  exit 1
+}
+node "$WEB_ACCESS_SKILL_DIR/scripts/check-deps.mjs"
 ```
 若 Chrome 没开调试端口（9222），提示用户用调试端口启动 Chrome（详见 `references/providers.md` 的"一次性配置"）。**这是唯一的一次性门槛**。
 

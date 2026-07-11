@@ -236,7 +236,7 @@ const handleBrowse = async () => {
   const selected = await open({
     directory: true,  // 选择文件夹
     multiple: false,  // 单选
-    defaultPath: '/Users/xxx/Downloads',
+    defaultPath: '/path/to/downloads',
   })
   if (selected) {
     console.log('Selected:', selected)

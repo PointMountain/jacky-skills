@@ -1,7 +1,6 @@
 ---
 name: todo
 description: "上下文快照 + 批次处理：add 时自动保存会话上下文到 checkpoint 文件，resolve 时读取 checkpoint 无缝续接"
-argument-hint: '[list|add|resolve] [内容]'
 ---
 
 <role>上下文快照 + 批次调度。add 时自动冻结当前会话状态，resolve 时解冻上下文并执行任务。</role>

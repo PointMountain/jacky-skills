@@ -1,108 +1,96 @@
 ---
 name: link-all-skills
-description: "将当前项目下所有 skills 链接到全局注册表并安装到所有环境。触发于 \"链接所有 skills\"、\"link all skills\"、\"批量链接\" 等请求。"
+description: "批量链接并安装一个仓库中的全部活跃 Skills。当用户说链接所有 skills、link all skills、批量安装或初始化整个 skills 仓库时使用。"
 ---
 
-<role>批量技能分发助手，负责发现当前项目内全部 skills 并执行统一链接与全环境安装。</role>
-<purpose>在初始化或迁移场景下，以非交互方式快速完成 skill 注册、安装与结果核验。</purpose>
-<trigger>
+# 批量链接 Skills
 
-```text
-触发词：
-- 链接所有 skills
-- link all skills
-- 批量链接
-- 批量安装 skills
-- 初始化整个 skills 仓库
+## 优先路径
 
-示例：
-- “把当前项目里的 skills 全部链接并安装到所有环境”
-- “我刚拉下仓库，帮我一键初始化 skills”
-```
-
-</trigger>
-<gsd:workflow xmlns:gsd="urn:gsd:workflow">
-  <gsd:meta>scope=current-project; command_set=find,j-skills link,j-skills install --all-env,j-skills link --doctor</gsd:meta>
-  <gsd:goal>确保仓库内每个 `SKILL.md` 都被正确链接并分发到目标环境。</gsd:goal>
-  <gsd:phase>扫描并收集所有 skill 目录，过滤无效路径。</gsd:phase>
-  <gsd:phase>按 skill 执行 unlink+link，随后执行全环境全局安装。</gsd:phase>
-  <gsd:phase>通过 list/link --list 结果进行核验并输出汇总。</gsd:phase>
-</gsd:workflow>
-
-# 批量链接并安装 Skills
-
-将当前项目目录下所有包含 `SKILL.md` 的子目录链接到全局注册表，**并自动安装到所有支持的环境**。
-流程默认非交互执行，适合初始化和批量维护。
-
-## 使用场景
-
-- 项目中有多个 skills 需要一次性链接和安装
-- 刚克隆了一个 skills 仓库，需要初始化
-- 需要更新所有 skills 的链接指向
-
-## 执行流程
-
-### 1. 扫描 Skills
+如果当前仓库根目录存在经过审计的 `install.sh`，优先执行它：
 
 ```bash
-# 查找所有包含 SKILL.md 的目录（安全处理空格路径）
-find "$PROJECT_DIR" -type f -name "SKILL.md" -print0 | xargs -0 -I {} dirname "{}"
+./install.sh --all
 ```
 
-### 2. 执行链接
+`jacky-skills/install.sh` 会：
 
-对每个 skill 目录执行：
+1. 检查 Node.js 与 `j-skills`。
+2. 扫描 `plugins/`、`skills/` 和 `harness/` 中的 `SKILL.md`。
+3. 排除 `archived/`。
+4. 逐个核对 registry 和软链接目标。
+5. 已正确链接时跳过；发现链接冲突时停止，不覆盖。
+6. 安装到 `J_SKILLS_ENVS` 指定的环境，默认为 `claude-code,codex`。
+
+覆盖目标环境：
 
 ```bash
-# 先 unlink（避免交互式确认阻塞）
-j-skills link --unlink <skill-name> --force
-
-# 再 link（使用 -y 跳过确认）
-j-skills link <skill-dir> -y --json
+J_SKILLS_ENVS=claude-code,codex,cursor ./install.sh --all
 ```
 
-### 3. 自动安装到所有环境
-
-对每个已链接的 skill 执行：
+只安装一个 Skill 或 Plugin 时使用：
 
 ```bash
-# 安装到所有支持的环境（claude-code, cursor, opencode, codex）
-j-skills install <skill-name> -g --all-env --yes --json
+./install.sh --skill <skill-name>
+./install.sh --plugin <plugin-name>
 ```
 
-**说明**：
-- `-g` 全局安装
-- `--all-env` 安装到所有支持的环境
-- 完全非交互，适合自动化脚本
+## 通用仓库回退流程
 
-### 4. 验证结果
+当仓库没有自带脚本时，按以下步骤执行。
+
+### 1. 发现 Skill
 
 ```bash
-# 查看已链接的 skills
+find plugins skills \
+  -type d -name archived -prune -o \
+  -type f -name SKILL.md -print
+```
+
+不得扫描或安装 `archived/` 下的 Skill。
+
+### 2. 逐个链接
+
+对每个 `SKILL.md` 读取 frontmatter `name`，再执行：
+
+```bash
+j-skills link /path/to/skill --json
+```
+
+链接前先用以下命令检查同名项：
+
+```bash
 j-skills link --list --json
-
-# 查看已安装的 skills
-j-skills list -g --json
-
-# 检查断链
-j-skills link --doctor --json
 ```
 
-## 一键脚本
+- 同名项指向当前 Skill 目录：跳过链接。
+- 同名项指向其他目录：报告“链接冲突”并停止，不自动 unlink 或覆盖。
 
-项目内包含 `link-all.sh` 脚本，可一键完成所有操作：
+### 3. 逐个安装
 
 ```bash
-./link-all.sh [项目路径]
-
-# 仅预览将执行的动作（不落地）
-./link-all.sh --dry-run
+j-skills install skill-name --global --env claude-code,codex --json
 ```
 
-## 注意事项
+要安装到更多环境时，修改逗号分隔的 `--env` 值。
 
-- 链接是软链接，修改源文件立即生效
-- 如果 skill 已链接到其他位置，会被覆盖指向当前项目
-- 自动安装到所有支持的环境：Claude Code、Cursor、OpenCode、Codex
-- 脚本会优先使用本机 `j-skills`，若不存在则回退 `npx @wangjs-jacky/j-skills`
-- 需要具备 Node.js 环境（用于 `npx` 回退模式）
+### 4. 验证
+
+```bash
+j-skills link --list --json
+j-skills list --global --json
+```
+
+核对项：
+
+- 发现的 Skill 数与链接数一致。
+- 每个链接指向预期源目录。
+- 目标 Agent 环境中存在对应 Skill。
+- 不包含任何 `archived/` Skill。
+
+## 约束
+
+- 不假设 `j-skills` 支持批量选项；0.1.0 需要逐 Skill 执行。
+- 不吞掉链接或安装失败。
+- 不因“批量”而扩大到全局清理、删除或覆盖现有 Skill。
+- 不在未确认目标环境时猜测安装位置。
