@@ -1,0 +1,129 @@
+version: 2
+name: web-flow
+
+run_inputs:
+  required: [intent]
+  optional: [references, deployment_authorized]
+  defaults:
+    deployment_authorized: false
+  rules:
+    - unattended 模式不代表获得部署授权
+    - 只有用户明确要求真实部署时 deployment_authorized 才能为 true
+
+runtime:
+  run_dir: ".web-flow/runs/<run_id>"
+  artifact_manifest: "artifact-manifest.yaml"
+  external_status: ".web-flow/runs/<run_id>/preflight/external-skills.yaml"
+  privacy:
+    target_gitignore: ".web-flow/"
+    redact: [tokens, credentials, authorization_headers, private_urls, private_absolute_paths]
+
+contracts:
+  stage_result:
+    required: [stage, status, artifacts, decision_trace, next]
+    status: [completed, blocked, skipped]
+  decision_trace:
+    required: [observations, evidence, decision, actions, validation, errors, root_cause, next_rule]
+  artifact_manifest:
+    required: [run_id, artifacts]
+    artifact_required: [key, stage, path, type]
+
+preflight:
+  - id: external-capability-state-init
+    source: external-skills.yaml
+    action: 初始化本轮空状态；能力在阶段首次使用时才探测并缓存
+    output: {key: external_status, path: preflight/external-skills.yaml, type: yaml}
+    register_in_manifest: true
+  - id: deployment-readiness
+    skill: web-flow-deploy
+    mode: preflight
+    when: "deployment_authorized == true"
+    output: {key: deployment_readiness, path: preflight/deployment-readiness.yaml, type: yaml}
+    register_in_manifest: true
+
+stages:
+  - id: research
+    skill: web-flow-research
+    inputs: [intent, references, external_status]
+    outputs:
+      - {key: content_spec, path: research/content-spec.yaml, type: yaml}
+      - {key: reference_evidence, path: research/reference-evidence.yaml, type: yaml}
+      - {key: asset_requirements, path: research/asset-requirements.yaml, type: yaml}
+      - {key: research_result, path: research/stage-result.yaml, type: yaml}
+    score: research
+    human_gates: []
+    next: wireframe
+
+  - id: wireframe
+    skill: web-flow-prototype
+    mode: wireframe
+    inputs: [content_spec, reference_evidence]
+    outputs:
+      - {key: wireframe, path: wireframe/wireframe.html, type: file}
+      - {key: wireframe_result, path: wireframe/stage-result.yaml, type: yaml}
+    score: wireframe
+    human_gates:
+      - {id: G1, artifact: wireframe, purpose: 确认信息架构与阅读路径}
+    next: prototype
+
+  - id: prototype
+    skill: web-flow-prototype
+    mode: prototype
+    inputs: [content_spec, reference_evidence, asset_requirements, wireframe, external_status]
+    outputs:
+      - {key: prototype, path: prototype/prototype.html, type: file}
+      - {key: prototype_result, path: prototype/stage-result.yaml, type: yaml}
+    score: prototype
+    human_gates:
+      - {id: G2, artifact: prototype, purpose: 确认视觉方向与关键交互}
+    next: design
+
+  - id: design
+    skill: web-flow-design
+    inputs: [content_spec, prototype]
+    outputs:
+      - {key: design_tokens, path: design/design-tokens.yaml, type: yaml}
+      - {key: layout_contract, path: design/layout-contract.yaml, type: yaml}
+      - {key: design_result, path: design/stage-result.yaml, type: yaml}
+    score: design
+    human_gates: []
+    next: build
+
+  - id: build
+    skill: web-flow-build
+    inputs: [content_spec, prototype, design_tokens, layout_contract, external_status]
+    outputs:
+      - {key: site, path: build/site, type: directory}
+      - {key: preview, path: build/preview.yaml, type: yaml}
+      - {key: build_result, path: build/stage-result.yaml, type: yaml}
+    score: build
+    human_gates:
+      - {id: G3, artifact: preview, purpose: 确认真实页面的桌面与移动表现}
+    next: deploy
+
+  - id: deploy
+    skill: web-flow-deploy
+    mode: publish
+    when: "deployment_authorized == true"
+    otherwise: deliver_preview_only
+    inputs: [site, deployment_readiness, deployment_authorized]
+    outputs:
+      - {key: production_url, path: deploy/production-url.txt, type: text}
+      - {key: deployment_evidence, path: deploy/deployment-evidence.yaml, type: yaml}
+      - {key: deploy_result, path: deploy/stage-result.yaml, type: yaml}
+    score: deploy
+    human_gates: []
+    next: null
+
+cross_cutting:
+  score:
+    skill: web-flow-benchmark
+    after_each_stage: true
+    independent_benchmark: true
+    max_rounds: 2
+    revise: top_fix_only
+  memory:
+    owner: current_stage_skill
+    index: memory/index.md
+    load: just_in_time
+    write: verified_root_cause_only

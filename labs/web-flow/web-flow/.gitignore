@@ -1,0 +1,11 @@
+# 原始评审噪声
+reviews/*.log
+reviews/*.txt
+*.log
+.DS_Store
+
+# 历史流水线和本机评审产物不参与日常分发
+archive/
+
+# 本 Skill 独立维护的本机错误记忆
+memory/
