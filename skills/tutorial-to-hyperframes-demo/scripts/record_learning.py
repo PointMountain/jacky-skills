@@ -16,6 +16,7 @@ import re
 import stat
 import sys
 from typing import Any
+import unicodedata
 
 from learning_common import (
     atomic_write_json,
@@ -67,6 +68,9 @@ BASIS_VALUES = {
     "aesthetic_opinion",
     "residual",
 }
+MEMORY_STATUSES = {"active", "superseded", "archived"}
+LOCAL_MEMORY_DESTINATIONS = {"local_memory", "error_memory"}
+SHARED_CANDIDATE_DESTINATIONS = {"reference", "skill_adjustment"}
 
 
 class LearningError(ValueError):
@@ -1304,6 +1308,724 @@ def finalize(
     return {"ok": True, "state": "frozen", "reused": False}
 
 
+def local_memory_root() -> Path:
+    return SKILL_ROOT / "local"
+
+
+def validate_scope(value: Any, label: str) -> dict[str, list[str]]:
+    if not isinstance(value, dict):
+        raise LearningError(f"{label} 必须是对象")
+    expected = {"task_intents", "mechanisms", "capability_ids"}
+    if set(value) != expected:
+        raise LearningError(f"{label} 必须只包含 task_intents/mechanisms/capability_ids")
+    return {
+        key: require_string_list(value.get(key), f"{label}.{key}")
+        for key in sorted(expected)
+    }
+
+
+def load_local_index(*, allow_missing: bool) -> tuple[Path, dict[str, Any] | None]:
+    root = local_memory_root()
+    if not root.exists():
+        if allow_missing:
+            return root, None
+        raise LearningError("local memory 不存在")
+    try:
+        ensure_secure_existing_directory(root)
+    except (FileNotFoundError, OSError, ValueError) as error:
+        raise LearningError("local memory 目录链非法或包含 symlink") from error
+    index_path = secure_run_relative(root, "index.json", must_exist=True)
+    index = load_object(index_path, "local/index.json")
+    reject_private_payload(index)
+    if index.get("schema_version") != SCHEMA_VERSION:
+        raise LearningError("local index schema_version 不受支持")
+    if not isinstance(index.get("memories"), dict) or not isinstance(
+        index.get("maps"), dict
+    ):
+        raise LearningError("local index memories/maps 必须是对象")
+    return root, index
+
+
+def load_indexed_memory(
+    root: Path, memory_id: str, entry: Any
+) -> tuple[dict[str, Any], str]:
+    validate_identifier(memory_id, "memory_id")
+    if not isinstance(entry, dict):
+        raise LearningError(f"memory index entry 非法：{memory_id}")
+    expected_path = f"memories/{memory_id}.json"
+    if entry.get("path") != expected_path or not HASH_RE.fullmatch(
+        str(entry.get("sha256"))
+    ):
+        raise LearningError(f"memory index descriptor 非法：{memory_id}")
+    path = secure_run_relative(root, expected_path, must_exist=True)
+    content = read_stable_file_bytes(path)
+    actual_hash = hashlib.sha256(content).hexdigest()
+    if actual_hash != entry.get("sha256"):
+        raise LearningError(f"memory index hash 漂移：{memory_id}")
+    try:
+        value = json.loads(content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise LearningError(f"memory 非法 JSON：{memory_id}") from error
+    if not isinstance(value, dict) or value.get("memory_id") != memory_id:
+        raise LearningError(f"memory identity 非法：{memory_id}")
+    reject_private_payload(value)
+    for field in ("revision", "status", "destination", "scope", "problem_model"):
+        if entry.get(field) != value.get(field):
+            raise LearningError(f"memory index 与 memory.{field} 不一致：{memory_id}")
+    if value.get("status") not in MEMORY_STATUSES:
+        raise LearningError(f"memory status 非法：{memory_id}")
+    if type(value.get("revision")) is not int or value["revision"] < 1:
+        raise LearningError(f"memory revision 非法：{memory_id}")
+    if value.get("destination") not in LOCAL_MEMORY_DESTINATIONS:
+        raise LearningError(f"memory destination 非法：{memory_id}")
+    validate_scope(value.get("scope"), f"memory {memory_id}.scope")
+    require_string(value.get("problem_model"), f"memory {memory_id}.problem_model")
+    return value, actual_hash
+
+
+def scope_match_score(query: dict[str, list[str]], scope: dict[str, list[str]]) -> int:
+    score = 0
+    constrained = False
+    for key in ("task_intents", "mechanisms", "capability_ids"):
+        values = set(scope[key])
+        if not values:
+            continue
+        constrained = True
+        overlap = values & set(query[key])
+        if not overlap:
+            return -1
+        score += len(overlap)
+    return score if constrained else -1
+
+
+def select_memory(
+    run_dir: Path,
+    run_path: Path,
+    run: dict[str, Any],
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    extension = require_collecting(run)
+    if "preflight" not in run.get("completed_stages", []):
+        raise LearningError("select-memory 只能在 preflight 完成后执行")
+    query = {
+        "task_intents": require_string_list(payload.get("task_intents"), "task_intents"),
+        "mechanisms": require_string_list(payload.get("mechanisms"), "mechanisms"),
+        "capability_ids": require_string_list(
+            payload.get("capability_ids"), "capability_ids"
+        ),
+        "conflicting_evidence_refs": evidence_descriptors(
+            run_dir,
+            payload.get("conflicting_evidence_refs"),
+            "conflicting_evidence_refs",
+        ),
+    }
+    if not query["task_intents"]:
+        raise LearningError("task_intents 不能为空")
+    created_at = normalize_rfc3339(payload.get("created_at"), "created_at")
+    selected: list[dict[str, Any]] = []
+    rejected: list[dict[str, Any]] = []
+    root, index = load_local_index(allow_missing=True)
+    matches: list[tuple[int, str, dict[str, Any], str]] = []
+    if index is not None:
+        for memory_id, entry in index["memories"].items():
+            memory, memory_hash = load_indexed_memory(root, memory_id, entry)
+            if memory.get("status") != "active":
+                continue
+            scope = validate_scope(memory.get("scope"), f"memory {memory_id}.scope")
+            score = scope_match_score(query, scope)
+            if score < 0:
+                continue
+            matches.append((score, memory_id, memory, memory_hash))
+    matches.sort(key=lambda item: (-item[0], item[1]))
+    has_conflict = bool(query["conflicting_evidence_refs"])
+    for _, memory_id, memory, memory_hash in matches:
+        base = {
+            "memory_id": memory_id,
+            "revision": memory.get("revision"),
+            "snapshot_sha256": memory_hash,
+        }
+        if has_conflict:
+            rejected.append({**base, "reason": "conflicting_evidence"})
+        elif len(selected) < 3:
+            selected.append({**base, "reason": "scope_match", "snapshot": memory})
+        else:
+            rejected.append({**base, "reason": "selection_limit"})
+    snapshot = {
+        "selected": [
+            {
+                "memory_id": item["memory_id"],
+                "revision": item["revision"],
+                "snapshot_sha256": item["snapshot_sha256"],
+            }
+            for item in selected
+        ],
+        "rejected": rejected,
+    }
+    value = {
+        "schema_version": SCHEMA_VERSION,
+        "workflow_version": WORKFLOW_VERSION,
+        "run_id": run.get("run_id"),
+        "query": query,
+        "selected": selected,
+        "rejected": rejected,
+        "selection_snapshot": snapshot,
+        "selection_snapshot_sha256": hashlib.sha256(
+            canonical_json_bytes(snapshot)
+        ).hexdigest(),
+        "created_at": created_at,
+    }
+    target = secure_run_relative(run_dir, "memory-selection.json", must_exist=False)
+    created = write_immutable_or_adopt(target, value)
+    updated = deepcopy(run)
+    updated_extension = learning_extension(updated)
+    descriptor_value = {"path": "memory-selection.json", "sha256": stable_sha256(target)}
+    current = updated_extension.get("selection")
+    if current is not None and current != descriptor_value:
+        if created:
+            secure_unlink_file(target)
+        raise LearningError("memory selection 已冻结且内容不同")
+    updated_extension["selection"] = descriptor_value
+    try:
+        atomic_write_json(run_path, updated)
+    except BaseException:
+        if created:
+            secure_unlink_file(target)
+        raise
+    return {"ok": True, "path": "memory-selection.json", "reused": not created}
+
+
+def require_post_run(run: dict[str, Any]) -> dict[str, Any]:
+    extension = learning_extension(run)
+    if extension.get("state") not in {"frozen", "backfilled"}:
+        raise LearningError("post-run 操作只支持 frozen/backfilled run")
+    return extension
+
+
+def load_bound_core_artifact(
+    run_dir: Path, run: dict[str, Any], stage: str
+) -> tuple[dict[str, Any], dict[str, str]]:
+    artifacts = run.get("artifacts")
+    item = artifacts.get(stage) if isinstance(artifacts, dict) else None
+    if not isinstance(item, dict):
+        raise LearningError(f"run 缺少 {stage} artifact")
+    relative = require_string(item.get("path"), f"{stage}.path")
+    actual = descriptor(run_dir, relative, stage)
+    if item != actual:
+        raise LearningError(f"{stage} artifact descriptor hash 漂移")
+    return load_object(run_dir / relative, stage), actual
+
+
+def core_review_hashes(run_dir: Path, run: dict[str, Any]) -> tuple[str, str]:
+    r2, _ = load_bound_core_artifact(run_dir, run, "review_r2")
+    final, _ = load_bound_core_artifact(run_dir, run, "finalize")
+    r2_hash = r2.get("reviewed_render_sha256")
+    final_hash = final.get("render_sha256")
+    if not HASH_RE.fullmatch(str(r2_hash)) or not HASH_RE.fullmatch(str(final_hash)):
+        raise LearningError("final/R2 缺少真实 render hash")
+    if r2_hash != final_hash:
+        raise LearningError("final hash 与 R2 reviewed hash 不一致")
+    return final_hash, r2_hash
+
+
+def trusted_feedback_evidence(
+    run_dir: Path, run: dict[str, Any]
+) -> dict[tuple[str, str], str]:
+    """只接受 run 已绑定的核心工件或受信执行回执/日志。"""
+
+    trusted: dict[tuple[str, str], str] = {}
+    artifacts = run.get("artifacts")
+    if not isinstance(artifacts, dict):
+        raise LearningError("run.artifacts 非法")
+    for stage, item in artifacts.items():
+        if not isinstance(item, dict):
+            raise LearningError(f"core artifact descriptor 非法：{stage}")
+        relative = require_string(item.get("path"), f"artifacts.{stage}.path")
+        actual = descriptor(run_dir, relative, f"core artifact {stage}")
+        if item != actual:
+            raise LearningError(f"core artifact descriptor 漂移：{stage}")
+        trusted[(actual["path"], actual["sha256"])] = f"core_artifact:{stage}"
+
+    sidecars = learning_extension(run).get("sidecars")
+    if not isinstance(sidecars, dict):
+        raise LearningError("learning sidecars 非法")
+    for relative, item in sidecars.items():
+        if not relative.startswith("usage-events/"):
+            continue
+        actual_event = descriptor(run_dir, relative, "usage event")
+        if item != actual_event:
+            raise LearningError(f"usage event descriptor 漂移：{relative}")
+        event = load_object(run_dir / relative, "usage event")
+        if (
+            event.get("kind") not in {"skill", "tool"}
+            or event.get("capture_state") != "captured"
+            or event.get("result") not in {"passed", "degraded", "failed"}
+        ):
+            continue
+        receipt = event.get("execution_receipt")
+        if not isinstance(receipt, dict):
+            continue
+        receipt_path = require_string(receipt.get("path"), "execution_receipt.path")
+        actual_receipt = descriptor(run_dir, receipt_path, "execution receipt")
+        if receipt != actual_receipt:
+            raise LearningError("execution receipt descriptor 漂移")
+        trusted[(actual_receipt["path"], actual_receipt["sha256"])] = "execution_receipt"
+        receipt_value = load_object(run_dir / receipt_path, "execution receipt")
+        for category in ("stdout", "stderr", "target"):
+            reference = receipt_value.get(category)
+            if not isinstance(reference, dict):
+                continue
+            actual_log = descriptor(
+                run_dir,
+                require_string(reference.get("path"), f"receipt.{category}.path"),
+                f"receipt.{category}",
+            )
+            if reference != actual_log:
+                raise LearningError(f"receipt.{category} descriptor 漂移")
+            trusted[(actual_log["path"], actual_log["sha256"])] = f"receipt:{category}"
+    return trusted
+
+
+def reject_untrusted_feedback_evidence(
+    run_dir: Path,
+    run: dict[str, Any],
+    refs: list[dict[str, str]],
+) -> None:
+    trusted = trusted_feedback_evidence(run_dir, run)
+    untrusted = [item["path"] for item in refs if (item["path"], item["sha256"]) not in trusted]
+    if untrusted:
+        raise LearningError(
+            "feedback evidence 不是 trusted core artifact/receipt/test/verification log："
+            + ", ".join(sorted(untrusted))
+        )
+
+
+def append_post_run_sidecar(
+    run_dir: Path,
+    run_path: Path,
+    run: dict[str, Any],
+    relative: str,
+    value: dict[str, Any],
+) -> bool:
+    target = secure_run_relative(run_dir, relative, must_exist=False)
+    created = write_immutable_or_adopt(target, value)
+    try:
+        update_sidecar_descriptor(
+            run_path, run, relative, target, allow_replace=False
+        )
+    except BaseException:
+        if created:
+            secure_unlink_file(target)
+        raise
+    return created
+
+
+def record_feedback(
+    run_dir: Path,
+    run_path: Path,
+    run: dict[str, Any],
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    require_post_run(run)
+    candidate_id = require_string(payload.get("candidate_id"), "candidate_id")
+    validate_identifier(candidate_id, "candidate_id")
+    final_hash, r2_hash = core_review_hashes(run_dir, run)
+    if payload.get("final_hash") != final_hash or payload.get("r2_hash") != r2_hash:
+        raise LearningError("candidate final_hash/r2_hash 与冻结 run 不一致")
+    refs = evidence_descriptors(run_dir, payload.get("evidence_refs"), "evidence_refs")
+    applies_to = require_string_list(payload.get("applies_to"), "applies_to")
+    if not applies_to:
+        raise LearningError("applies_to 不能为空")
+    destination = payload.get("destination")
+    if destination not in DESTINATIONS:
+        raise LearningError("candidate destination 非法")
+    source = require_string(payload.get("source"), "source")
+    if source == "reviewer_feedback" and not refs:
+        raise LearningError("reviewer feedback 必须绑定 R2、测试或验证证据")
+    if source == "reviewer_feedback":
+        reject_untrusted_feedback_evidence(run_dir, run, refs)
+    if not refs and destination != "backlog":
+        raise LearningError("无可复验证据的反馈只能进入 backlog")
+    value: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "workflow_version": WORKFLOW_VERSION,
+        "run_id": run.get("run_id"),
+        "candidate_id": candidate_id,
+        "final_hash": final_hash,
+        "r2_hash": r2_hash,
+        "evidence_refs": refs,
+        "applies_to": applies_to,
+        "destination": destination,
+        "received_at": normalize_rfc3339(payload.get("received_at"), "received_at"),
+        "source": source,
+        "claim": require_string(payload.get("claim"), "claim"),
+        "next_validation": require_string(
+            payload.get("next_validation"), "next_validation"
+        ),
+    }
+    for field in (
+        "finding_type",
+        "symptom",
+        "root_cause",
+        "future_recurrence",
+        "verified_at",
+        "problem_model",
+    ):
+        if field in payload:
+            item = payload.get(field)
+            if item is not None:
+                item = require_string(item, field)
+                if field == "verified_at":
+                    item = normalize_rfc3339(item, field)
+            value[field] = item
+    if value.get("finding_type") is not None and value["finding_type"] not in FINDING_TYPES:
+        raise LearningError("candidate finding_type 非法")
+    if "not_applies_to" in payload:
+        value["not_applies_to"] = require_string_list(
+            payload.get("not_applies_to"), "not_applies_to"
+        )
+    if "scope" in payload:
+        value["scope"] = validate_scope(payload.get("scope"), "scope")
+    relative = f"feedback-candidates/{candidate_id}.json"
+    created = append_post_run_sidecar(run_dir, run_path, run, relative, value)
+    return {"ok": True, "path": relative, "reused": not created}
+
+
+def validate_candidate_evidence(
+    run_dir: Path, candidate: dict[str, Any]
+) -> list[dict[str, str]]:
+    refs = candidate.get("evidence_refs")
+    if not isinstance(refs, list):
+        raise LearningError("candidate evidence_refs 非法")
+    normalized: list[dict[str, str]] = []
+    for index, item in enumerate(refs):
+        if not isinstance(item, dict):
+            raise LearningError("candidate evidence descriptor 非法")
+        actual = descriptor(
+            run_dir,
+            require_string(item.get("path"), f"evidence_refs[{index}].path"),
+            f"evidence_refs[{index}]",
+        )
+        if item != actual:
+            raise LearningError("candidate evidence hash 漂移")
+        normalized.append(actual)
+    return normalized
+
+
+def normalized_root_key(value: str) -> str:
+    normalized = " ".join(unicodedata.normalize("NFC", value).casefold().split())
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def default_local_index() -> dict[str, Any]:
+    return {"schema_version": SCHEMA_VERSION, "memories": {}, "maps": {}}
+
+
+def reconcile_problem_maps_and_index(
+    root: Path, index: dict[str, Any], updated_at: str
+) -> None:
+    groups: dict[str, list[str]] = {}
+    for memory_id, entry in index["memories"].items():
+        memory, _ = load_indexed_memory(root, memory_id, entry)
+        if memory.get("status") == "active":
+            groups.setdefault(memory["problem_model"], []).append(memory_id)
+    groups = {
+        model: sorted(memory_ids)
+        for model, memory_ids in groups.items()
+        if len(memory_ids) >= 3
+    }
+    desired: dict[str, tuple[str, dict[str, Any]]] = {}
+    for problem_model, memory_ids in sorted(groups.items()):
+        map_id = "map-" + hashlib.sha256(problem_model.encode("utf-8")).hexdigest()[:20]
+        relative = f"maps/{map_id}.json"
+        desired[map_id] = (
+            relative,
+            {
+                "schema_version": SCHEMA_VERSION,
+                "map_id": map_id,
+                "problem_model": problem_model,
+                "memory_ids": memory_ids,
+                "updated_at": updated_at,
+            },
+        )
+
+    touched_paths = {
+        item.get("path")
+        for item in index["maps"].values()
+        if isinstance(item, dict) and isinstance(item.get("path"), str)
+    } | {relative for relative, _ in desired.values()}
+    backups: dict[str, dict[str, Any] | None] = {}
+    for relative in touched_paths:
+        path = secure_run_relative(root, relative, must_exist=False)
+        backups[relative] = load_object(path, f"map backup {relative}") if path.exists() else None
+
+    try:
+        next_maps: dict[str, dict[str, Any]] = {}
+        for map_id, (relative, value) in desired.items():
+            path = secure_run_relative(root, relative, must_exist=False)
+            atomic_write_json(path, value)
+            next_maps[map_id] = {
+                "path": relative,
+                "sha256": stable_sha256(path),
+                "problem_model": value["problem_model"],
+                "memory_ids": value["memory_ids"],
+                "reason": "three_active_memories_share_problem_model",
+            }
+        desired_paths = {relative for relative, _ in desired.values()}
+        for relative in touched_paths - desired_paths:
+            secure_unlink_file(secure_run_relative(root, relative, must_exist=True))
+        index["maps"] = next_maps
+        atomic_write_json(root / "index.json", index)
+    except BaseException:
+        for relative, value in backups.items():
+            path = secure_run_relative(root, relative, must_exist=False)
+            if value is None:
+                if path.exists():
+                    secure_unlink_file(path)
+            else:
+                atomic_write_json(path, value)
+        raise
+
+
+def promote_memory(
+    run_dir: Path,
+    run_path: Path,
+    run: dict[str, Any],
+    candidate_relative: str,
+    candidate: dict[str, Any],
+) -> dict[str, Any]:
+    extension = require_post_run(run)
+    match = re.fullmatch(r"feedback-candidates/([A-Za-z0-9][A-Za-z0-9._-]{0,127})\.json", candidate_relative)
+    if match is None or candidate.get("candidate_id") != match.group(1):
+        raise LearningError("promote-memory input 必须是匹配 candidate_id 的 feedback candidate")
+    candidate_descriptor = extension["sidecars"].get(candidate_relative)
+    actual_candidate = descriptor(run_dir, candidate_relative, "source candidate")
+    if candidate_descriptor != actual_candidate:
+        raise LearningError("source candidate descriptor 缺失或漂移")
+    final_hash, r2_hash = core_review_hashes(run_dir, run)
+    if candidate.get("final_hash") != final_hash or candidate.get("r2_hash") != r2_hash:
+        raise LearningError("source candidate 已与 final/R2 脱钩")
+    refs = validate_candidate_evidence(run_dir, candidate)
+    reject_untrusted_feedback_evidence(run_dir, run, refs)
+    destination = candidate.get("destination")
+    if destination in SHARED_CANDIDATE_DESTINATIONS:
+        raise LearningError("共享规则只能保留 candidate 并走正常 Skill Review")
+    if destination == "backlog":
+        raise LearningError("backlog candidate 不可晋升")
+    if destination not in LOCAL_MEMORY_DESTINATIONS:
+        raise LearningError("candidate destination 不可晋升为本地 memory")
+    if not refs:
+        raise LearningError("promotion 必须有可复验证据")
+    root_cause = require_string(candidate.get("root_cause"), "root_cause")
+    symptom = require_string(candidate.get("symptom"), "symptom")
+    problem_model = require_string(candidate.get("problem_model"), "problem_model")
+    scope = validate_scope(candidate.get("scope"), "scope")
+    if not any(scope.values()):
+        raise LearningError("promotion scope 不能为空")
+    applies_to = require_string_list(candidate.get("applies_to"), "applies_to")
+    if not applies_to:
+        raise LearningError("promotion applies_to 不能为空")
+    if destination == "error_memory":
+        if candidate.get("finding_type") != "failure_root_cause":
+            raise LearningError("error_memory 必须来自 failure_root_cause")
+        require_string(candidate.get("future_recurrence"), "future_recurrence")
+        verified_at = candidate.get("verified_at") or candidate.get("received_at")
+    else:
+        if candidate.get("finding_type") != "environment_fact":
+            raise LearningError("local_memory 必须来自 environment_fact")
+        verified_at = normalize_rfc3339(candidate.get("verified_at"), "verified_at")
+
+    candidate_id = candidate["candidate_id"]
+    promotion_id = f"promotion-{candidate_id}"
+    receipt_relative = f"promotion-receipts/{candidate_id}.json"
+    receipt_path = secure_run_relative(run_dir, receipt_relative, must_exist=False)
+    if receipt_path.exists():
+        receipt = load_object(receipt_path, "promotion receipt")
+        if (
+            receipt.get("promotion_id") != promotion_id
+            or receipt.get("source_candidate") != actual_candidate
+        ):
+            raise LearningError("既有 promotion receipt 与 candidate 不一致")
+        if extension["sidecars"].get(receipt_relative) != descriptor(
+            run_dir, receipt_relative, "promotion receipt"
+        ):
+            update_sidecar_descriptor(
+                run_path, run, receipt_relative, receipt_path, allow_replace=False
+            )
+        return {"ok": True, "path": receipt_relative, "reused": True}
+
+    root_key = normalized_root_key(root_cause)
+    memory_id = "memory-" + root_key[:20]
+    root, index = load_local_index(allow_missing=True)
+    if index is None:
+        index = default_local_index()
+    relative = f"memories/{memory_id}.json"
+    memory_path = secure_run_relative(root, relative, must_exist=False) if root.exists() else root / relative
+    existing: dict[str, Any] | None = None
+    if memory_id in index["memories"]:
+        existing, _ = load_indexed_memory(root, memory_id, index["memories"][memory_id])
+        if existing.get("root_cause_key") != root_key:
+            raise LearningError("同 stable memory ID 的 root cause 不一致")
+    revision = int(existing.get("revision", 0)) + 1 if existing else 1
+    created_at = existing.get("created_at") if existing else candidate.get("received_at")
+    memory = {
+        "schema_version": SCHEMA_VERSION,
+        "memory_id": memory_id,
+        "revision": revision,
+        "status": "active",
+        "destination": destination,
+        "finding_type": candidate.get("finding_type"),
+        "symptom": symptom,
+        "root_cause": root_cause,
+        "root_cause_key": root_key,
+        "next_rule": candidate.get("next_validation"),
+        "applies_to": applies_to,
+        "not_applies_to": require_string_list(
+            candidate.get("not_applies_to", []), "not_applies_to"
+        ),
+        "scope": scope,
+        "problem_model": problem_model,
+        "evidence_refs": [{"run_id": run.get("run_id"), **item} for item in refs],
+        "verified_at": normalize_rfc3339(verified_at, "verified_at"),
+        "created_at": created_at,
+        "updated_at": candidate.get("received_at"),
+        "source_candidate": {
+            "run_id": run.get("run_id"),
+            "candidate_id": candidate_id,
+            **actual_candidate,
+        },
+    }
+    reject_private_payload(memory)
+    atomic_write_json(memory_path, memory)
+    index["memories"][memory_id] = {
+        "path": relative,
+        "sha256": stable_sha256(memory_path),
+        "revision": revision,
+        "status": "active",
+        "destination": destination,
+        "scope": scope,
+        "problem_model": problem_model,
+        "entered_at": memory["verified_at"],
+        "reason": "evidence_gated_promotion",
+    }
+    reconcile_problem_maps_and_index(root, index, candidate.get("received_at"))
+
+    receipt = {
+        "schema_version": SCHEMA_VERSION,
+        "workflow_version": WORKFLOW_VERSION,
+        "run_id": run.get("run_id"),
+        "promotion_id": promotion_id,
+        "candidate_id": candidate_id,
+        "destination": destination,
+        "evidence_refs": refs,
+        "source_candidate": actual_candidate,
+        "promoted_revision": revision,
+        "memory_id": memory_id,
+        "memory_ref": {"path": relative, "sha256": stable_sha256(memory_path)},
+        "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
+    created = append_post_run_sidecar(
+        run_dir, run_path, run, receipt_relative, receipt
+    )
+    return {"ok": True, "path": receipt_relative, "reused": not created}
+
+
+def scan_json_directory(root: Path, name: str) -> set[str]:
+    directory = root / name
+    if not directory.exists():
+        return set()
+    if directory.is_symlink() or not directory.is_dir():
+        raise LearningError(f"{name} 必须是普通目录")
+    output: set[str] = set()
+    for item in directory.iterdir():
+        if item.is_symlink() or not item.is_file() or item.suffix != ".json":
+            raise LearningError(f"{name} 只允许普通 JSON 文件")
+        output.add(f"{name}/{item.name}")
+    return output
+
+
+def lint_learning_memory(run_dir: Path, run: dict[str, Any]) -> dict[str, Any]:
+    extension = learning_extension(run)
+    for name in ("feedback-candidates", "promotion-receipts"):
+        actual = scan_json_directory(run_dir, name)
+        declared = {
+            relative
+            for relative in extension["sidecars"]
+            if relative.startswith(f"{name}/")
+        }
+        if actual != declared:
+            raise LearningError(f"orphan {name}: actual={sorted(actual)} declared={sorted(declared)}")
+        for relative in actual:
+            if extension["sidecars"].get(relative) != descriptor(
+                run_dir, relative, relative
+            ):
+                raise LearningError(f"{relative} descriptor hash 漂移")
+            reject_private_payload(load_object(run_dir / relative, relative))
+
+    root, index = load_local_index(allow_missing=True)
+    if index is None:
+        return {"ok": True, "memory_count": 0, "map_count": 0}
+    actual_memories = scan_json_directory(root, "memories")
+    declared_memories = {
+        item.get("path")
+        for item in index["memories"].values()
+        if isinstance(item, dict)
+    }
+    if actual_memories != declared_memories:
+        raise LearningError(
+            f"orphan memory: actual={sorted(actual_memories)} declared={sorted(declared_memories)}"
+        )
+    root_keys: set[str] = set()
+    for memory_id, entry in index["memories"].items():
+        memory, _ = load_indexed_memory(root, memory_id, entry)
+        if memory.get("status") not in MEMORY_STATUSES or entry.get("status") != memory.get("status"):
+            raise LearningError(f"memory status 非法：{memory_id}")
+        key = memory.get("root_cause_key")
+        if not HASH_RE.fullmatch(str(key)) or key in root_keys:
+            raise LearningError("memory root_cause_key 缺失或重复")
+        root_keys.add(key)
+    actual_maps = scan_json_directory(root, "maps")
+    declared_maps = {
+        item.get("path") for item in index["maps"].values() if isinstance(item, dict)
+    }
+    if actual_maps != declared_maps:
+        raise LearningError(
+            f"orphan map: actual={sorted(actual_maps)} declared={sorted(declared_maps)}"
+        )
+    for map_id, entry in index["maps"].items():
+        if not isinstance(entry, dict) or entry.get("path") != f"maps/{map_id}.json":
+            raise LearningError(f"map index entry 非法：{map_id}")
+        path = secure_run_relative(root, entry["path"], must_exist=True)
+        if entry.get("sha256") != stable_sha256(path):
+            raise LearningError(f"map hash 漂移：{map_id}")
+        value = load_object(path, f"map {map_id}")
+        reject_private_payload(value)
+        members = value.get("memory_ids")
+        if not isinstance(members, list) or len(set(members)) < 3 or any(
+            memory_id not in index["memories"] for memory_id in members
+        ):
+            raise LearningError(f"map 至少需要三个有效 memory：{map_id}")
+        problem_model = value.get("problem_model")
+        expected_members = sorted(
+            memory_id
+            for memory_id, memory_entry in index["memories"].items()
+            if isinstance(memory_entry, dict)
+            and memory_entry.get("status") == "active"
+            and memory_entry.get("problem_model") == problem_model
+        )
+        if sorted(members) != expected_members or len(expected_members) < 3:
+            raise LearningError(f"map 成员必须全部 active 且属于同一 problem_model：{map_id}")
+        if (
+            entry.get("problem_model") != problem_model
+            or entry.get("memory_ids") != members
+        ):
+            raise LearningError(f"map index 与 map 内容不一致：{map_id}")
+    return {
+        "ok": True,
+        "memory_count": len(index["memories"]),
+        "map_count": len(index["maps"]),
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--repo", required=True)
@@ -1311,13 +2033,21 @@ def build_parser() -> argparse.ArgumentParser:
     common.add_argument("--json", action="store_true")
     parser = argparse.ArgumentParser(description="记录教程学习闭环的可审计运行事实")
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for name in ("record-capability", "record-decision", "record-usage"):
+    for name in (
+        "record-capability",
+        "record-decision",
+        "record-usage",
+        "select-memory",
+        "record-feedback",
+        "promote-memory",
+    ):
         command = subparsers.add_parser(name, parents=[common])
         command.add_argument("--input", required=True)
     finalize_parser = subparsers.add_parser("finalize", parents=[common])
     finalize_parser.add_argument("--manifest-input", required=True)
     finalize_parser.add_argument("--ledger-input", required=True)
     finalize_parser.add_argument("--retrospective-input", required=True)
+    subparsers.add_parser("lint", parents=[common])
     return parser
 
 
@@ -1351,6 +2081,28 @@ def main(argv: list[str] | None = None) -> int:
                     run,
                     read_draft(run_dir, args.input, "usage draft"),
                 )
+            elif args.command == "select-memory":
+                result = select_memory(
+                    run_dir,
+                    run_path,
+                    run,
+                    read_draft(run_dir, args.input, "memory query"),
+                )
+            elif args.command == "record-feedback":
+                result = record_feedback(
+                    run_dir,
+                    run_path,
+                    run,
+                    read_draft(run_dir, args.input, "feedback candidate draft"),
+                )
+            elif args.command == "promote-memory":
+                result = promote_memory(
+                    run_dir,
+                    run_path,
+                    run,
+                    args.input,
+                    read_draft(run_dir, args.input, "feedback candidate"),
+                )
             elif args.command == "finalize":
                 result = finalize(
                     run_dir,
@@ -1360,6 +2112,8 @@ def main(argv: list[str] | None = None) -> int:
                     read_draft(run_dir, args.ledger_input, "ledger draft"),
                     read_draft(run_dir, args.retrospective_input, "retrospective draft"),
                 )
+            elif args.command == "lint":
+                result = lint_learning_memory(run_dir, run)
             else:
                 raise AssertionError("不可达 command")
     except (LearningError, FileExistsError, FileNotFoundError, OSError, TypeError, ValueError) as error:
