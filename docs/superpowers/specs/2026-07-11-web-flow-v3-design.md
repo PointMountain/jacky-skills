@@ -1,6 +1,6 @@
 # WebFlow V3：Markdown 导航 + 最小 JS 运行契约
 
-> 状态：待独立复审。本文定义 WebFlow V3 的目标形态；它替代 V2 以 YAML 描述工作流、rubric 和交接结果的做法。
+> 状态：独立复审通过。本文定义 WebFlow V3 的目标形态；它替代 V2 以 YAML 描述工作流、rubric 和交接结果的做法。
 
 ## 背景
 
@@ -78,9 +78,25 @@ labs/web-flow/
 │   ├── scripts/
 │   │   ├── web-flow-runtime.mjs
 │   │   └── lib/
-│   │       └── run-contract.mjs
+│   │       ├── state-contract.mjs
+│   │       ├── runtime-store.mjs
+│   │       ├── artifact-store.mjs
+│   │       ├── artifact-ledger.mjs
+│   │       ├── source-safety.mjs
+│   │       ├── workflow-contract.mjs
+│   │       ├── review-contract.mjs
+│   │       ├── review-store.mjs
+│   │       ├── gate-contract.mjs
+│   │       ├── gate-store.mjs
+│   │       ├── deployment-contract.mjs
+│   │       └── validators.mjs
 │   └── tests/
-│       └── web-flow-runtime.test.mjs
+│       ├── state-contract.test.mjs
+│       ├── artifacts-paths.test.mjs
+│       ├── review-contract.test.mjs
+│       ├── deployment-contract.test.mjs
+│       ├── package-validation.test.mjs
+│       └── runtime-smoke.test.mjs
 ├── web-flow-research/SKILL.md
 ├── web-flow-prototype/SKILL.md
 ├── web-flow-design/SKILL.md
@@ -148,7 +164,7 @@ Node 工具的 `init` 命令创建：
 
 ## 源码安全边界
 
-所有路径先转成相对 `projectRoot` 的 POSIX 路径。机器文件中禁止保存绝对路径、`..` 跳转、凭证、认证头和私有 URL。
+所有路径先转成相对 `projectRoot` 的 POSIX 路径。机器文件中禁止保存绝对路径、`..` 跳转、凭证、认证头和私有 URL。Markdown 通过统一写入红线、脱敏步骤和有限模式扫描降低泄漏风险；扫描器不能识别所有秘密，因此规格不宣称“任意 Markdown 绝不会泄漏”。私有来源只保留稳定标签、必要摘要和脱敏证据。
 
 ### create 模式
 
@@ -158,8 +174,11 @@ Node 工具的 `init` 命令创建：
 
 ### update 模式
 
-- 修改前检查版本控制状态并在 `preexisting-state.md` 记录已有改动；
+- init 检查版本控制状态，在 `preexisting-state.md` 记录已有改动，并在初始化事件中保存这些 dirty path 的基线 hash；
+- build 前用 `source_plan_recorded` typed event 登记允许修改的相对路径；项目根更新时不得用 `.` 作为通配许可；
+- 允许路径与既有 dirty path 重叠时先阻断，只有用户明确处理方向后才能记录新的许可；
 - 只修改为当前目标列出的文件；不覆盖、删除或格式化无关用户内容；
+- build 后比较版本控制 change set 与 dirty path 基线；新增变化超出允许路径或既有脏文件 hash 被意外改变时阻断；
 - 与已有改动冲突时阻断并请求方向，不自动重置。
 
 ### 通用约束
@@ -213,7 +232,7 @@ research → wireframe → G1 → prototype → G2 → design → build → G3 �
 
 初始化时暂不决定最终路径。G1 后根据参考依赖、视觉复杂度、素材风险和用户时间偏好解析为 fast 或 full，并在进入 design 前锁定。
 
-锁定后不允许在同一 run 中临时补插 prototype。若设计目标发生实质变化，结束当前 run 为 `partial`，新建 run，并显式登记可复用的旧 artifact；这避免“补插后哪些阶段需要重跑”的隐式分支。
+锁定后不允许在同一 run 中临时补插 prototype。若设计目标发生实质变化：已有通过 G3 的 preview 时当前 run 可以 `partial` 结束；build 前尚无可交付 preview 时当前 run 必须 `cancelled`，并记录 `supersededBy`。随后新建 run，显式登记可复用旧 artifact 的来源；这避免“补插后哪些阶段需要重跑”的隐式分支。
 
 ## 阶段与产物
 
@@ -228,9 +247,45 @@ research → wireframe → G1 → prototype → G2 → design → build → G3 �
 
 每个生产阶段完成前都调用 benchmark。benchmark 不是 DAG 中的生产阶段，而是绑定当前 artifact revision 的独立 review。
 
+运行证据与项目源码的归属固定如下：
+
+```text
+<projectRoot>/
+├── <sourceDir>/                         # 可维护源码；build 的唯一写入目标
+└── .web-flow/runs/<runId>/              # ignored 运行证据
+    ├── run.json
+    ├── events.jsonl
+    ├── artifacts.jsonl
+    ├── research/*.md
+    ├── wireframe/{wireframe.html,stage-result.md}
+    ├── prototype/{prototype.html,stage-result.md}   # full only
+    ├── design/{design-tokens.css,layout-contract.md,stage-result.md}
+    ├── build/{preview-evidence.md,stage-result.md}
+    ├── reviews/<stage>/attempt-<n>/*.md
+    ├── gates/<gate>/decision-<n>.md
+    ├── preflight/deployment-readiness.md
+    ├── deploy/deployment-evidence.md
+    ├── skill-usage.md
+    └── retrospective.md
+```
+
+run 内的 `design-tokens.css` 是设计契约证据；build 必须把实际使用的样式实现到 `sourceDir`。wireframe、prototype 和 stage result 是运行证据，不是最终项目源码。
+
 ## 最小运行状态
 
-`run.json` 是可恢复的当前快照，`events.jsonl` 是不可回写的状态迁移历史，`artifacts.jsonl` 是不可回写的 artifact revision 历史。详细字段与合法迁移写入 `references/runtime-state.md`，实现由 JS 常量维护，不再另建 schema YAML。
+`events.jsonl` 是状态迁移的唯一机器权威；`run.json` 是由事件重放得到、可以删除后重建的当前投影；`artifacts.jsonl` 是不可回写的 artifact revision 历史。三者只能由 Node 工具写入，Agent 不得手工双写。
+
+合法迁移、profile/gate applicability 和事件 reducer 只在 `state-contract.mjs` 中维护。`references/runtime-state.md` 解释语义、展示命令和给出示例，不手工复制完整迁移表；当文档与 JS 行为冲突时，以 JS contract 和测试为执行裁决，并修正文档。
+
+每条事件包含单调 `sequence`、唯一 `eventId`、`type`、`at`、`actor`、`beforeStateHash`、完整 typed `payload` 和 `afterStateHash`。第一条 `run_initialized` 事件包含重建初始状态所需的全部非敏感输入。后续状态必须能仅依赖事件和 JS reducer 重放得到。
+
+写入协议：
+
+1. 校验当前投影 hash 等于事件尾部 `afterStateHash`；
+2. 用 JS reducer 计算候选投影，并写入同目录临时文件；
+3. 先追加并同步事件，再原子替换 `run.json`；
+4. 若进程在第 3 步之间崩溃，下一次命令用 `reconcile` 从权威事件重建投影；
+5. 若投影领先于事件或出现未知手工修改，拒绝继续，不猜测修复。
 
 `run.json` 至少包含：
 
@@ -249,9 +304,14 @@ research → wireframe → G1 → prototype → G2 → design → build → G3 �
   "stages": {},
   "gates": {},
   "resume": { "stage": "research", "action": "start" },
+  "eventSequence": 1,
+  "stateHash": "...",
+  "supersededBy": null,
   "updatedAt": "2026-07-11T12:00:00.000Z"
 }
 ```
+
+`stateHash` 对移除 `stateHash` 字段后的规范化 JSON 计算 SHA-256，避免自引用；`eventSequence` 必须等于权威事件尾部序号。
 
 阶段状态：
 
@@ -263,18 +323,18 @@ awaiting_gate → running | completed | blocked | cancelled
 blocked → running | failed | cancelled
 ```
 
-`completed`、`skipped`、`failed` 和 `cancelled` 对该阶段是终态；若需要重做已完成阶段，必须登记新的 artifact revision 和 `stage_reopened` 事件，不能静默覆盖历史。
+`completed`、`skipped`、`failed` 和 `cancelled` 对该阶段是终态。同一 run 不允许 `stage_reopened`；已完成阶段发生实质变更时新建 run，并用 artifact provenance 记录复用来源。这样无需实现复杂的下游失效传播。
 
 run 状态：
 
 - `running`：仍在正常执行；
 - `blocked`：可恢复，`resume` 必须指出阶段与所需动作；
 - `success`：本轮已完成用户实际授权范围；
-- `partial`：已有可交付 preview，但请求的部署或实质变更未完成；
+- `partial`：已有通过 G3 的可交付 preview，但请求的部署或后续范围未完成；
 - `failed`：没有可交付结果且无法继续；
 - `cancelled`：用户拒绝或明确终止。
 
-只有 `blocked` 可以恢复为 `running`。其余四个结束状态不可原地重开；继续工作需要新 run。
+只有 `blocked` 可以恢复为 `running`。其余四个结束状态不可原地重开；继续工作需要新 run。被新 run 取代时，旧 run 用 `supersededBy` 指向新 run id。
 
 ## Artifact 身份
 
@@ -289,9 +349,12 @@ run 状态：
 - 路径一律相对项目根；
 - 文件 hash 为原始字节的 SHA-256；
 - 目录 hash 先按 POSIX 相对路径排序，计算每个文件 SHA-256，再对规范化清单计算 SHA-256；
-- 目录 hash 排除 `.git/`、`.web-flow/`、`node_modules/` 和框架缓存目录；
+- 目录 hash 固定排除 `.git/`、`.web-flow/`、`node_modules/`、`.next/cache/`、`.cache/`、`.turbo/` 和 `coverage/`；不得使用含糊的“框架缓存目录”规则；
+- hash 遍历遇到符号链接立即拒绝并要求物化，避免项目外逃逸、循环和链接目标内容漂移；
 - review、gate 和 deploy evidence 必须引用完整 `artifactId@revision` 与 hash；
 - 修改产物必须新增 revision，不得改写旧 artifact 记录。
+
+在 review record、gate decide、deploy publish 和 finalize 每个消费点，Node 工具都重新计算当前路径 hash。若与所引用 revision 不一致，旧 review/gate 自动视为失效，必须先登记新 revision，再重新评审；仅检查“revision 编号最新”不够。
 
 ## G1、G2、G3
 
@@ -300,6 +363,8 @@ run 状态：
 | G1 | 低保真 wireframe、信息架构、桌面/移动视图 | 解析并锁定 profile |
 | G2 | full 路径的视觉或交互 prototype | 进入 design |
 | G3 | 来自 `sourceDir` 的真实 preview 与验证证据 | 可按授权进入 deploy |
+
+所有 gate 的共同前置条件是：最新独立 review 绑定当前实时 hash，且全部 must-pass 已通过。attended 用户可以接受主观 residual，但不能批准事实门失败的 artifact。
 
 attended 决定：
 
@@ -314,7 +379,7 @@ unattended 决定：
 - review 为 `blocked` 时 gate 不能自动放行；
 - fast 路径的 G2 必须写 `not_applicable`，不能伪造 approval。
 
-gate 详情写 Markdown 到 `gates/G1.md` 等文件；可恢复的当前决定与 artifact ref 同步写入 `run.json`，不可变历史追加到 `events.jsonl`。
+gate 详情按决定次数写 Markdown 到 `gates/<gate>/decision-<n>.md`，禁止覆盖旧决定。`gate decide` 把该 Markdown 的相对路径和原始字节 SHA-256 写入 typed event；finalize 会重新校验文档 hash。内容变化必须创建下一版本并重新登记。可恢复的当前决定与 artifact ref 出现在 `run.json` 投影中，不可变历史只通过 Node 命令追加到 `events.jsonl`。
 
 ## 独立 Benchmark
 
@@ -327,15 +392,15 @@ gate 详情写 Markdown 到 `gates/G1.md` 等文件；可恢复的当前决定�
 
 评审必须由未参与当前 artifact 生成的独立 Agent 完成；若运行环境只能使用干净上下文而无法创建独立 Agent，review 中必须记录这个限制，不能写成完全独立。
 
-review 使用 `references/review-template.md` 的 Markdown 结构，保存到：
+review 使用 `references/review-template.md` 的 Markdown 结构，并按阶段 attempt 版本化保存，禁止覆盖旧评审：
 
 ```text
-reviews/<stage>-round-1.md
-reviews/<stage>-round-2.md
-reviews/<stage>-must-pass-recheck-<n>.md
+reviews/<stage>/attempt-<n>/round-1--<artifactId>-r<revision>.md
+reviews/<stage>/attempt-<n>/round-2--<artifactId>-r<revision>.md
+reviews/<stage>/attempt-<n>/must-pass-recheck-<n>--<artifactId>-r<revision>.md
 ```
 
-每份 review 必须记录 evaluator、rubric revision、时间、artifact ref/hash、逐项 must-pass 证据、各维度分数、加权结果、唯一 `top_fix`、decision 和 residual。
+每份 review 必须记录 evaluator、rubric revision、时间、artifact ref/hash、逐项 must-pass 证据、各维度分数、加权结果、唯一 `top_fix`、decision 和 residual。`rubric revision` 是当前 `rubrics.md` 原始字节的 SHA-256；不另维护版本配置。`review record` 同时把 review Markdown 的相对路径与原始字节 SHA-256 写入 typed event；gate 与 finalize 发现文档漂移时必须拒绝。
 
 两轮规则：
 
@@ -347,7 +412,7 @@ round 2 达阈值 → pass
 round 2 未达阈值 → proceed_with_residual，停止主观循环
 ```
 
-`run.json` 只保存最新 review 的 artifact ref、decision、must-pass 结果和分数，完整理由留在 Markdown。JS 验证器检查允许值、轮次上限、artifact 绑定和 gate 条件，不尝试解释主观文本。
+`run.json` 投影只保存最新 review 的 artifact ref、decision、must-pass 结果和分数，完整理由留在 Markdown。JS 验证器检查结构、允许值、轮次上限、rubric hash、artifact 绑定和 gate 条件，不复制 rubric 权重/阈值，也不重新解释主观 decision；评分规则的唯一事实源仍是 `rubrics.md`。
 
 ## 外部能力
 
@@ -370,7 +435,7 @@ V3 不维护静态候选 YAML 注册表。`references/external-capabilities.md` 
 规则：
 
 1. `deployment.requested=false`：不做 preflight；G3 后 preview 验证通过即可 `success`；
-2. `requested=true` 且 `authorized=false`：禁止外部写操作；交付 preview 后为 `partial`；
+2. `requested=true` 且 `authorized=false`：禁止外部写操作。G3 后、finalize 前，attended 用户若补授权则通过 `deployment_authorization_changed` 事件继续 deploy；若拒绝则 `partial`，若延期则 `blocked`。unattended 直接 `partial`；已经进入 `partial` 后再授权必须新建 run；
 3. `requested=true` 且 `authorized=true`：开局可做一次早期 preflight 发现凭证/项目问题；
 4. publish 前必须重新执行全部易漂移检查，早期 readiness 不能作为永久通行证；
 5. publish 必须绑定当前 build artifact hash，保存命令退出码、URL、HTTP 结果、浏览器证据和控制台结果；
@@ -381,13 +446,23 @@ V3 不维护静态候选 YAML 注册表。`references/external-capabilities.md` 
 
 ## 终态与复盘
 
-进入 `success`、`partial`、`failed` 或 `cancelled` 前必须依次：
+终态证据按结果条件化：
+
+| 终态 | 必需证据 |
+|------|----------|
+| `success` | 当前 build hash 对应的 G3 preview；若本轮请求且授权部署，还需同一 build hash 的有效部署证据 |
+| `partial` | 当前 build hash 对应的 G3 preview，以及未完成部署或后续范围的说明 |
+| `failed` | 失败原因、最后有效事件、无法继续的证据；不要求 preview |
+| `cancelled` | 用户决定或 supersession 证据；不要求 preview |
+
+进入任何终态前必须完成 `skill-usage.md` 与 `retrospective.md`。终态不能靠手工依次改三个文件，统一调用 `finalize`：
 
 1. 完成 `skill-usage.md`；
 2. 完成 `retrospective.md`，记录目标、实际路径、偏差、有效做法、失败、residual 和候选规则；
-3. 运行 `validate-run`；
-4. 追加 terminal event，再更新 `run.json` 终态；
-5. 输出 preview 或 production URL、关键验证证据和 residual。
+3. `finalize` 构造候选终态并按上表预验证；
+4. 通过统一写入协议追加 terminal event，并从事件重建 `run.json`；
+5. `finalize` 再执行一次 `validate-run --require-terminal`，确认真实落盘终态；
+6. 输出适用于该终态的 URL、关键证据、原因和 residual。
 
 低分或主观偏好不能直接写 memory。只有真实错误、根因有证据、未来可能复现三项同时成立，才在 retrospective 中生成候选；是否晋升到可分享 Skill/reference 是后续独立维护动作。
 
@@ -398,17 +473,24 @@ V3 不维护静态候选 YAML 注册表。`references/external-capabilities.md` 
 ```text
 node web-flow/scripts/web-flow-runtime.mjs init ...
 node web-flow/scripts/web-flow-runtime.mjs artifact add ...
-node web-flow/scripts/web-flow-runtime.mjs event append ...
+node web-flow/scripts/web-flow-runtime.mjs transition <runDir> --event-file <event.json>
+node web-flow/scripts/web-flow-runtime.mjs review record <runDir> ...
+node web-flow/scripts/web-flow-runtime.mjs gate decide <runDir> ...
+node web-flow/scripts/web-flow-runtime.mjs deploy record <runDir> ...
+node web-flow/scripts/web-flow-runtime.mjs finalize <runDir> --status <terminal>
+node web-flow/scripts/web-flow-runtime.mjs reconcile <runDir>
 node web-flow/scripts/web-flow-runtime.mjs validate-package
 node web-flow/scripts/web-flow-runtime.mjs validate-run <runDir>
 ```
+
+不提供可绕过 reducer 的公共 `event append`。`transition` 只接受 JS contract 已声明的有限 typed event，例如阶段迁移、profile 锁定、部署授权变化和 run 阻断/恢复；`review record`、`gate decide`、`deploy record` 与 `finalize` 是带各自前置校验的窄入口。`deploy record` 在登记 publish 结果时重新计算 build hash，并保存 deployment evidence 文档 hash、晚期 preflight、HTTP、浏览器和控制台事实结果。重复提交同一 `eventId` 必须幂等，事件序号必须连续。
 
 职责仅限：
 
 - 安全解析项目与源码路径；
 - 创建初始状态；
 - 计算并登记 artifact hash/revision；
-- 追加不可变事件；
+- 通过有限命令追加不可变事件、重放投影和处理事件领先快照的恢复；
 - 检查 JSON/JSONL 结构、状态迁移、artifact 引用、gate/review 条件和终态必需文件；
 - 检查活跃 WebFlow 文档链接、禁止的独立 YAML 文件和遗留引用。
 
@@ -416,18 +498,21 @@ node web-flow/scripts/web-flow-runtime.mjs validate-run <runDir>
 
 ## 测试
 
-使用 `node:test` 覆盖：
+使用 `node:test`，按状态、artifact/path 和 package 三个职责拆分测试，覆盖：
 
 1. package 自检能发现遗留 YAML 文件、失效相对链接和对旧文件名的引用；
-2. init 生成合法 `run.json`、空 JSONL 文件和安全 run id；
-3. create/update 路径规则与符号链接逃逸被拒绝；
-4. 文件与目录 hash 稳定，排除目录不影响结果；
-5. artifact revision 只追加、不覆盖，review 引用旧 revision 时被拒绝；
+2. init 生成合法 `run.json` 和安全 run id；`events.jsonl` 包含且仅包含首条 `run_initialized`，`artifacts.jsonl` 为空，并且仅靠该事件可重建初始投影；
+3. create/update 路径规则与目录内任何符号链接被拒绝；
+4. 文件与目录 hash 稳定，固定排除目录不影响结果，原地内容漂移会使 review/gate 失效；
+5. artifact revision 只追加、不覆盖，review 引用旧 revision 或旧 hash 时被拒绝；
 6. fast/full/adaptive 的 stage 与 gate applicability 正确；
 7. 非法阶段迁移、非法 terminal 重开和缺失 resume 被拒绝；
-8. unattended gate 不能绕过 blocked must-pass；
-9. terminal 缺 `skill-usage.md`、`retrospective.md` 或有效 preview/deploy evidence 时失败；
-10. 凭证形态和绝对路径不会进入机器状态或 Markdown 证据。
+8. attended 与 unattended gate 都不能绕过 blocked must-pass；
+9. event 已追加但 snapshot 未更新时可重建，snapshot 手工领先事件时拒绝；
+10. 重复 event id 幂等、事件序号单调，finalize 后再次验证真实终态；
+11. `success/partial` 与 `failed/cancelled` 分别遵守自己的证据矩阵；
+12. G3 后可以通过显式用户事件补充部署授权；
+13. 已知凭证形态和绝对路径被有限扫描拒绝；测试不宣称能发现所有秘密。
 
 测试命令：
 
