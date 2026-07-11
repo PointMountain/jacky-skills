@@ -51,6 +51,12 @@
       "version": "2.4.1"
     },
     {
+      "name": "media-toolkit",
+      "source": "./plugins/media-toolkit",
+      "description": "媒体流下载与视频文件修复工具",
+      "version": "1.0.0"
+    },
+    {
       "name": "monitoring",
       "source": "./plugins/monitoring",
       "description": "Claude Code 运行监控与历史查询工具",
