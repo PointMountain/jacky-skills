@@ -85,6 +85,9 @@ SUPPORTED_LEARNING_CONTRACTS = {
     },
 }
 CAPABILITY_REGISTRIES_ROOT = SKILL_ROOT / "references" / "capability-registries"
+LEGACY_CAPABILITY_REGISTRY_SHA256 = (
+    "6540068ddf9971dcb5815ee3ce7561d78c0a2eb450f414391ffa4bf9289f2583"
+)
 RUBRIC_PATH = SKILL_ROOT / "references" / "rubric.json"
 REQUIRED_VERIFICATION_LOGS = {
     "tests",
@@ -1923,6 +1926,23 @@ class Validator:
         if self.learning_registry is not None:
             return self.learning_registry
         extension = self.workflow.get("learning_extension")
+        if self.workflow_version == "1.0.0" and not isinstance(extension, dict):
+            path = CAPABILITY_REGISTRIES_ROOT / "1.0.0.json"
+            try:
+                registry, actual_hash = load_stable_object(path)
+            except ValidationFailure as error:
+                self.error(str(error))
+                return None
+            if (
+                registry.get("registry_version") != "1.0.0"
+                or actual_hash != LEGACY_CAPABILITY_REGISTRY_SHA256
+            ):
+                self.error("legacy frozen capability registry 漂移")
+                return None
+            self.learning_registry = registry
+            self.learning_registry_version = "1.0.0"
+            self.learning_registry_hash = actual_hash
+            return registry
         if not isinstance(extension, dict):
             self.error("workflow learning_extension 缺失 capability registry pin")
             return None
@@ -2289,7 +2309,13 @@ class Validator:
                 for candidate in entry.get("candidates", [])
                 if isinstance(candidate, dict)
             }
-            if value.get("actual_id") not in candidates:
+            historical_unknown = (
+                self.workflow_version == "1.0.0"
+                and value.get("actual_id") == "unknown_historical_usage"
+                and capture_state == "not_recorded"
+                and result == "not_recorded"
+            )
+            if value.get("actual_id") not in candidates and not historical_unknown:
                 self.error(f"{context}.actual_id 不在 capability registry")
             version = value.get("version")
             if version is None and not (
@@ -2416,7 +2442,19 @@ class Validator:
             selected = item.get("selected")
             if selected is not None and selected not in registry.get(capability, set()):
                 self.error(f"{context}.selected 不在 capability registry")
-            if isinstance(candidates, list) and selected not in candidates:
+            historical_best_effort = (
+                self.workflow_version == "1.0.0"
+                and item.get("source") == "historical_best_effort"
+                and item.get("mode") == "historical_best_effort"
+                and item.get("result") == "not_recorded"
+                and candidates == []
+                and selected is None
+            )
+            if (
+                isinstance(candidates, list)
+                and selected not in candidates
+                and not historical_best_effort
+            ):
                 self.error(f"{context}.selected 必须属于 candidates_checked")
             if item.get("result") not in {"passed", "degraded", "failed", "not_recorded"}:
                 self.error(f"{context}.result 非法")

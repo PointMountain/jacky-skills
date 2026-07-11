@@ -35,6 +35,10 @@ WORKFLOW_VERSION = "1.1.0"
 CONTRACT_VERSION = "1.0.0"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = SKILL_ROOT / "references" / "workflows" / "1.1.0.json"
+LEGACY_WORKFLOW_PATH = SKILL_ROOT / "references" / "workflows" / "1.0.0.json"
+LEGACY_CAPABILITY_REGISTRY_SHA256 = (
+    "6540068ddf9971dcb5815ee3ce7561d78c0a2eb450f414391ffa4bf9289f2583"
+)
 CAPABILITIES_PATH = SKILL_ROOT / "references" / "capabilities.json"
 CAPABILITY_REGISTRIES_ROOT = SKILL_ROOT / "references" / "capability-registries"
 LEARNING_CONTRACTS_ROOT = SKILL_ROOT / "references" / "learning-contracts"
@@ -2026,6 +2030,317 @@ def lint_learning_memory(run_dir: Path, run: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def legacy_context(
+    repo: Path, run_id: str
+) -> tuple[Path, Path, dict[str, Any], dict[str, Any]]:
+    """只解析已完成的 workflow 1.0 run，不把当前环境冒充历史事实。"""
+
+    validate_identifier(run_id, "run-id")
+    runs_root = repo / ".learning" / "runs"
+    run_dir = runs_root / run_id
+    try:
+        ensure_secure_existing_directory(runs_root)
+        ensure_secure_existing_directory(run_dir)
+    except (FileNotFoundError, OSError, ValueError) as error:
+        raise LearningError(".learning/runs/run 目录链不存在或包含 symlink") from error
+    run_path = secure_run_relative(run_dir, "run.json", must_exist=True)
+    run = load_object(run_path, "run.json")
+    if run.get("run_id") != run_id:
+        raise LearningError("run.json 的 run_id 与目录不一致")
+    if run.get("workflow_version") != "1.0.0":
+        raise LearningError("backfill 只支持 workflow 1.0.0")
+    workflow, workflow_hash = load_stable_object(LEGACY_WORKFLOW_PATH, "workflow 1.0.0")
+    if run.get("workflow_sha256") != workflow_hash:
+        raise LearningError("run.workflow_sha256 与稳定 workflow 1.0.0 字节不一致")
+    if run.get("status") not in {"completed", "completed_with_residuals"}:
+        raise LearningError("backfill 只支持 completed legacy run")
+    stages = [item.get("id") for item in workflow.get("stages", []) if isinstance(item, dict)]
+    if run.get("completed_stages") != stages:
+        raise LearningError("backfill 要求 legacy 核心阶段全部 completed")
+    extensions = run.get("extensions")
+    existing = extensions.get("learning_loop") if isinstance(extensions, dict) else None
+    if existing is not None and (
+        not isinstance(existing, dict) or existing.get("state") != "backfilled"
+    ):
+        raise LearningError("legacy run 已有非 backfilled learning extension")
+
+    # 只把已经通过旧核心契约的 run 纳入回填，扩展错误不参与这一步。
+    from validate_run import Validator
+
+    result = Validator(repo, run_id, "off", core_only=True).validate()
+    if not result.get("ok"):
+        raise LearningError("legacy core validation failed: " + "; ".join(result["errors"]))
+    return run_dir, run_path, run, workflow
+
+
+def historical_timestamp(run: dict[str, Any]) -> str:
+    for key in ("updated_at", "created_at"):
+        try:
+            return normalize_rfc3339(run.get(key), f"run.{key}")
+        except LearningError:
+            continue
+    return "1970-01-01T00:00:00Z"
+
+
+def backfill_core_ref(
+    run_dir: Path, run: dict[str, Any], stage: str
+) -> dict[str, str]:
+    artifacts = run.get("artifacts")
+    item = artifacts.get(stage) if isinstance(artifacts, dict) else None
+    if not isinstance(item, dict):
+        raise LearningError(f"legacy run 缺少 {stage} artifact")
+    relative = require_string(item.get("path"), f"artifacts.{stage}.path")
+    actual = descriptor(run_dir, relative, f"artifact {stage}")
+    if item.get("sha256") != actual["sha256"]:
+        raise LearningError(f"legacy {stage} artifact hash 漂移")
+    return actual
+
+
+def backfill_learning(
+    run_dir: Path,
+    run_path: Path,
+    run: dict[str, Any],
+    workflow: dict[str, Any],
+) -> dict[str, Any]:
+    """从冻结核心工件生成 best-effort 历史账本；不推断工具、Skill 或版本。"""
+
+    timestamp = historical_timestamp(run)
+    identity = {
+        "schema_version": SCHEMA_VERSION,
+        "workflow_version": "1.0.0",
+        "run_id": run.get("run_id"),
+    }
+    artifacts = {
+        stage: backfill_core_ref(run_dir, run, stage)
+        for stage in run.get("completed_stages", [])
+    }
+    registry_path = CAPABILITY_REGISTRIES_ROOT / "1.0.0.json"
+    registry, registry_hash = load_stable_object(
+        registry_path, "capability registry 1.0.0"
+    )
+    if (
+        registry.get("registry_version") != "1.0.0"
+        or registry_hash != LEGACY_CAPABILITY_REGISTRY_SHA256
+    ):
+        raise LearningError("legacy frozen capability registry 漂移")
+
+    snapshot = {"selected": [], "rejected": []}
+    selection = {
+        **identity,
+        "query": {
+            "task_intents": ["historical_backfill"],
+            "mechanisms": [],
+            "capability_ids": [],
+            "conflicting_evidence_refs": [],
+        },
+        "selected": [],
+        "rejected": [],
+        "selection_snapshot": snapshot,
+        "selection_snapshot_sha256": hashlib.sha256(
+            canonical_json_bytes(snapshot)
+        ).hexdigest(),
+        "created_at": timestamp,
+    }
+    runtime = {
+        **identity,
+        "registry_version": "1.0.0",
+        "registry_sha256": registry_hash,
+        "probed_at": timestamp,
+        "capabilities": {},
+    }
+    decision_specs = (
+        ("historical-extraction", "transcript", "transcript"),
+        ("historical-plan", "plan_demo", "plan_demo"),
+        ("historical-r1-revision", "revise", "review_r1"),
+    )
+    decisions = {
+        **identity,
+        "decisions": [
+            {
+                "decision_id": decision_id,
+                "stage": stage,
+                "observation": "已有 legacy 核心工件，可确认该阶段曾完成。",
+                "evidence_refs": [artifacts[evidence_stage]],
+                "decision": "仅回填可由冻结工件证明的历史事实。",
+                "action": "记录 best-effort 历史账本，不推断当时工具。",
+                "validation": "证据 hash 与 legacy run artifact descriptor 一致。",
+                "error": None,
+                "root_cause": None,
+                "next_rule": "缺失的 Skill、工具与版本统一记为 not_recorded。",
+                "recorded_at": timestamp,
+            }
+            for decision_id, stage, evidence_stage in decision_specs
+        ],
+    }
+
+    source_kind = (
+        run.get("source", {}).get("kind")
+        if isinstance(run.get("source"), dict)
+        else None
+    )
+    usage_payloads: dict[str, dict[str, Any]] = {}
+    manifest_entries: list[dict[str, Any]] = []
+    for stage_item in workflow.get("stages", []):
+        if not isinstance(stage_item, dict):
+            continue
+        stage = stage_item.get("id")
+        capabilities = list(stage_item.get("capability_ids", []))
+        for condition in stage_item.get("conditional_capabilities", []):
+            if (
+                isinstance(condition, dict)
+                and condition.get("when") == "source.kind == 'url'"
+                and source_kind == "url"
+                and isinstance(condition.get("capability_id"), str)
+            ):
+                capabilities.append(condition["capability_id"])
+        for capability_id in capabilities:
+            event_id = f"historical-{stage}-{capability_id}"
+            relative = f"usage-events/{event_id}.json"
+            evidence = [artifacts[stage]]
+            usage_payloads[relative] = {
+                **identity,
+                "event_id": event_id,
+                "kind": "tool",
+                "stage": stage,
+                "capability_id": capability_id,
+                "actual_id": "unknown_historical_usage",
+                "purpose": "覆盖 legacy 已完成阶段；原始使用记录不存在。",
+                "result": "not_recorded",
+                "capture_state": "not_recorded",
+                "evidence_refs": evidence,
+                "recorded_at": timestamp,
+                "version": None,
+                "execution_receipt": None,
+            }
+            manifest_entries.append(
+                {
+                    "capability": capability_id,
+                    "phase": stage,
+                    "candidates_checked": [],
+                    "selected": None,
+                    "source": "historical_best_effort",
+                    "revision": None,
+                    "mode": "historical_best_effort",
+                    "inputs": [],
+                    "outputs": evidence,
+                    "result": "not_recorded",
+                    "evidence_refs": evidence,
+                    "friction": "历史 run 未记录使用的 Skill、工具和版本。",
+                    "adjustment_candidate": None,
+                }
+            )
+
+    bindings = {
+        "source_media_sha256": (
+            run.get("source", {}).get("media_sha256")
+            if isinstance(run.get("source"), dict)
+            else None
+        ),
+        **{stage: artifacts[stage] for stage in ("build", "review_r1", "review_r2", "finalize")},
+    }
+    manifest = {
+        **identity,
+        "entries": manifest_entries,
+        "bindings": bindings,
+    }
+    payloads: dict[str, dict[str, Any]] = {
+        "memory-selection.json": selection,
+        "runtime-capabilities.json": runtime,
+        "decision-trace.json": decisions,
+        **usage_payloads,
+        "skill-usage-manifest.json": manifest,
+    }
+
+    event_refs = [
+        {"path": relative, "sha256": hashlib.sha256(canonical_json_bytes(value)).hexdigest()}
+        for relative, value in usage_payloads.items()
+    ]
+    ledger_entries = {kind: [] for kind in ("content", "skill", "tool")}
+    ledger_entries["tool"] = [
+        {
+            "event_id": value["event_id"],
+            "event_ref": relative,
+            "stage": value["stage"],
+            "capability_id": value["capability_id"],
+            "actual_id": value["actual_id"],
+            "result": value["result"],
+            "capture_state": value["capture_state"],
+            "evidence_refs": value["evidence_refs"],
+        }
+        for relative, value in sorted(usage_payloads.items())
+    ]
+    manifest_ref = {
+        "path": "skill-usage-manifest.json",
+        "sha256": hashlib.sha256(canonical_json_bytes(manifest)).hexdigest(),
+    }
+    payloads["usage-ledger.json"] = {
+        **identity,
+        "event_refs": event_refs,
+        "manifest": manifest_ref,
+        "entries": ledger_entries,
+        "bindings": bindings,
+    }
+    payloads["retrospective.json"] = {
+        **identity,
+        "objective": "从已完成 workflow 1.0 核心工件回填可审计历史事实。",
+        "result": (
+            "success_with_residuals"
+            if run.get("status") == "completed_with_residuals"
+            else "success"
+        ),
+        "skills_manifest_ref": "skill-usage-manifest.json",
+        "evidence": [
+            artifacts["review_r1"],
+            artifacts["review_r2"],
+            artifacts["finalize"],
+        ],
+        "findings": [],
+        "bindings": bindings,
+    }
+    reject_private_payload(payloads)
+
+    created_paths: list[Path] = []
+    try:
+        for relative, value in payloads.items():
+            target = secure_run_relative(run_dir, relative, must_exist=False)
+            if write_immutable_or_adopt(target, value):
+                created_paths.append(target)
+        sidecars = {
+            relative: {"path": relative, "sha256": stable_sha256(run_dir / relative)}
+            for relative in payloads
+            if relative != "memory-selection.json"
+        }
+        extension = {
+            "required": True,
+            "state": "backfilled",
+            "contract_version": CONTRACT_VERSION,
+            "selection": {
+                "path": "memory-selection.json",
+                "sha256": stable_sha256(run_dir / "memory-selection.json"),
+            },
+            "sidecars": sidecars,
+        }
+        updated = deepcopy(run)
+        existing_extensions = updated.get("extensions")
+        if existing_extensions is None:
+            updated["extensions"] = {"learning_loop": extension}
+        elif isinstance(existing_extensions, dict):
+            existing = existing_extensions.get("learning_loop")
+            if existing is not None and existing != extension:
+                raise LearningError("既有 backfilled extension 与确定性回填结果不同")
+            existing_extensions["learning_loop"] = extension
+        else:
+            raise LearningError("run.extensions 必须是对象")
+        reused = not created_paths and updated == run
+        if updated != run:
+            atomic_write_json(run_path, updated)
+        return {"ok": True, "state": "backfilled", "reused": reused}
+    except BaseException:
+        for path in reversed(created_paths):
+            secure_unlink_file(path)
+        raise
+
+
 def build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--repo", required=True)
@@ -2047,6 +2362,7 @@ def build_parser() -> argparse.ArgumentParser:
     finalize_parser.add_argument("--manifest-input", required=True)
     finalize_parser.add_argument("--ledger-input", required=True)
     finalize_parser.add_argument("--retrospective-input", required=True)
+    subparsers.add_parser("backfill", parents=[common])
     subparsers.add_parser("lint", parents=[common])
     return parser
 
@@ -2058,9 +2374,17 @@ def main(argv: list[str] | None = None) -> int:
         if not repo.is_dir():
             raise LearningError(f"仓库目录不存在：{args.repo}")
         with repository_lock(repo):
-            # 锁内重新读取 run，禁止使用进程启动时的 stale snapshot。
-            _, run_dir, run_path, run = resolve_context(str(repo), args.run_id)
-            if args.command == "record-capability":
+            if args.command == "backfill":
+                run_dir, run_path, run, workflow = legacy_context(repo, args.run_id)
+                result = backfill_learning(
+                    run_dir, run_path, run, workflow
+                )
+            else:
+                # 锁内重新读取 run，禁止使用进程启动时的 stale snapshot。
+                _, run_dir, run_path, run = resolve_context(str(repo), args.run_id)
+            if args.command == "backfill":
+                pass
+            elif args.command == "record-capability":
                 result = record_capability(
                     run_dir,
                     run_path,
