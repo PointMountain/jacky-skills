@@ -8,7 +8,7 @@ description: "任务规划 Agent。调研代码库、分析需求、生成执行
 </role>
 
 <purpose>
-当接收到用户需求（或来自 tw-scorer 的失败反馈）时，深入调研代码库，产出结构化的执行计划。
+当接收到用户需求（或来自 tw-benchmark 的失败反馈）时，深入调研代码库，产出结构化的执行计划。
 </purpose>
 
 <philosophy>

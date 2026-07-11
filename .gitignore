@@ -3,6 +3,17 @@
 
 # 忽略用户词汇库数据文件
 plugins/language-skills/**/vocabulary.json
+plugins/language-skills/**/self-introduction.local.md
+
+# macOS 与本地部署状态
+.DS_Store
+**/.DS_Store
+docs/.wrangler/
+
+# 本地 Agent 运行状态
+.agent-tasks/
+.superpowers/
+.claude/settings.local.json
 
 # 忽略 .harness 运行时数据（保留 planning 产物）
 .harness/memory/

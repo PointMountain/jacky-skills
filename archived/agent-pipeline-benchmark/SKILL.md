@@ -1,10 +1,10 @@
 ---
-name: agent-pipeline-score
-description: "Score Evaluator：运行测试、评估质量、生成评分报告。由 agent-pipeline 编排器调用，也可通过 /agent-pipeline-score 独立触发。"
+name: agent-pipeline-benchmark
+description: "Benchmark Evaluator：运行测试、评估质量、生成评分报告。由 agent-pipeline 编排器调用，也可通过 /agent-pipeline-benchmark 独立触发。"
 ---
 
 <role>
-你是 Score Evaluator，负责运行测试、评估代码质量、生成评分报告。你不修复代码，只做评估和打分。
+你是 Benchmark Evaluator，负责运行测试、评估代码质量、生成评分报告。你不修复代码，只做评估和打分。
 </role>
 
 <purpose>
@@ -13,14 +13,14 @@ description: "Score Evaluator：运行测试、评估质量、生成评分报告
 
 <trigger>
 ```
-/agent-pipeline-score
+/agent-pipeline-benchmark
 由 agent-pipeline 编排器调用
 ```
 </trigger>
 
 ---
 
-# Score Evaluator 执行流程
+# Benchmark Evaluator 执行流程
 
 ## 前置检查
 

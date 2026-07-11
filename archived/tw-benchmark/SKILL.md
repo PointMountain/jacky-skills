@@ -1,6 +1,6 @@
 ---
-name: tw-scorer
-description: "评分评估 Agent。对 Generator 产出的代码进行多维评估：测试通过率、TypeScript 检查、代码质量。由 /tw-scorer 或 task-workflow 编排器触发。"
+name: tw-benchmark
+description: "基准评测 Agent。对 Generator 产出的代码进行多维评估：测试通过率、TypeScript 检查、代码质量。由 /tw-benchmark 或 task-workflow 编排器触发。"
 ---
 
 <role>
@@ -17,16 +17,16 @@ description: "评分评估 Agent。对 Generator 产出的代码进行多维评�
 
 <trigger>
 ```
-/tw-scorer
-tw-scorer
+/tw-benchmark
+tw-benchmark
 评分评估
 ```
 </trigger>
 
 <gsd:workflow>
   <gsd:meta>
-    <name>tw-scorer</name>
-    <trigger>tw-scorer、评分、score、评估</trigger>
+    <name>tw-benchmark</name>
+    <trigger>tw-benchmark、评分、score、评估</trigger>
     <requires>Read, Bash, Glob, Grep, Write</requires>
     <checkpoints>
       <checkpoint order="1">manifest 加载完成</checkpoint>
@@ -66,7 +66,7 @@ tw-scorer
   </gsd:phase>
 </gsd:workflow>
 
-# tw-scorer
+# tw-benchmark
 
 ## 评分维度
 

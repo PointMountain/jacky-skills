@@ -40,7 +40,7 @@ tw-generator
     </constraints>
   </gsd:meta>
 
-  <gsd:goal>按 PLAN.md 执行所有任务，产出 manifest.json 供 tw-scorer 评估</gsd:goal>
+  <gsd:goal>按 PLAN.md 执行所有任务，产出 manifest.json 供 tw-benchmark 评估</gsd:goal>
 
   <gsd:phase name="load-plan" order="1">
     <gsd:step>读取 .harness/tasks/{slug}/plan/PLAN.md</gsd:step>
@@ -119,6 +119,6 @@ tw-generator
 
 | 文件 | 说明 | 消费者 |
 |------|------|--------|
-| `execute/manifest.json` | 变更清单 | tw-scorer |
+| `execute/manifest.json` | 变更清单 | tw-benchmark |
 | `execute/deviations.md` | 偏差记录 | tw-planner（重试时） |
 | `workflow.json` | 更新 generator 状态 | 编排器 |
