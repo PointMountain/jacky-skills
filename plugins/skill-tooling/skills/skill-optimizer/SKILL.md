@@ -39,7 +39,7 @@ xxx skill 有问题，为什么没有触发 yyy
     
     <!-- 必须阅读的标准参考 -->
     <require_read>
-      <ref id="gsd-creator-skills" required="true">GSD 风格 Skill 创建与管理标准</ref>
+      <ref id="skill-creator" required="false">优先使用当前环境提供的官方 Skill 创建规范；若不可用，则回退到通用 SKILL.md frontmatter、触发边界和渐进披露规范</ref>
       <ref id="efficiency-audit" required="false">效率审计 Skill（可选依赖，用于分析当前会话执行效率）</ref>
     </require_read>
 
@@ -300,154 +300,10 @@ Agent 完成后， 检查:
 
 </process>
 
-<!-- ========== 常见问题诊断模式 ========== -->
-<diagnosis_patterns>
+## 详细诊断模式
 
-## 一、命令未触发问题
+Phase 2 无法仅凭诊断表确定根因，或需要设计具体优化方案时，读取 [references/detailed-diagnosis-guide.md](references/detailed-diagnosis-guide.md)。若需要更多历史案例，可再读取 [references/diagnosis-patterns.md](references/diagnosis-patterns.md)。
 
-### 症状
-- skill 文档中定义了命令（如 `/xxx translate`）
-- 但执行时命令没有被识别
-- 需要显式调用才能执行
-
-### 诊断步骤
-1. 检查 skill 的 `<commands>` 部分
-2. 确认命令是否在 commands 中明确定义
-3. 检查 `<process>` 中是否有对应的执行逻辑
-4. 确认： 是独立功能还是流程的一部分？
-
-### 优化方向
-**方案 A: 添加自动触发**
-```markdown
-## Phase X: 自动执行
-
-### Step X.X: 自动 {功能名}
-+ 检测条件
-+ 如果满足，自动执行
-```
-
-**方案 B: 添加别名/快捷方式**
-```markdown
-触发条件支持:
-- 旧触发词
-- 新触发词: 等同旧触发词 + {新触发词}
-```
-
-## 二、触发条件不匹配问题
-
-### 症状
-- skill 存在但没有被触发
-- description 不够具体
-- 触发词不匹配用户输入模式
-
-### 诊断步骤
-1. 检查 `description` 字段
-2. 检查 `<trigger>` 示例
-3. 分析是否有歧义
-4. 检查是否有多个 skill 使用相同触发词
-
-### 优化方向
-**方案 A: 扩展触发词**
-```yaml
-description: 扩展后的描述，包含更多触发词： xxx, yyy, zzz, aaa
-```
-
-**方案 B: 添加更具体的触发示例**
-```markdown
-<trigger>
-```
-# 原有示例
-/repo-study <url> <问题>
-
-# 新增示例
-调研下 xxx
-研究下 xxx
-学习下 xxx
-```
-</trigger>
-```
-
-## 三、功能缺失问题
-
-### 症状
-- 预期功能在 skill 中找不到
-- 没有对应的 process 步骤
-- 没有对应的 commands 定义
-
-### 诊断步骤
-1. 明确缺失的功能是什么
-2. 检查是否是设计遗漏还是有意为之
-3. 评估功能的重要性和通用性
-4. 确定实现方式
-
-### 优化方向
-**方案 A: 添加新功能模块**
-```markdown
-## Phase X: {功能名}
-
-### Step X.1: {功能描述}
-+ 宣传步骤
-
-### Step X.2: 执行逻辑
-+ 具体实现
-
-**方案 B: 添加可选步骤**
-```markdown
-## Phase X: 可选 {功能名}
-
-> 沉淀笔记后，可选：翻译所有文档
-
-### Step X.1: 检查是否需要翻译
-+ ...
-```
-```
-
-## 四、自动执行逻辑问题
-
-### 症状
-- 功能应该自动执行但没有
-- 分析结果不完整
-- 流程中断
-
-### 诊断步骤
-1. 评估 skill 的复杂度
-2. 检查是否有大量文件读取
-3. 分析是否适合使用 Agent
-4. 确认是否需要分阶段执行
-
-### 优化方向
-**方案 A: 使用 Agent 模式**
-- 将复杂分析委派给 Agent
-- 使用 subagent_type=general-purpose
-- 在独立上下文中执行
-- 返回摘要信息
-
-**方案 B: 分阶段执行**
-- 添加 continue 命令
-- 支持暂停和恢复
-- 使用 task-memory 保存进度
-
-## 五、输出格式问题
-
-### 症状
-- skill 输出格式不规范
-- 用户难以理解结果
-- 后续处理困难
-
-### 诊断步骤
-1. 检查输出是否有明确结构
-2. 确认是否使用了 markdown 表格
-3. 检查是否有代码块格式化
-4. 验证链接和引用是否正确
-
-### 优化方向
-**方案 A: 标准化输出格式**
-- 使用统一的 markdown 模板
-- 添加表格总结
-- 使用 callout 高亮重要信息
-- 添加快速参考部分
-
-</diagnosis_patterns>
 
 <!-- ========== 反模式 ========== -->
 <anti_patterns>
