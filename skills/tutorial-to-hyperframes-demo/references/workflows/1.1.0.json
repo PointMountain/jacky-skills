@@ -93,7 +93,7 @@
   "learning_extension": {
     "contract_version": "1.0.0",
     "contract_allowlist": ["1.0.0"],
-    "contract_sha256": "218e9249cc462c1371683395dbef94b85688902b411738925dcb8ca089f46e5f",
+    "contract_sha256": "e333654ef5ac2582f19f5ee9e5b90dd11b9a3b9f8d6c783283840d56bf1196e7",
     "extension_key": "learning_loop",
     "required": true,
     "selection": {

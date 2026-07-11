@@ -112,6 +112,7 @@
       "source",
       "artifacts",
       "bindings",
+      "extensions",
       "created_at",
       "updated_at",
       "extensions.learning_loop.required",

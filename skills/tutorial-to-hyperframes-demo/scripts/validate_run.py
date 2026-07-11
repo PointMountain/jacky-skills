@@ -67,9 +67,18 @@ IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 DEMO_RE = re.compile(r"^(\d+)-([a-z0-9][a-z0-9-]*)$")
 CURRENT_SCHEMA_VERSION = "1.0.0"
-CURRENT_WORKFLOW_VERSION = "1.0.0"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW_PATH = SKILL_ROOT / "references" / "workflow.json"
+WORKFLOWS_ROOT = SKILL_ROOT / "references" / "workflows"
+SUPPORTED_WORKFLOWS = {
+    "1.0.0": WORKFLOWS_ROOT / "1.0.0.json",
+    "1.1.0": WORKFLOWS_ROOT / "1.1.0.json",
+}
+SUPPORTED_LEARNING_CONTRACTS = {
+    "1.0.0": {
+        "path": SKILL_ROOT / "references" / "learning-contracts" / "1.0.0.json",
+        "sha256": "e333654ef5ac2582f19f5ee9e5b90dd11b9a3b9f8d6c783283840d56bf1196e7",
+    },
+}
 RUBRIC_PATH = SKILL_ROOT / "references" / "rubric.json"
 REQUIRED_VERIFICATION_LOGS = {
     "tests",
@@ -124,7 +133,15 @@ def validate_identifier(value: str, label: str) -> None:
 
 
 class Validator:
-    def __init__(self, repo: Path, run_id: str, ffprobe_mode: str) -> None:
+    def __init__(
+        self,
+        repo: Path,
+        run_id: str,
+        ffprobe_mode: str,
+        *,
+        core_only: bool = False,
+        require_learning_memory: bool = False,
+    ) -> None:
         validate_identifier(run_id, "run-id")
         self.repo = repo.resolve()
         self.run_id = run_id
@@ -138,13 +155,30 @@ class Validator:
             raise ValidationFailure("run-id 必须直接位于 .learning/runs 下")
         self.run_path = self.run_dir / "run.json"
         self.ffprobe_mode = ffprobe_mode
+        self.core_only = core_only
+        self.require_learning_memory = require_learning_memory
         self.errors: list[str] = []
         self.warnings: list[str] = []
         self.invalid_index: int | None = None
         self.contents: dict[str, dict[str, Any]] = {}
-        self.workflow = load_object(WORKFLOW_PATH)
+        # run 本身决定要解析哪一份冻结契约；未知版本绝不能回退到 current。
+        self.run = load_object(self.run_path)
+        raw_workflow_version = self.run.get("workflow_version")
+        self.workflow_version = (
+            raw_workflow_version if isinstance(raw_workflow_version, str) else None
+        )
+        self.workflow_path = SUPPORTED_WORKFLOWS.get(self.workflow_version or "")
+        self.workflow_resolution_error: str | None = None
+        if self.workflow_path is None:
+            self.workflow = {}
+            self.workflow_hash: str | None = None
+            self.workflow_resolution_error = (
+                f"run.workflow_version 不受支持：{raw_workflow_version!r}"
+            )
+        else:
+            self.workflow = load_object(self.workflow_path)
+            self.workflow_hash = file_hash(self.workflow_path)
         self.rubric = load_object(RUBRIC_PATH)
-        self.workflow_hash = file_hash(WORKFLOW_PATH)
         self.dimension_weights = self.load_dimension_weights()
         self.threshold = self.rubric.get("threshold")
         if not is_number(self.threshold):
@@ -161,7 +195,6 @@ class Validator:
         self.transcript_source_id: str | None = None
         self.transcript_cues: dict[str, dict[str, Any]] = {}
         self.build_target_hash: str | None = None
-        self.run = load_object(self.run_path)
 
     def load_dimension_weights(self) -> dict[str, float]:
         dimensions = self.rubric.get("subjective_dimensions")
@@ -348,11 +381,8 @@ class Validator:
                 f"run.schema_version 必须是当前支持的 {CURRENT_SCHEMA_VERSION}",
                 "preflight",
             )
-        if self.run.get("workflow_version") != CURRENT_WORKFLOW_VERSION:
-            self.error(
-                f"run.workflow_version 必须是当前支持的 {CURRENT_WORKFLOW_VERSION}",
-                "preflight",
-            )
+        if self.workflow_resolution_error is not None:
+            self.error(self.workflow_resolution_error, "preflight")
         workflow_stages = self.workflow.get("stages")
         workflow_ids = (
             [item.get("id") for item in workflow_stages if isinstance(item, dict)]
@@ -361,12 +391,12 @@ class Validator:
         )
         if (
             self.workflow.get("schema_version") != CURRENT_SCHEMA_VERSION
-            or self.workflow.get("workflow_version") != CURRENT_WORKFLOW_VERSION
+            or self.workflow.get("workflow_version") != self.workflow_version
             or workflow_ids != STAGES
         ):
-            self.error("当前 workflow.json 与校验器阶段契约不一致", "preflight")
-        if completed and self.run.get("workflow_sha256") != self.workflow_hash:
-            self.error("run.workflow_sha256 与当前 workflow.json 实际 hash 不一致", "preflight")
+            self.error("所选 workflow 与校验器阶段契约不一致", "preflight")
+        if self.workflow_hash is not None and self.run.get("workflow_sha256") != self.workflow_hash:
+            self.error("run.workflow_sha256 与所选 workflow.json 实际 hash 不一致", "preflight")
         return [stage for stage in completed if stage in STAGES]
 
     def validate_source_truth(self, completed: list[str]) -> None:
@@ -489,13 +519,13 @@ class Validator:
             self.error(f"run.artifacts.{stage}.sha256 必须是 SHA-256", stage)
         if descriptor.get("schema_version") != CURRENT_SCHEMA_VERSION:
             self.error(f"{stage} schema_version 与当前支持版本漂移", stage)
-        if descriptor.get("workflow_version") != CURRENT_WORKFLOW_VERSION:
-            self.error(f"{stage} workflow_version 与当前支持版本漂移", stage)
+        if descriptor.get("workflow_version") != self.workflow_version:
+            self.error(f"{stage} workflow_version 与 run 选择版本漂移", stage)
         descriptor_workflow_hash = descriptor.get(
             "workflow_sha256", descriptor.get("workflow_file_sha256")
         )
         if descriptor_workflow_hash != self.workflow_hash:
-            self.error(f"{stage} workflow.json 实际 hash 漂移", stage)
+            self.error(f"{stage} 所选 workflow.json 实际 hash 漂移", stage)
 
         source = self.run.get("source")
         media_hash = (
@@ -1615,6 +1645,369 @@ class Validator:
             if is_hash(second) and final_hash != second:
                 self.error("final render hash 必须与 R2 reviewed_render_sha256 相同", "finalize")
 
+    def learning_path(self, value: Any, context: str) -> Path | None:
+        """解析私有 sidecar；学习扩展错误永远不绑定核心阶段。"""
+
+        if not isinstance(value, str) or not value:
+            self.error(f"{context} 必须是 run 内的非空相对路径")
+            return None
+        candidate = Path(value)
+        if candidate.is_absolute() or ".." in candidate.parts:
+            self.error(f"{context} 禁止绝对路径或 ..")
+            return None
+        cursor = self.run_dir
+        for part in candidate.parts:
+            cursor = cursor / part
+            if cursor.is_symlink():
+                self.error(f"{context} 任一路径组件都不得是 symlink")
+                return None
+        resolved = (self.run_dir / candidate).resolve()
+        try:
+            resolved.relative_to(self.run_dir.resolve())
+        except ValueError:
+            self.error(f"{context} 逃逸 run 目录")
+            return None
+        return resolved
+
+    def validate_learning_descriptor(
+        self,
+        descriptor: Any,
+        context: str,
+        *,
+        expected_path: str | None = None,
+    ) -> Path | None:
+        if not isinstance(descriptor, dict):
+            self.error(f"{context} 必须是包含 path/sha256 的对象")
+            return None
+        path_value = descriptor.get("path")
+        if expected_path is not None and path_value != expected_path:
+            self.error(f"{context}.path 必须是 {expected_path!r}")
+        path = self.learning_path(path_value, f"{context}.path")
+        declared_hash = descriptor.get("sha256")
+        if not is_hash(declared_hash):
+            self.error(f"{context}.sha256 必须是 SHA-256")
+        if path is None:
+            return None
+        if not path.is_file() or path.stat().st_size == 0:
+            self.error(f"{context} 指向的文件不存在或为空：{path_value}")
+            return path
+        if is_hash(declared_hash) and file_hash(path) != declared_hash:
+            self.error(f"{context} 内容 hash 与 sha256 不一致")
+        return path
+
+    def load_learning_object(
+        self, path: Path | None, context: str
+    ) -> dict[str, Any] | None:
+        if path is None or not path.is_file() or path.stat().st_size == 0:
+            return None
+        try:
+            return load_object(path)
+        except ValidationFailure as error:
+            self.error(f"{context} 必须是 JSON 对象：{error}")
+            return None
+
+    def validate_learning_identity(
+        self,
+        value: dict[str, Any],
+        required_fields: Any,
+        contract: dict[str, Any],
+        context: str,
+    ) -> None:
+        if not isinstance(required_fields, list) or any(
+            not isinstance(field, str) or not field for field in required_fields
+        ):
+            self.error(f"{context} 对应 contract required fields 非法")
+            return
+        missing = [field for field in required_fields if field not in value]
+        if missing:
+            self.error(f"{context} 缺少 required fields：{', '.join(missing)}")
+        if value.get("schema_version") != contract.get("schema_version"):
+            self.error(f"{context}.schema_version 与 learning contract 不一致")
+        if value.get("workflow_version") != self.workflow_version:
+            self.error(f"{context}.workflow_version 与 run 不一致")
+        if value.get("run_id") != self.run_id:
+            self.error(f"{context}.run_id 与目录名不一致")
+
+    def classify_learning_sidecar(
+        self, path_value: str, contract: dict[str, Any]
+    ) -> tuple[str, Any] | None:
+        artifacts = contract.get("artifacts")
+        required = artifacts.get("required") if isinstance(artifacts, dict) else None
+        fixed = (
+            {
+                key: fields
+                for key, fields in required.items()
+                if key != "memory-selection.json"
+            }
+            if isinstance(required, dict)
+            else {}
+        )
+        if path_value in fixed:
+            return "fixed", fixed[path_value]
+
+        logical_path = Path(path_value)
+        if logical_path.as_posix() != path_value:
+            return None
+        parts = logical_path.parts
+        if len(parts) != 2:
+            return None
+        directory, filename = parts
+        if not filename.endswith(".json") or not filename[:-5]:
+            return None
+        if directory == "usage-events":
+            return "usage_event", None
+
+        optional = (
+            artifacts.get("post_run_optional")
+            if isinstance(artifacts, dict)
+            else None
+        )
+        if isinstance(optional, dict):
+            pattern = f"{directory}/*.json"
+            if pattern in optional and directory in {
+                "feedback-candidates",
+                "promotion-receipts",
+            }:
+                return "post_run", optional[pattern]
+        return None
+
+    def validate_learning_json(
+        self,
+        path: Path | None,
+        kind: str,
+        required_fields: Any,
+        contract: dict[str, Any],
+        context: str,
+    ) -> None:
+        value = self.load_learning_object(path, context)
+        if value is None:
+            return
+        if kind != "usage_event":
+            self.validate_learning_identity(
+                value, required_fields, contract, context
+            )
+            return
+
+        usage = contract.get("usage_event")
+        if not isinstance(usage, dict):
+            self.error("learning contract usage_event 必须是对象")
+            return
+        self.validate_learning_identity(
+            value, usage.get("common_required_fields"), contract, context
+        )
+        kind_value = value.get("kind")
+        if kind_value not in usage.get("kind_enum", []):
+            self.error(f"{context}.kind 非法：{kind_value!r}")
+        capture_state = value.get("capture_state")
+        if capture_state not in usage.get("capture_state_enum", []):
+            self.error(f"{context}.capture_state 非法：{capture_state!r}")
+        result = value.get("result")
+        if result not in usage.get("result_enum", []):
+            self.error(f"{context}.result 非法：{result!r}")
+        branches = usage.get("branches")
+        branch = branches.get(kind_value) if isinstance(branches, dict) else None
+        if isinstance(branch, dict):
+            branch_fields = branch.get("required_fields")
+            if not isinstance(branch_fields, list):
+                self.error(f"{context} kind branch required fields 非法")
+            else:
+                missing = [field for field in branch_fields if field not in value]
+                if missing:
+                    self.error(
+                        f"{context} 缺少 kind required fields：{', '.join(missing)}"
+                    )
+
+    def validate_learning_extension(self, completed: list[str]) -> None:
+        if self.core_only:
+            return
+
+        extensions = self.run.get("extensions")
+        extension = (
+            extensions.get("learning_loop") if isinstance(extensions, dict) else None
+        )
+        workflow_extension = self.workflow.get("learning_extension")
+        workflow_requires = (
+            isinstance(workflow_extension, dict)
+            and workflow_extension.get("required") is True
+        )
+
+        # legacy 1.0 默认保持原样；只有显式 require 或已有 extension 才进入校验。
+        if extension is None and not workflow_requires and not self.require_learning_memory:
+            return
+        if extension is None:
+            self.error("run.extensions.learning_loop 缺失")
+            return
+        if not isinstance(extension, dict):
+            self.error("run.extensions.learning_loop 必须是对象")
+            return
+
+        required_fields = {"required", "state", "contract_version", "selection", "sidecars"}
+        missing = sorted(required_fields - extension.keys())
+        if missing:
+            self.error(
+                "run.extensions.learning_loop 缺少字段：" + ", ".join(missing)
+            )
+        if extension.get("required") is not True:
+            self.error("run.extensions.learning_loop.required 必须为 true")
+
+        contract_version = extension.get("contract_version")
+        contract_spec = (
+            SUPPORTED_LEARNING_CONTRACTS.get(contract_version)
+            if isinstance(contract_version, str)
+            else None
+        )
+        if not isinstance(contract_spec, dict):
+            self.error(f"learning_loop contract_version 不受支持：{contract_version!r}")
+            contract = None
+            contract_path = None
+            pinned_contract_hash = None
+        else:
+            contract_path = contract_spec.get("path")
+            pinned_contract_hash = contract_spec.get("sha256")
+            if not isinstance(contract_path, Path) or not is_hash(pinned_contract_hash):
+                self.error("learning contract resolver 配置非法")
+                contract = None
+                contract_path = None
+            else:
+                actual_contract_hash = file_hash(contract_path)
+                if actual_contract_hash != pinned_contract_hash:
+                    self.error("learning contract 实际 hash 与固定 allowlist 不一致")
+                contract = load_object(contract_path)
+        if isinstance(contract, dict):
+            if contract.get("contract_version") != contract_version:
+                self.error("learning contract 文件版本与 extension 不一致")
+
+        if isinstance(workflow_extension, dict):
+            allowlist = workflow_extension.get("contract_allowlist")
+            if not isinstance(allowlist, list) or contract_version not in allowlist:
+                self.error("learning_loop contract_version 不在 workflow allowlist")
+            expected_contract_hash = workflow_extension.get("contract_sha256")
+            if pinned_contract_hash is not None and (
+                not is_hash(expected_contract_hash)
+                or expected_contract_hash != pinned_contract_hash
+            ):
+                self.error("learning contract 实际 hash 与 workflow pin 不一致")
+            if workflow_extension.get("contract_version") != contract_version:
+                self.error("workflow learning contract version 与 run extension 不一致")
+
+        states = (
+            contract.get("extension", {}).get("state_enum")
+            if isinstance(contract, dict)
+            else None
+        )
+        state = extension.get("state")
+        if not isinstance(states, list) or state not in states:
+            self.error(f"run.extensions.learning_loop.state 非法：{state!r}")
+
+        selection = extension.get("selection")
+        selection_required = "preflight" in completed
+        if selection is None:
+            if selection_required:
+                self.error("preflight 完成后 learning_loop.selection 必须存在")
+        else:
+            expected_selection = (
+                workflow_extension.get("selection", {}).get("path")
+                if isinstance(workflow_extension, dict)
+                else "memory-selection.json"
+            )
+            selection_path = self.validate_learning_descriptor(
+                selection,
+                "run.extensions.learning_loop.selection",
+                expected_path=expected_selection,
+            )
+            if isinstance(contract, dict):
+                required_artifacts = contract.get("artifacts", {}).get("required", {})
+                required_fields = (
+                    required_artifacts.get(expected_selection)
+                    if isinstance(required_artifacts, dict)
+                    else None
+                )
+                self.validate_learning_json(
+                    selection_path,
+                    "selection",
+                    required_fields,
+                    contract,
+                    "run.extensions.learning_loop.selection",
+                )
+
+        sidecars = extension.get("sidecars")
+        if not isinstance(sidecars, dict):
+            self.error("run.extensions.learning_loop.sidecars 必须是对象")
+            return
+        recognized_usage_events: list[str] = []
+        for key, descriptor in sidecars.items():
+            if not isinstance(key, str) or not key:
+                self.error("learning_loop.sidecars key 必须是非空相对路径")
+                continue
+            membership = (
+                self.classify_learning_sidecar(key, contract)
+                if isinstance(contract, dict)
+                else None
+            )
+            if membership is None:
+                self.error(f"learning_loop.sidecars 不允许该 sidecar：{key!r}")
+            sidecar_path = self.validate_learning_descriptor(
+                descriptor,
+                f"run.extensions.learning_loop.sidecars[{key!r}]",
+                expected_path=key,
+            )
+            if membership is None or not isinstance(contract, dict):
+                continue
+            kind, artifact_required_fields = membership
+            if kind == "usage_event":
+                recognized_usage_events.append(key)
+            if kind == "post_run" and state not in {"frozen", "backfilled"}:
+                self.error(
+                    "post-run sidecar 只允许 learning_loop.state 为 frozen/backfilled"
+                )
+            self.validate_learning_json(
+                sidecar_path,
+                kind,
+                artifact_required_fields,
+                contract,
+                f"run.extensions.learning_loop.sidecars[{key!r}]",
+            )
+
+        completed_all = completed == STAGES
+        if not completed_all:
+            if self.workflow_version == "1.0.0":
+                self.error("legacy 1.0 learning extension/backfill 只允许核心阶段全部完成后存在")
+            if self.workflow_version == "1.1.0" and state != "collecting":
+                self.error("workflow 1.1 未完成时 learning_loop.state 必须是 collecting")
+            return
+
+        expected_terminal_state = (
+            "frozen" if self.workflow_version == "1.1.0" else "backfilled"
+        )
+        if state != expected_terminal_state:
+            self.error(
+                "核心阶段完成后 learning_loop.state 必须是 "
+                f"{expected_terminal_state}"
+            )
+
+        required_sidecars = (
+            workflow_extension.get("required_sidecars", [])
+            if isinstance(workflow_extension, dict)
+            else [
+                {"path": "runtime-capabilities.json"},
+                {"path": "decision-trace.json"},
+                {"path": "skill-usage-manifest.json"},
+                {"path": "usage-ledger.json"},
+                {"path": "retrospective.json"},
+            ]
+        )
+        required_paths = {
+            item.get("path")
+            for item in required_sidecars
+            if isinstance(item, dict) and isinstance(item.get("path"), str)
+        }
+        for path_value in sorted(required_paths):
+            if path_value not in sidecars:
+                self.error(f"完成态 learning_loop.sidecars 缺少 {path_value}")
+
+        if not recognized_usage_events:
+            self.error("完成态 learning_loop.sidecars 缺少 usage-events/*.json coverage")
+
     def validate(self) -> dict[str, Any]:
         completed = self.validate_state()
         self.completed = set(completed)
@@ -1632,6 +2025,7 @@ class Validator:
             )
             previous_stage = stage
         self.cross_validate_rounds(completed)
+        self.validate_learning_extension(completed)
 
         invalidated_from = (
             STAGES[self.invalid_index] if self.invalid_index is not None else None
@@ -1680,6 +2074,17 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="把首个失效阶段及下游写回 run.json",
     )
+    learning_mode = parser.add_mutually_exclusive_group()
+    learning_mode.add_argument(
+        "--core-only",
+        action="store_true",
+        help="只校验原 12 阶段、final 与 ffprobe，跳过 learning sidecar",
+    )
+    learning_mode.add_argument(
+        "--require-learning-memory",
+        action="store_true",
+        help="legacy run 也必须具备并通过 learning extension",
+    )
     parser.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     return parser
 
@@ -1688,7 +2093,13 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     repo = Path(args.repo).expanduser().resolve()
     try:
-        validator = Validator(repo, args.run_id, args.ffprobe)
+        validator = Validator(
+            repo,
+            args.run_id,
+            args.ffprobe,
+            core_only=args.core_only,
+            require_learning_memory=args.require_learning_memory,
+        )
         result = validator.validate()
         if args.apply_invalidation and result["invalidated_from"] is not None:
             validator.apply_invalidation()

@@ -790,6 +790,101 @@ class ValidateRunTests(CliTestCase):
         )
         self.write_run_json("valid-run", run)
 
+    def learning_payload(self, name: str) -> dict:
+        identity = {
+            "schema_version": "1.0.0",
+            "workflow_version": "1.1.0",
+            "run_id": "valid-run",
+        }
+        payloads = {
+            "memory-selection.json": {
+                **identity,
+                "query": {},
+                "selected": [],
+                "rejected": [],
+                "selection_snapshot": [],
+                "selection_snapshot_sha256": hashlib.sha256(b"[]").hexdigest(),
+                "created_at": "2026-07-11T00:00:00Z",
+            },
+            "runtime-capabilities.json": {
+                **identity,
+                "probed_at": "2026-07-11T00:00:00Z",
+                "capabilities": {},
+            },
+            "decision-trace.json": {**identity, "decisions": []},
+            "skill-usage-manifest.json": {**identity, "entries": []},
+            "usage-ledger.json": {
+                **identity,
+                "event_refs": ["usage-events/event-001.json"],
+                "manifest": {},
+            },
+            "retrospective.json": {
+                **identity,
+                "objective": "验证结构边界",
+                "result": "success",
+                "skills_manifest_ref": "skill-usage-manifest.json",
+                "evidence": [],
+                "findings": [],
+            },
+            "usage-events/event-001.json": {
+                **identity,
+                "event_id": "event-001",
+                "kind": "content",
+                "stage": "preflight",
+                "capability_id": "environment_probe",
+                "actual_id": "source-media",
+                "purpose": "验证使用事件最低结构",
+                "result": "passed",
+                "capture_state": "captured",
+                "evidence_refs": ["preflight.json"],
+                "recorded_at": "2026-07-11T00:00:00Z",
+                "content_ref": "preflight.json",
+                "content_sha256": "f" * 64,
+            },
+        }
+        return payloads[name]
+
+    def add_structural_learning_sidecars(self) -> None:
+        run = self.run_json("valid-run")
+        sidecar_names = [
+            "runtime-capabilities.json",
+            "decision-trace.json",
+            "skill-usage-manifest.json",
+            "usage-ledger.json",
+            "retrospective.json",
+            "usage-events/event-001.json",
+        ]
+        descriptors = {}
+        for name in ["memory-selection.json", *sidecar_names]:
+            path = self.run_dir / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                json.dumps(self.learning_payload(name), ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            descriptor = {"path": name, "sha256": self.digest(path)}
+            if name == "memory-selection.json":
+                run["extensions"]["learning_loop"]["selection"] = descriptor
+            else:
+                descriptors[name] = descriptor
+        run["extensions"]["learning_loop"].update(
+            {"state": "frozen", "sidecars": descriptors}
+        )
+        self.write_run_json("valid-run", run)
+
+    def validate_full_learning(self) -> tuple[subprocess.CompletedProcess[str], dict]:
+        result = self.run_cli(
+            VALIDATE_RUN,
+            "--repo",
+            str(self.repo),
+            "--run-id",
+            "valid-run",
+            "--ffprobe",
+            "off",
+            "--json",
+        )
+        return result, json.loads(result.stdout)
+
     def validate(self, *extra: str) -> tuple[subprocess.CompletedProcess[str], dict]:
         result = self.run_cli(
             VALIDATE_RUN,
@@ -799,6 +894,7 @@ class ValidateRunTests(CliTestCase):
             "valid-run",
             "--ffprobe",
             "off",
+            "--core-only",
             "--json",
             *extra,
         )
@@ -814,6 +910,148 @@ class ValidateRunTests(CliTestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["errors"], [])
         self.assertIsNone(payload["invalidated_from"])
+
+    def test_completed_v11_requires_frozen_hashed_sidecars_and_usage_coverage(self) -> None:
+        result, payload = self.validate_full_learning()
+        self.assertNotEqual(result.returncode, 0)
+        errors = "\n".join(payload["errors"])
+        self.assertIn("selection", errors)
+        self.assertIn("frozen", errors)
+        self.assertIn("runtime-capabilities.json", errors)
+        self.assertIn("usage-events/*.json coverage", errors)
+        self.assertIsNone(payload["invalidated_from"])
+
+        self.add_structural_learning_sidecars()
+        result, payload = self.validate_full_learning()
+        self.assertEqual(result.returncode, 0, payload)
+
+        run = self.run_json("valid-run")
+        del run["extensions"]["learning_loop"]["sidecars"][
+            "runtime-capabilities.json"
+        ]
+        self.write_run_json("valid-run", run)
+        result, payload = self.validate_full_learning()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("runtime-capabilities.json", "\n".join(payload["errors"]))
+
+        self.add_structural_learning_sidecars()
+        run = self.run_json("valid-run")
+        run["extensions"]["learning_loop"]["sidecars"][
+            "usage-ledger.json"
+        ]["sha256"] = "f" * 64
+        self.write_run_json("valid-run", run)
+        result, payload = self.validate_full_learning()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("hash", "\n".join(payload["errors"]))
+
+        self.add_structural_learning_sidecars()
+        run = self.run_json("valid-run")
+        del run["extensions"]["learning_loop"]["sidecars"][
+            "usage-events/event-001.json"
+        ]
+        self.write_run_json("valid-run", run)
+        result, payload = self.validate_full_learning()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("coverage", "\n".join(payload["errors"]))
+
+        self.add_structural_learning_sidecars()
+        run = self.run_json("valid-run")
+        runtime_path = self.run_dir / "runtime-capabilities.json"
+        runtime_path.write_text("{}\n", encoding="utf-8")
+        run["extensions"]["learning_loop"]["sidecars"][
+            "runtime-capabilities.json"
+        ]["sha256"] = self.digest(runtime_path)
+        self.write_run_json("valid-run", run)
+        result, payload = self.validate_full_learning()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("required fields", "\n".join(payload["errors"]))
+
+        self.add_structural_learning_sidecars()
+        run = self.run_json("valid-run")
+        event_path = self.run_dir / "usage-events" / "event-001.json"
+        event = json.loads(event_path.read_text(encoding="utf-8"))
+        event["kind"] = "rogue"
+        event_path.write_text(json.dumps(event) + "\n", encoding="utf-8")
+        run["extensions"]["learning_loop"]["sidecars"][
+            "usage-events/event-001.json"
+        ]["sha256"] = self.digest(event_path)
+        self.write_run_json("valid-run", run)
+        result, payload = self.validate_full_learning()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(".kind 非法", "\n".join(payload["errors"]))
+
+        for field, invalid_value, expected in (
+            ("capture_state", "invented", ".capture_state 非法"),
+            ("result", "invented", ".result 非法"),
+        ):
+            with self.subTest(field=field):
+                self.add_structural_learning_sidecars()
+                run = self.run_json("valid-run")
+                event_path = self.run_dir / "usage-events" / "event-001.json"
+                event = json.loads(event_path.read_text(encoding="utf-8"))
+                event[field] = invalid_value
+                event_path.write_text(json.dumps(event) + "\n", encoding="utf-8")
+                run["extensions"]["learning_loop"]["sidecars"][
+                    "usage-events/event-001.json"
+                ]["sha256"] = self.digest(event_path)
+                self.write_run_json("valid-run", run)
+                result, payload = self.validate_full_learning()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected, "\n".join(payload["errors"]))
+
+        self.add_structural_learning_sidecars()
+        run = self.run_json("valid-run")
+        event_path = self.run_dir / "usage-events" / "event-001.json"
+        event = json.loads(event_path.read_text(encoding="utf-8"))
+        del event["content_ref"]
+        event_path.write_text(json.dumps(event) + "\n", encoding="utf-8")
+        run["extensions"]["learning_loop"]["sidecars"][
+            "usage-events/event-001.json"
+        ]["sha256"] = self.digest(event_path)
+        self.write_run_json("valid-run", run)
+        result, payload = self.validate_full_learning()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("kind required fields", "\n".join(payload["errors"]))
+
+        self.add_structural_learning_sidecars()
+        run = self.run_json("valid-run")
+        feedback_name = "feedback-candidates/feedback-001.json"
+        feedback_path = self.run_dir / feedback_name
+        feedback_path.parent.mkdir(exist_ok=True)
+        feedback_path.write_text("{}\n", encoding="utf-8")
+        run["extensions"]["learning_loop"]["sidecars"][feedback_name] = {
+            "path": feedback_name,
+            "sha256": self.digest(feedback_path),
+        }
+        self.write_run_json("valid-run", run)
+        result, payload = self.validate_full_learning()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("required fields", "\n".join(payload["errors"]))
+
+        feedback = {
+            "schema_version": "1.0.0",
+            "workflow_version": "1.1.0",
+            "run_id": "valid-run",
+            "candidate_id": "feedback-001",
+            "final_hash": "f" * 64,
+            "r2_hash": "e" * 64,
+            "evidence_refs": ["final.json"],
+            "applies_to": ["tutorial-demo"],
+            "destination": "backlog",
+            "received_at": "2026-07-11T00:00:00Z",
+            "source": "reviewer",
+            "claim": "需要后续验证",
+            "next_validation": "下一次 run 复核",
+        }
+        feedback_path.write_text(
+            json.dumps(feedback, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        run["extensions"]["learning_loop"]["sidecars"][feedback_name][
+            "sha256"
+        ] = self.digest(feedback_path)
+        self.write_run_json("valid-run", run)
+        result, payload = self.validate_full_learning()
+        self.assertEqual(result.returncode, 0, payload)
 
     def test_url_run_can_resume_at_ingest_while_media_hash_is_provisional(self) -> None:
         self.start("url-partial", "https://example.test/tutorial/partial")
@@ -861,6 +1099,7 @@ class ValidateRunTests(CliTestCase):
             "url-partial",
             "--ffprobe",
             "off",
+            "--core-only",
             "--json",
         )
         output = json.loads(result.stdout)

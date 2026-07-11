@@ -14,7 +14,7 @@ import zlib
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 VALIDATE_RUN = SKILL_ROOT / "scripts" / "validate_run.py"
-WORKFLOW_PATH = SKILL_ROOT / "references" / "workflow.json"
+WORKFLOW_PATH = SKILL_ROOT / "references" / "workflows" / "1.0.0.json"
 RUBRIC_PATH = SKILL_ROOT / "references" / "rubric.json"
 STAGES = [
     "preflight",

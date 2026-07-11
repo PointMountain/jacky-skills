@@ -21,7 +21,8 @@ from urllib.parse import urlparse
 
 
 SCHEMA_VERSION = "1.0.0"
-WORKFLOW_VERSION = "1.0.0"
+WORKFLOW_VERSION = "1.1.0"
+LEARNING_CONTRACT_VERSION = "1.0.0"
 IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 DEMO_RE = re.compile(r"^(\d+)-[a-z0-9][a-z0-9-]*$")
@@ -39,7 +40,7 @@ BIND_INTENT_NAME = "binding-intent.json"
 BIND_OWNER_NAME = "binding-owner.json"
 FAULT_ENV = "TUTORIAL_TO_HYPERFRAMES_FAULT"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW_PATH = SKILL_ROOT / "references" / "workflow.json"
+WORKFLOW_PATH = SKILL_ROOT / "references" / "workflows" / f"{WORKFLOW_VERSION}.json"
 
 
 class ContractError(ValueError):
@@ -318,6 +319,15 @@ def command_start(args: argparse.Namespace) -> dict[str, Any]:
             "source": source,
             "artifacts": {},
             "bindings": [],
+            "extensions": {
+                "learning_loop": {
+                    "required": True,
+                    "state": "collecting",
+                    "contract_version": LEARNING_CONTRACT_VERSION,
+                    "selection": None,
+                    "sidecars": {},
+                }
+            },
             "created_at": utc_now(),
             "updated_at": utc_now(),
         }
