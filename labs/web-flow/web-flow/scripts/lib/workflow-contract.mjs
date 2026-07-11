@@ -117,6 +117,15 @@ function applyStageTransition(state, event) {
   if (!allowed?.has(to)) {
     throw new Error(`stage ${stage} 不允许从 ${from} 迁移到 ${String(to)}`);
   }
+  if (
+    stage === 'build' &&
+    from === 'not_started' &&
+    to === 'running' &&
+    state.source?.mode === 'update' &&
+    !state.source.plan
+  ) {
+    throw new Error('update run 启动 build 前必须记录 source.plan');
+  }
   if (GATED_STAGES.has(stage) && to === 'completed') {
     throw new Error(`${stage} 必须先进入 awaiting_gate，由 gate event 完成`);
   }

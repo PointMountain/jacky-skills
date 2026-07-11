@@ -1,5 +1,6 @@
 import { createGateDecisionEvent } from './gate-contract.mjs';
 import {
+  assertCanonicalRubricBinding,
   readLatestArtifactBinding,
   readRunFileBinding,
 } from './review-store.mjs';
@@ -30,12 +31,13 @@ export async function recordGateDecision({
   decision,
   decisionPath,
   metadata,
-}) {
+}, dependencies = {}) {
   const { state } = await assertProjectionMatchesEvents(runDir);
   const stageName = GATE_STAGES[gate];
   if (!stageName) throw new Error(`未知 gate：${String(gate)}`);
   const review = state.stages?.[stageName]?.latestReview;
   if (!review) throw new Error(`${gate} 缺少 latestReview`);
+  await assertCanonicalRubricBinding(review, dependencies);
 
   const liveReview = await readRunFileBinding(
     runDir,

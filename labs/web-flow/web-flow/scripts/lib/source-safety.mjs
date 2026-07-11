@@ -177,6 +177,18 @@ export function prepareSourcePlan({
   }
   if (source.plan) throw new Error('source plan 已记录，不得覆盖');
   const canonicalAllowlist = canonicalPaths(allowlist, 'allowlist');
+  const sourceDir = normalizeProjectRelativePath(source.dir, {
+    allowProjectRoot: true,
+  });
+  if (source.dir !== sourceDir) {
+    throw new Error('sourceDir 必须是规范的项目相对 POSIX 路径');
+  }
+  if (
+    sourceDir !== '.' &&
+    canonicalAllowlist.some((allowed) => !pathCovers(sourceDir, allowed))
+  ) {
+    throw new Error('allowlist 不得越出 sourceDir 源码目录');
+  }
   const canonicalConfirmed = canonicalPaths(
     confirmedDirtyPaths,
     'confirmedDirtyPaths',

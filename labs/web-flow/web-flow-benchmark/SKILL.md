@@ -1,20 +1,19 @@
 ---
 name: web-flow-benchmark
-description: "web-flow 内部的独立多维评测阶段：按当前 stage rubric 先验 must-pass，再对主观质量评分，每轮只给一个 top_fix，最多两轮并输出结构化 YAML。仅在 web-flow 主 Skill 明确调用时使用。不要因普通用户请求单独触发。"
+description: "web-flow 内部的独立多维评测阶段：按当前 stage rubric 先验 must-pass，再对主观质量评分，每轮只给一个 top_fix，最多两轮并输出可审计 Markdown。仅在 web-flow 主 Skill 明确调用时使用。不要因普通用户请求单独触发。"
 ---
 
 # web-flow-benchmark · 有限评测
 
 > 评分负责发现问题，不负责制造无限循环；memory 只接收经过根因验证的错误，不接收所有低分。
 
-## 输入
+## 按需读取
 
-- `stage`、`round`（1 或 2）
-- 本阶段真实产物
-- 内容、原型或设计参考
-- 可复核的测试、浏览器或命令证据
+- 只读 [rubrics](references/rubrics.md) 中当前 stage 的小节；不要加载其他阶段细节。
+- 使用 [review template](references/review-template.md)记录证据和结论。
+- 输入包括 stage、attempt、当前 artifact revision、参考 artifact，以及测试、浏览器或命令证据。
 
-只读取 `rubrics.yaml` 中当前 stage；不要加载其他阶段细节。
+评审文档路径必须是 `reviews/<stage>/attempt-<n>/round-<n>--<artifact-id>-r<revision>.md`。事实门修复使用同目录的 must-pass recheck 版本路径，不占主观 round 1/2。
 
 ## 独立 memory
 
@@ -26,12 +25,12 @@ description: "web-flow 内部的独立多维评测阶段：按当前 stage rubri
 
 ## 一次评分
 
-1. 读取当前 rubric 的 `must_pass`、维度、权重、阈值和 0/3/5 锚点。
-2. 先逐项验证 `must_pass`，为每项写 `passed` 和 evidence。事实门修复后的重新验证不占用主观评分两轮。
-3. 任一 `must_pass` 失败：`decision: blocked`，指出一个最先要恢复的事实条件；不计算“平均后通过”。
+1. 读取当前 rubric 的 must-pass、维度、权重、阈值和 0/3/5 锚点，并计算 rubric 原始字节 hash。
+2. 先逐项验证 must-pass，为每项写 passed/failed 和直接 evidence。修复后的 `must-pass recheck` 不占主观评分两轮。
+3. 任一 must-pass 失败：decision 为 blocked、weighted score 为 null，只指出一个最先要恢复的事实条件。
 4. 硬校验全过后，对每个主观维度打 0–5 分并给证据；加权均分公式为 `sum(score × weight) / sum(weight)`，保留两位小数。
-5. 只选择一个对结果影响最大且当前可改的 `top_fix`。
-6. 按 `score-result.template.yaml` 输出 YAML；`decision` 只能是 `pass/revise_once/proceed_with_residual/blocked`，不输出另一套 Markdown 打分卡。
+5. 只选择一个对结果影响最大且当前可改的 top fix。
+6. 按 review template 写 Markdown，再调用 runtime `review record`，绑定 reviewer、独立性、rubric ref/hash、review path/hash、artifact ref/hash、must-pass、分数和 decision。
 
 ## 两轮规则
 
@@ -61,4 +60,5 @@ round 2 → 停止主观评审循环
 - 不引入 rubric 之外的“更漂亮”要求；
 - 不在一轮同时要求修多个问题；
 - 不用高分掩盖链接打不开、产物不存在等事实失败；
+- 不以生成者自报结果代替 live artifact、实时 hash、HTTP 或 browser 证据；
 - 不保存评测 Agent 的冗长原始推理，只保存分数、证据、决定和候选。

@@ -30,7 +30,12 @@ import {
   reconcileRun,
   verifySourceChanges,
 } from '../scripts/lib/runtime-store.mjs';
-import { captureGitBaseline } from '../scripts/lib/source-safety.mjs';
+import {
+  captureGitBaseline,
+  prepareSourcePlan,
+} from '../scripts/lib/source-safety.mjs';
+import { createGateDecisionEvent } from '../scripts/lib/gate-contract.mjs';
+import { createReviewEvent } from '../scripts/lib/review-contract.mjs';
 import {
   assertSupersessionAllowed,
   createWorkflowEvent,
@@ -90,6 +95,13 @@ test('initialization rejects invalid enums and deployment combinations', () => {
     {
       input: {
         ...initializationInput,
+        projectRoot: ['', 'Users', 'example', 'project'].join('/'),
+      },
+      expected: /projectRoot.*\./,
+    },
+    {
+      input: {
+        ...initializationInput,
         source: { ...initializationInput.source, mode: 'patch' },
       },
       expected: /source\.mode/,
@@ -146,6 +158,35 @@ test('initialization rejects invalid enums and deployment combinations', () => {
 
   for (const { input, expected } of invalidInputs) {
     assert.throws(() => createRunInitialization(input, eventMetadata), expected);
+  }
+});
+
+test('runtime rejects sensitive initialization before writing project state', async () => {
+  const projectRoot = await createTemporaryProject('web-flow-sensitive-init-');
+  const sensitiveIntent = ['password', 'plain-secret'].join('=');
+  try {
+    await assert.rejects(
+      () =>
+        initializeRun({
+          projectRoot,
+          input: {
+            ...inputForRun('20260712T210000Z-s3n1'),
+            intent: sensitiveIntent,
+          },
+          metadata: metadataForRun('evt-sensitive-init'),
+        }),
+      /sensitive|password|凭证/i,
+    );
+    await assert.rejects(
+      () => readFile(path.join(projectRoot, '.gitignore'), 'utf8'),
+      { code: 'ENOENT' },
+    );
+    await assert.rejects(
+      () => readFile(path.join(projectRoot, '.web-flow', 'runs'), 'utf8'),
+      { code: 'ENOENT' },
+    );
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
   }
 });
 
@@ -535,6 +576,41 @@ test('update init rejects a non-Git project before writing .gitignore', async ()
   }
 });
 
+test('update init rejects sensitive captured baseline before mutating gitignore', async () => {
+  const projectRoot = await createTemporaryProject('web-flow-sensitive-baseline-');
+  const dangerousName = ` ${['token', 'plain-secret'].join('=')}`;
+  try {
+    await initializeGitProject(projectRoot, {
+      '.gitignore': '# existing\n',
+      'src/index.txt': 'committed',
+    });
+    await writeFile(path.join(projectRoot, dangerousName), 'untracked');
+    const beforeIgnore = await readFile(
+      path.join(projectRoot, '.gitignore'),
+      'utf8',
+    );
+    await assert.rejects(
+      () =>
+        initializeRun({
+          projectRoot,
+          input: updateInputForRun('20260712T211000Z-s3n3'),
+          metadata: metadataForRun('evt-sensitive-baseline'),
+        }),
+      /sensitive|token|凭证/i,
+    );
+    assert.equal(
+      await readFile(path.join(projectRoot, '.gitignore'), 'utf8'),
+      beforeIgnore,
+    );
+    await assert.rejects(
+      () => readFile(path.join(projectRoot, '.web-flow'), 'utf8'),
+      { code: 'ENOENT' },
+    );
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
+});
+
 test('source plan records one typed canonical allowlist and requires exact user confirmation for dirty overlap', async () => {
   const projectRoot = await createTemporaryProject('web-flow-source-plan-');
 
@@ -664,6 +740,99 @@ test('source plan reducer independently rejects an incomplete dirty confirmation
       ),
     /confirmedDirtyPaths|精确|dirty/i,
   );
+});
+
+test('source plan pure contract keeps every allowlist path inside sourceDir with exact directory boundaries', () => {
+  const source = {
+    mode: 'update',
+    dir: 'src',
+    baseline: { dirty: [], managed: [] },
+  };
+
+  assert.deepEqual(
+    prepareSourcePlan({
+      source,
+      allowlist: ['src', 'src/nested/file.txt'],
+      actor: 'agent',
+    }).allowlist,
+    ['src', 'src/nested/file.txt'],
+  );
+  for (const outsidePath of [
+    'src-other/file.txt',
+    'src2/file.txt',
+    'package.json',
+  ]) {
+    assert.throws(
+      () =>
+        prepareSourcePlan({
+          source,
+          allowlist: [outsidePath],
+          actor: 'agent',
+        }),
+      /sourceDir|源码目录|越界/i,
+    );
+  }
+  assert.deepEqual(
+    prepareSourcePlan({
+      source: { ...source, dir: '.' },
+      allowlist: ['package.json', 'src/file.txt'],
+      actor: 'agent',
+    }).allowlist,
+    ['package.json', 'src/file.txt'],
+  );
+});
+
+test('source plan CLI rejects an allowlist outside sourceDir without appending an event', async () => {
+  const projectRoot = await createTemporaryProject('web-flow-plan-boundary-');
+
+  try {
+    await initializeGitProject(projectRoot, {
+      '.gitignore': '.web-flow/\n',
+      'src/index.txt': 'inside',
+      'outside.txt': 'outside',
+    });
+    const initialized = await initializeRun({
+      projectRoot,
+      input: updateInputForRun('20260712T063000Z-n4p5'),
+      metadata: {
+        eventId: 'evt-boundary-init-n4p5',
+        at: '2026-07-12T06:30:00.000Z',
+        actor: 'web-flow-runtime',
+      },
+    });
+    const eventsPath = path.join(initialized.runDir, 'events.jsonl');
+    const eventsBefore = await readFile(eventsPath, 'utf8');
+    const plan = spawnSync(
+      process.execPath,
+      [
+        runtimeCli.pathname,
+        'source',
+        'plan',
+        initialized.runDir,
+        '--allow',
+        'outside.txt',
+        '--event-id',
+        'evt-boundary-plan-n4p5',
+        '--at',
+        '2026-07-12T06:30:01.000Z',
+        '--actor',
+        'agent',
+      ],
+      { encoding: 'utf8' },
+    );
+
+    assert.notEqual(plan.status, 0);
+    assert.match(plan.stderr, /sourceDir|源码目录|越界/i);
+    assert.equal(await readFile(eventsPath, 'utf8'), eventsBefore);
+    assert.equal(
+      JSON.parse(
+        await readFile(path.join(initialized.runDir, 'run.json'), 'utf8'),
+      ).eventSequence,
+      1,
+    );
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
 });
 
 test('source verify rejects unauthorized dirty drift or restoration and changes outside allowlist', async () => {
@@ -1289,6 +1458,229 @@ test('stage transitions are persisted through the narrow transition CLI', async 
       (await assertProjectionMatchesEvents(initialized.runDir)).state.stages
         .research.status,
       'running',
+    );
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test('runtime rejects sensitive workflow payload without appending an event', async () => {
+  const projectRoot = await createTemporaryProject('web-flow-sensitive-event-');
+  try {
+    const initialized = await initializeRun({
+      projectRoot,
+      input: inputForRun('20260712T210100Z-s3n2'),
+      metadata: metadataForRun('evt-sensitive-event-init'),
+    });
+    const eventsPath = path.join(initialized.runDir, 'events.jsonl');
+    const before = await readFile(eventsPath, 'utf8');
+    await assert.rejects(
+      () =>
+        recordWorkflowTransition(initialized.runDir, {
+          eventId: 'evt-sensitive-transition',
+          type: 'stage_transition',
+          at: '2026-07-12T21:01:01.000Z',
+          actor: 'agent',
+          payload: {
+            stage: 'research',
+            to: 'running',
+            note: ['api_key', 'plain-secret'].join('='),
+          },
+        }),
+      /sensitive|api-key|凭证/i,
+    );
+    assert.equal(await readFile(eventsPath, 'utf8'), before);
+    assert.equal(
+      (await assertProjectionMatchesEvents(initialized.runDir)).state
+        .eventSequence,
+      1,
+    );
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
+});
+
+function buildReadyUpdateRun() {
+  const initialized = createRunInitialization(
+    {
+      ...initializationInput,
+      runId: '20260712T190000Z-b1u1',
+      source: {
+        mode: 'update',
+        dir: 'src',
+        baseline: { head: 'baseline', dirty: [], managed: [] },
+      },
+      profile: { requested: 'fast' },
+    },
+    {
+      eventId: 'evt-build-guard-init',
+      at: '2026-07-12T19:00:00.000Z',
+      actor: 'web-flow-runtime',
+    },
+  );
+  const events = [initialized.event];
+  let state = initialized.state;
+  let index = 1;
+  const metadata = (label, actor = 'agent') => {
+    index += 1;
+    return {
+      eventId: `evt-build-guard-${label}`,
+      at: `2026-07-12T19:00:${String(index).padStart(2, '0')}.000Z`,
+      actor,
+    };
+  };
+  const workflow = (type, payload, label) => {
+    const result = createWorkflowEvent(state, {
+      ...metadata(label),
+      type,
+      payload,
+    });
+    events.push(result.event);
+    state = result.state;
+  };
+  const review = (stage, artifactId) => {
+    const result = createReviewEvent(
+      state,
+      {
+        stage,
+        attempt: 1,
+        kind: 'subjective',
+        round: 1,
+        recheck: null,
+        reviewer: 'independent-reviewer',
+        independence: { independent: true, limitation: null },
+        rubricRef: `web-flow-benchmark/references/rubrics.md#${stage}`,
+        rubricSha256: 'a'.repeat(64),
+        reviewPath: `reviews/${stage}/attempt-1/round-1--${artifactId}-r1.md`,
+        reviewSha256: 'b'.repeat(64),
+        artifactRef: `${artifactId}@1`,
+        artifactSha256: 'c'.repeat(64),
+        mustPass: 'passed',
+        decision: 'pass',
+        weightedScore: 4,
+      },
+      metadata(`review-${stage}`, 'independent-reviewer'),
+    );
+    events.push(result.event);
+    state = result.state;
+  };
+
+  workflow('stage_transition', { stage: 'research', to: 'running' }, 'research-running');
+  review('research', 'research.spec');
+  workflow('stage_transition', { stage: 'research', to: 'completed' }, 'research-completed');
+  workflow('stage_transition', { stage: 'wireframe', to: 'running' }, 'wireframe-running');
+  review('wireframe', 'wireframe.preview');
+  workflow('stage_transition', { stage: 'wireframe', to: 'awaiting_gate' }, 'wireframe-awaiting');
+  const latestReview = state.stages.wireframe.latestReview;
+  const gate = createGateDecisionEvent(
+    state,
+    {
+      gate: 'G1',
+      decision: 'approved',
+      decisionNumber: 1,
+      decisionPath: 'gates/G1/decision-1.md',
+      decisionSha256: 'd'.repeat(64),
+      reviewPath: latestReview.reviewPath,
+      reviewSha256: latestReview.reviewSha256,
+      reviewEventId: latestReview.eventId,
+      artifactRef: latestReview.artifactRef,
+      artifactSha256: latestReview.artifactSha256,
+    },
+    metadata('g1-approved', 'user'),
+  );
+  events.push(gate.event);
+  state = gate.state;
+  workflow('profile_locked', { resolved: 'fast' }, 'profile-fast');
+  workflow('stage_transition', { stage: 'design', to: 'running' }, 'design-running');
+  review('design', 'design.contract');
+  workflow('stage_transition', { stage: 'design', to: 'completed' }, 'design-completed');
+  return { events, state };
+}
+
+test('build start requires a recorded source plan only for update mode', () => {
+  const ready = buildReadyUpdateRun().state;
+  assert.throws(
+    () =>
+      createWorkflowEvent(ready, {
+        eventId: 'evt-build-start-without-plan',
+        type: 'stage_transition',
+        at: '2026-07-12T19:01:00.000Z',
+        actor: 'agent',
+        payload: { stage: 'build', to: 'running' },
+      }),
+    /source\.plan|update|build/i,
+  );
+
+  const planned = rehashState({
+    ...ready,
+    source: {
+      ...ready.source,
+      plan: { allowlist: ['src/index.html'], confirmedDirtyPaths: [] },
+    },
+  });
+  assert.equal(
+    createWorkflowEvent(planned, {
+      eventId: 'evt-build-start-with-plan',
+      type: 'stage_transition',
+      at: '2026-07-12T19:01:01.000Z',
+      actor: 'agent',
+      payload: { stage: 'build', to: 'running' },
+    }).state.stages.build.status,
+    'running',
+  );
+
+  const createMode = rehashState({
+    ...ready,
+    source: { mode: 'create', dir: 'site' },
+  });
+  assert.equal(
+    createWorkflowEvent(createMode, {
+      eventId: 'evt-build-start-create',
+      type: 'stage_transition',
+      at: '2026-07-12T19:01:02.000Z',
+      actor: 'agent',
+      payload: { stage: 'build', to: 'running' },
+    }).state.stages.build.status,
+    'running',
+  );
+});
+
+test('runtime transition rejects update build start without appending an event', async () => {
+  const projectRoot = await createTemporaryProject('web-flow-build-guard-');
+  const fixture = buildReadyUpdateRun();
+  const runDir = path.join(
+    projectRoot,
+    '.web-flow',
+    'runs',
+    fixture.state.runId,
+  );
+  try {
+    await mkdir(runDir, { recursive: true });
+    await writeFile(
+      path.join(runDir, 'events.jsonl'),
+      `${fixture.events.map((event) => canonicalJson(event)).join('\n')}\n`,
+    );
+    await writeFile(
+      path.join(runDir, 'run.json'),
+      `${JSON.stringify(fixture.state, null, 2)}\n`,
+    );
+    await writeFile(path.join(runDir, 'artifacts.jsonl'), '');
+    const before = await readFile(path.join(runDir, 'events.jsonl'), 'utf8');
+
+    await assert.rejects(
+      () =>
+        recordWorkflowTransition(runDir, {
+          eventId: 'evt-runtime-build-without-plan',
+          type: 'stage_transition',
+          at: '2026-07-12T19:02:00.000Z',
+          actor: 'agent',
+          payload: { stage: 'build', to: 'running' },
+        }),
+      /source\.plan|update|build/i,
+    );
+    assert.equal(
+      await readFile(path.join(runDir, 'events.jsonl'), 'utf8'),
+      before,
     );
   } finally {
     await rm(projectRoot, { recursive: true, force: true });

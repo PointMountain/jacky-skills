@@ -93,7 +93,9 @@ function assertInitializationInput(input) {
   }
 
   requireNonEmptyString(input.intent, 'intent');
-  requireNonEmptyString(input.projectRoot, 'projectRoot');
+  if (input.projectRoot !== '.') {
+    throw new Error('projectRoot 必须严格为 .');
+  }
   requireNonEmptyString(input.source?.dir, 'source.dir');
   requireAllowedValue(input.source?.mode, SOURCE_MODES, 'source.mode');
   requireAllowedValue(
@@ -240,7 +242,7 @@ function createInitialProjection(payload, updatedAt) {
       resolved: null,
       lockedAt: null,
     },
-    deployment: cloneJson(payload.deployment),
+    deployment: { ...cloneJson(payload.deployment), preflight: null, latestResult: null },
     status: 'running',
     currentStage: 'research',
     stages: {

@@ -16,7 +16,10 @@ import {
   createReviewEvent,
   reviewEventReducer,
 } from '../scripts/lib/review-contract.mjs';
-import { recordReview } from '../scripts/lib/review-store.mjs';
+import {
+  readCanonicalRubricBinding,
+  recordReview,
+} from '../scripts/lib/review-store.mjs';
 import {
   assertProjectionMatchesEvents,
   initializeRun,
@@ -34,6 +37,8 @@ import {
 
 const runtimeCli = new URL('../scripts/web-flow-runtime.mjs', import.meta.url);
 const HASH = 'a'.repeat(64);
+const WIREFRAME_RUBRIC_REF =
+  'web-flow-benchmark/references/rubrics.md#wireframe';
 
 function sha256(contents) {
   return createHash('sha256').update(contents).digest('hex');
@@ -83,7 +88,7 @@ function reviewPayload(overrides = {}) {
     recheck: null,
     reviewer: 'independent-reviewer',
     independence: { independent: true, limitation: null },
-    rubricRef: 'web-flow-rubrics#wireframe-v1',
+    rubricRef: WIREFRAME_RUBRIC_REF,
     rubricSha256: HASH,
     reviewPath:
       'reviews/wireframe/attempt-1/round-1--wireframe.preview-r1.md',
@@ -97,6 +102,24 @@ function reviewPayload(overrides = {}) {
   };
 }
 
+test('review binding rejects every non-canonical rubric reference', () => {
+  const state = reviewReadyState();
+  assert.throws(
+    () =>
+      createReview(
+        state,
+        reviewPayload({ rubricRef: 'custom-rubrics.md#wireframe' }),
+      ),
+    /rubricRef|canonical|rubrics\.md/i,
+  );
+  assert.doesNotThrow(() =>
+    createReview(
+      state,
+      reviewPayload({ rubricRef: WIREFRAME_RUBRIC_REF }),
+    ),
+  );
+});
+
 function createReview(state, payload, index = 1) {
   return createReviewEvent(state, payload, {
     eventId: `evt-review-${index}`,
@@ -105,8 +128,24 @@ function createReview(state, payload, index = 1) {
   });
 }
 
-async function setupReviewRun(runId = '20260712T130000Z-r2v2') {
+async function setupReviewRun(
+  runId = '20260712T130000Z-r2v2',
+  temporaryRubrics = null,
+) {
   const projectRoot = await mkdtemp(path.join(tmpdir(), 'web-flow-review-'));
+  const dependencies = temporaryRubrics === null
+    ? {}
+    : { packageRoot: projectRoot };
+  if (temporaryRubrics !== null) {
+    const rubricPath = path.join(
+      projectRoot,
+      'web-flow-benchmark',
+      'references',
+      'rubrics.md',
+    );
+    await mkdir(path.dirname(rubricPath), { recursive: true });
+    await writeFile(rubricPath, temporaryRubrics);
+  }
   const initialized = await initializeRun({
     projectRoot,
     input: {
@@ -137,8 +176,6 @@ async function setupReviewRun(runId = '20260712T130000Z-r2v2') {
   };
   await transition('research', 'running');
   await mkdir(path.join(projectRoot, 'site'), { recursive: true });
-  const rubricPath = path.join(projectRoot, 'rubrics.md');
-  await writeFile(rubricPath, '# Rubric\n原始字节\n');
   await writeFile(path.join(projectRoot, 'site', 'research.md'), '# Research\n');
   const researchArtifact = await addArtifact({
     runDir: initialized.runDir,
@@ -165,8 +202,7 @@ async function setupReviewRun(runId = '20260712T130000Z-r2v2') {
     recheck: null,
     reviewer: 'independent-reviewer',
     independence: { independent: true, limitation: null },
-    rubricRef: 'web-flow-rubrics#research-v1',
-    rubricPath,
+    rubricRef: 'web-flow-benchmark/references/rubrics.md#research',
     reviewPath: researchReviewPath,
     artifactRef: `${researchArtifact.artifact.artifactId}@${researchArtifact.artifact.revision}`,
     mustPass: 'passed',
@@ -177,7 +213,7 @@ async function setupReviewRun(runId = '20260712T130000Z-r2v2') {
       at: '2026-07-12T13:00:03.000Z',
       actor: 'independent-reviewer',
     },
-  });
+  }, dependencies);
   await transition('research', 'completed');
   await transition('wireframe', 'running');
 
@@ -193,7 +229,7 @@ async function setupReviewRun(runId = '20260712T130000Z-r2v2') {
     projectRoot,
     runDir: initialized.runDir,
     artifact: artifact.artifact,
-    rubricPath,
+    dependencies,
   };
 }
 
@@ -209,8 +245,7 @@ function reviewRecordInput(context, overrides = {}) {
     recheck: null,
     reviewer: 'independent-reviewer',
     independence: { independent: true, limitation: null },
-    rubricRef: 'web-flow-rubrics#wireframe-v1',
-    rubricPath: context.rubricPath,
+    rubricRef: WIREFRAME_RUBRIC_REF,
     reviewPath,
     artifactRef: `${artifact.artifactId}@${artifact.revision}`,
     mustPass: 'passed',
@@ -237,6 +272,18 @@ test('review record binds raw review/rubric bytes, independent reviewer, and the
   try {
     await mkdir(path.dirname(reviewAbsolutePath), { recursive: true });
     await writeFile(reviewAbsolutePath, reviewContents);
+    const arbitraryRubricPath = path.join(context.projectRoot, 'custom-rubric.md');
+    await writeFile(arbitraryRubricPath, '# Caller selected rubric\n');
+    await assert.rejects(
+      () =>
+        recordReview({
+          runDir: context.runDir,
+          ...input,
+          rubricRef: WIREFRAME_RUBRIC_REF,
+          rubricPath: arbitraryRubricPath,
+        }),
+      /rubricPath|canonical|调用方|唯一/i,
+    );
     await assert.rejects(
       () =>
         recordReview({
@@ -247,11 +294,11 @@ test('review record binds raw review/rubric bytes, independent reviewer, and the
       /actor|reviewer/i,
     );
     const recorded = await recordReview({ runDir: context.runDir, ...input });
-    const rubricContents = await readFile(context.rubricPath);
+    const rubric = await readCanonicalRubricBinding();
 
     assert.equal(recorded.event.type, 'review_recorded');
     assert.equal(recorded.event.payload.reviewSha256, sha256(reviewContents));
-    assert.equal(recorded.event.payload.rubricSha256, sha256(rubricContents));
+    assert.equal(recorded.event.payload.rubricSha256, rubric.sha256);
     assert.equal(recorded.event.payload.rubricPath, undefined);
     assert.equal(recorded.event.payload.artifactRef, 'wireframe.preview@1');
     assert.equal(
@@ -279,6 +326,64 @@ test('review record binds raw review/rubric bytes, independent reviewer, and the
           metadata: { ...input.metadata, eventId: 'evt-overwrite' },
         }),
       /review.*漂移|覆盖|已登记/i,
+    );
+  } finally {
+    await rm(context.projectRoot, { recursive: true, force: true });
+  }
+});
+
+test('gate rehashes the injected canonical rubrics document and rejects drift', async () => {
+  const rubricContents = '# Canonical Rubrics\n\n## wireframe\n';
+  const context = await setupReviewRun(
+    '20260712T130500Z-r2w2',
+    rubricContents,
+  );
+  const input = reviewRecordInput(context);
+  const reviewAbsolutePath = path.join(context.runDir, input.reviewPath);
+  const decisionPath = 'gates/G1/decision-1.md';
+
+  try {
+    await mkdir(path.dirname(reviewAbsolutePath), { recursive: true });
+    await writeFile(reviewAbsolutePath, '# Review\n');
+    const recorded = await recordReview(
+      { runDir: context.runDir, ...input },
+      context.dependencies,
+    );
+    assert.equal(recorded.event.payload.rubricSha256, sha256(rubricContents));
+    await recordWorkflowTransition(context.runDir, {
+      eventId: 'evt-rubric-drift-awaiting-gate',
+      type: 'stage_transition',
+      at: '2026-07-12T13:05:07.000Z',
+      actor: 'agent',
+      payload: { stage: 'wireframe', to: 'awaiting_gate' },
+    });
+    await mkdir(path.dirname(path.join(context.runDir, decisionPath)), {
+      recursive: true,
+    });
+    await writeFile(path.join(context.runDir, decisionPath), '# approve\n');
+    await writeFile(
+      path.join(
+        context.projectRoot,
+        'web-flow-benchmark',
+        'references',
+        'rubrics.md',
+      ),
+      '# Drifted Rubrics\n',
+    );
+    await assert.rejects(
+      () =>
+        recordGateDecision({
+          runDir: context.runDir,
+          gate: 'G1',
+          decision: 'approved',
+          decisionPath,
+          metadata: {
+            eventId: 'evt-rubric-drift-g1',
+            at: '2026-07-12T13:05:08.000Z',
+            actor: 'user',
+          },
+        }, context.dependencies),
+      /rubric|rubrics\.md|hash|漂移/i,
     );
   } finally {
     await rm(context.projectRoot, { recursive: true, force: true });
@@ -529,7 +634,30 @@ test('review record CLI is a narrow route and replay composes workflow plus revi
       recursive: true,
     });
     await writeFile(path.join(context.runDir, input.reviewPath), '# CLI Review\n');
-    await writeFile(inputPath, JSON.stringify(input), 'utf8');
+    await writeFile(
+      inputPath,
+      JSON.stringify({ ...input, rubricPath: context.projectRoot }),
+      'utf8',
+    );
+    const rejected = spawnSync(
+      process.execPath,
+      [
+        runtimeCli.pathname,
+        'review',
+        'record',
+        context.runDir,
+        '--input-file',
+        inputPath,
+      ],
+      { encoding: 'utf8' },
+    );
+    assert.notEqual(rejected.status, 0);
+    assert.match(rejected.stderr, /rubricPath|唯一事实源/i);
+    await writeFile(
+      inputPath,
+      JSON.stringify({ ...input, packageRoot: context.projectRoot }),
+      'utf8',
+    );
     const result = spawnSync(
       process.execPath,
       [
@@ -544,6 +672,9 @@ test('review record CLI is a narrow route and replay composes workflow plus revi
     );
 
     assert.equal(result.status, 0, result.stderr);
+    const cliEvent = JSON.parse(result.stdout).event;
+    assert.equal(cliEvent.payload.rubricRef, WIREFRAME_RUBRIC_REF);
+    assert.equal(cliEvent.payload.packageRoot, undefined);
     const projection = (await assertProjectionMatchesEvents(context.runDir)).state;
     assert.equal(projection.stages.wireframe.subjectiveRound, 1);
     assert.equal(projection.stages.wireframe.latestReview.decision, 'pass');

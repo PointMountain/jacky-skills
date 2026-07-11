@@ -5,42 +5,39 @@ description: "将一句话产品意图落地为真实、带动效、可部署的
 
 # web-flow · 总地图
 
-> 本文件只负责导航与调度。阶段事实以 `workflow.yaml` 为准，外部能力候选与降级以 `external-skills.yaml` 为准；不要一次性加载全部子 Skill。
+> 把产品意图推进成可验证的真实网站。本文件只保留入口、硬约束与按需导航；不要一次性加载全部阶段 Skill。
 
-## V2 不变量
+## 何时使用
 
-1. **先观察真实 SOP**：每阶段都写清观察、证据、决定、行动和验证，不凭理想架构补步骤。
-2. **渐进加载**：只加载当前阶段 Skill；到阶段入口再读取该 Skill 自己的 `memory/index.md` 和 1–3 条相关 memory，不存在时直接继续。
-3. **外部能力按需探测**：能力在本轮第一次使用时才探测并缓存 `available/degraded/missing`、证据与 fallback；失败或证据失效才刷新。
-4. **有限评分**：每个生产阶段由独立 AI 多维评分，每轮只修 `top_fix`，最多两轮，不追求主观收敛。
-5. **事实门不放水**：`must_pass` 未通过时保持阻断，不能被平均分或轮次上限掩盖。
-6. **低分不是记忆**：先生成 `memory_candidate`；真实错误、根因已验证、未来可复现三项同时成立才入库。
+用于官网、落地页、产品站、参考站点重构，以及需要真实项目代码、浏览器验证或可选部署的前端任务。纯后端、纯 CLI、非可视产物不属于本 Skill；单文件 HTML 成品应使用 crafted-web。
 
-## 调度流程
+## 开始前
 
-1. **建本轮目录**：先确认目标项目根 `.gitignore` 已包含 `.web-flow/`（没有就补一条），再创建 `.web-flow/runs/<run_id>/`；所有状态只写相对路径，并脱敏 token、凭证、认证头、私有 URL 与私有绝对路径。
-2. **判模式与授权**：用户明确要求无人值守时用 `unattended`；否则用 `attended`。另行记录 `deployment_authorized`，只有用户明确要求真实部署才为 true；无人值守本身不构成部署授权。
-3. **只读调度记忆**：若主 Skill 自己的 `memory/index.md` 存在，只读取与调度相关的 1–3 条 memory；不扫描子 Skill 的 memory。
-4. **做 preflight**：初始化本轮外部能力状态；仅在已获部署授权时调用 `web-flow-deploy` 的 `preflight` 模式。不要在开局遍历探测全部外部能力。
-5. **逐阶段运行**：按 `workflow.yaml` 的 `research → wireframe → prototype → design → build → deploy`，到哪一步才加载哪个子 Skill；未获部署授权时在 G3 后交付 preview 并结束。
-6. **阶段交接评测**：每阶段结束调用 `web-flow-benchmark` 对应 rubric；需要返工时只把 `top_fix` 交回原阶段一次。
-7. **处理视觉门**：attended 模式在 G1 草图、G2 视觉原型、G3 真实预览停下给用户看；unattended 模式使用独立评分结果继续。
-8. **沉淀错误**：候选交回发生错误的阶段 Skill，由该 Skill 在自己的 `memory/` 内验证、查重和归档；未验证项只留在本轮 residual。
+1. 先读[工作流导航](references/workflow.md)，确认 create/update、attended/unattended、fast/full/adaptive，以及是否请求部署。
+2. 再读[运行时状态](references/runtime-state.md)，通过 Node CLI 初始化 run；update 模式必须先记录源码变更计划，才可进入 build。
+3. 只有当前阶段真的需要浏览器、设计或图像能力时，才读[外部能力](references/external-capabilities.md)并做一次最小探测。
+4. 到达某阶段才读取对应 Skill，不预载后续阶段说明。
 
-## 结构化交接
+## 硬约束
 
-每个阶段按 `workflow.yaml` 的具体 path 写工件，并同步更新本轮 `artifact-manifest.yaml` 与决策轨迹：
+1. `events.jsonl` 是运行事实源；`run.json` 只是可重建投影。所有机器状态由 JS 合约校验，禁止手写或直接改状态文件。
+2. 所有持久化路径必须是项目相对 POSIX 路径；不得记录 token、认证头、用户绝对路径、localhost 或私网 URL。
+3. 阶段产物先写文件，再登记不可变 artifact revision；更新只能追加 revision，复用必须记录来源 run、artifact ref 与 hash。
+4. 每个生产阶段交给 `web-flow-benchmark` 独立评审。事实门失败立即阻断；主观评审最多两轮，每轮只修一个 `top_fix`。
+5. attended 模式的 G1/G2/G3 由用户决定；unattended 只能由运行时依据已绑定的独立评审自动通过，不能替用户授权部署。
+6. 部署是可选分支。只有用户在 G3 后明确授权，`web-flow-deploy` 才能发布；Node 运行时只记录 preflight 与发布证据，不执行网络发布。
+7. 当前阶段 Skill 拥有自己的错误 memory 候选。只有真实错误、根因已验证、未来可复现三项同时成立才允许沉淀；主 Skill 不建中心 memory。
+8. 终态必须通过 `finalize` 写入，随后以 `validate-run --require-terminal` 对账；不得直接把 run 标成完成。
 
-```text
-观察 → 证据 → 决定 → 行动 → 验证 → 错误 → 根因 → 下次规则
-```
+## 阶段调用
 
-这里只记录可审计事实，不保存冗长原始推理。最终交付至少包含真实预览或生产 URL、关键验证证据和仍存在的 residual。
+- research：调用 [web-flow-research](../web-flow-research/SKILL.md)，产出内容规格、参考证据与素材需求。
+- wireframe / prototype：调用 [web-flow-prototype](../web-flow-prototype/SKILL.md)，并处理 G1；full profile 还要处理 G2。
+- design：调用 [web-flow-design](../web-flow-design/SKILL.md)，把已批准原型转成设计契约。
+- build：调用 [web-flow-build](../web-flow-build/SKILL.md)，写入真实 sourceDir、启动预览并处理 G3。
+- review：每个生产阶段调用 [web-flow-benchmark](../web-flow-benchmark/SKILL.md)，将评审和 rubric 原始字节绑定到事件。
+- deploy：仅在请求且获授权时调用 [web-flow-deploy](../web-flow-deploy/SKILL.md)。
 
-## 按需文件
+## 结束条件
 
-- 当前阶段与交接：`workflow.yaml`
-- 外部能力选择：`external-skills.yaml`
-- 评测细节：调用 `web-flow-benchmark`
-- 错误记忆：由当前阶段 Skill 独立维护 `memory/`
-- 历史方案：`archive/`，日常运行不读
+交付至少包含真实预览或生产 URL、当前 G3 证据、验证结果、`skill-usage.md`、`retrospective.md` 与 residual。success、partial、failed、cancelled 都必须有可解释原因和可重放终态。

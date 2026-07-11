@@ -90,12 +90,18 @@ labs/web-flow/
 │   │       ├── gate-store.mjs
 │   │       ├── deployment-contract.mjs
 │   │       ├── deployment-store.mjs
-│   │       └── validators.mjs
+│   │       ├── sensitive-scan.mjs
+│   │       ├── finalize-contract.mjs
+│   │       ├── finalize-store.mjs
+│   │       ├── terminal-validator.mjs
+│   │       ├── validators.mjs
+│   │       └── package-validator.mjs
 │   └── tests/
 │       ├── state-contract.test.mjs
 │       ├── artifacts-paths.test.mjs
 │       ├── review-contract.test.mjs
 │       ├── deployment-contract.test.mjs
+│       ├── finalization-contract.test.mjs
 │       ├── package-validation.test.mjs
 │       └── runtime-smoke.test.mjs
 ├── web-flow-research/SKILL.md

@@ -32,10 +32,13 @@ class TriggerContractTests(unittest.TestCase):
                 self.assertIn("不要因普通用户请求单独触发", description)
 
     def test_web_flow_uses_benchmark_and_stage_owned_memory(self) -> None:
-        workflow_path = WEB_FLOW_ROOT / "web-flow" / "workflow.yaml"
-        workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
-        self.assertEqual("web-flow-benchmark", workflow["cross_cutting"]["score"]["skill"])
-        self.assertEqual("current_stage_skill", workflow["cross_cutting"]["memory"]["owner"])
+        skill_path = WEB_FLOW_ROOT / "web-flow" / "SKILL.md"
+        skill = skill_path.read_text(encoding="utf-8")
+        self.assertIn("references/workflow.md", skill)
+        self.assertIn("web-flow-benchmark", skill)
+        self.assertIn("当前阶段 Skill", skill)
+        self.assertNotIn("workflow.yaml", skill)
+        self.assertNotIn("external-skills.yaml", skill)
         self.assertFalse((WEB_FLOW_ROOT / "web-flow-memory").exists())
 
     def test_crafted_web_and_web_flow_are_mutually_exclusive(self) -> None:

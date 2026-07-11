@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { lstat, readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   readArtifactLedger,
@@ -9,7 +10,10 @@ import {
   hashArtifact,
   normalizeProjectRelativePath,
 } from './artifact-store.mjs';
-import { createReviewEvent } from './review-contract.mjs';
+import {
+  canonicalRubricRef,
+  createReviewEvent,
+} from './review-contract.mjs';
 import {
   appendRuntimeEvent,
   assertProjectionMatchesEvents,
@@ -20,6 +24,19 @@ import { canonicalJson } from './state-contract.mjs';
 
 const ARTIFACT_REF_PATTERN =
   /^([a-z0-9]+(?:[._-][a-z0-9]+)*)@([1-9]\d*)$/u;
+const DEFAULT_PACKAGE_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../..',
+);
+
+export function resolveCanonicalRubricPath(packageRoot = DEFAULT_PACKAGE_ROOT) {
+  return path.join(
+    path.resolve(packageRoot),
+    'web-flow-benchmark',
+    'references',
+    'rubrics.md',
+  );
+}
 
 function rawSha256(contents) {
   return createHash('sha256').update(contents).digest('hex');
@@ -36,6 +53,29 @@ async function readPlainFile(filePath, label) {
   if (stats.isSymbolicLink()) throw new Error(`${label} 不能是符号链接`);
   if (!stats.isFile()) throw new Error(`${label} 必须是普通文件`);
   return readFile(filePath);
+}
+
+export async function readCanonicalRubricBinding({ packageRoot } = {}) {
+  const contents = await readPlainFile(
+    resolveCanonicalRubricPath(packageRoot),
+    'canonical rubric Markdown',
+  );
+  return { contents, sha256: rawSha256(contents) };
+}
+
+export async function assertCanonicalRubricBinding(
+  review,
+  dependencies = {},
+) {
+  const expectedRef = canonicalRubricRef(review?.stage);
+  if (review?.rubricRef !== expectedRef) {
+    throw new Error(`review rubricRef 必须绑定 ${expectedRef}`);
+  }
+  const canonical = await readCanonicalRubricBinding(dependencies);
+  if (review.rubricSha256 !== canonical.sha256) {
+    throw new Error('canonical rubrics.md 原始字节 hash 发生漂移');
+  }
+  return canonical;
 }
 
 async function readRunRelativeFile(runDir, relativePath, label) {
@@ -110,14 +150,21 @@ export async function recordReview({
   decision,
   weightedScore,
   metadata,
-}) {
+}, dependencies = {}) {
+  if (rubricPath !== undefined) {
+    throw new Error('调用方不得提供 rubricPath；rubrics.md 是唯一事实源');
+  }
+  const expectedRubricRef = canonicalRubricRef(stage);
+  if (rubricRef !== undefined && rubricRef !== expectedRubricRef) {
+    throw new Error(`rubricRef 必须是 ${expectedRubricRef}`);
+  }
   const { state } = await assertProjectionMatchesEvents(runDir);
   const review = await readRunFileBinding(
     runDir,
     reviewPath,
     'review Markdown',
   );
-  const rubricContents = await readPlainFile(rubricPath, 'rubric Markdown');
+  const rubric = await readCanonicalRubricBinding(dependencies);
   const artifact = await readLatestArtifactBinding(runDir, artifactRef, stage);
   const payload = {
     stage,
@@ -127,8 +174,8 @@ export async function recordReview({
     recheck,
     reviewer,
     independence,
-    rubricRef,
-    rubricSha256: rawSha256(rubricContents),
+    rubricRef: expectedRubricRef,
+    rubricSha256: rubric.sha256,
     reviewPath,
     reviewSha256: review.sha256,
     ...artifact,

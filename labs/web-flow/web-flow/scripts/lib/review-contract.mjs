@@ -17,6 +17,13 @@ const TERMINAL_RUN_STATES = new Set([
 const ARTIFACT_REF_PATTERN =
   /^([a-z0-9]+(?:[._-][a-z0-9]+)*)@([1-9]\d*)$/u;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
+export const CANONICAL_RUBRIC_DOCUMENT_REF =
+  'web-flow-benchmark/references/rubrics.md';
+
+export function canonicalRubricRef(stage) {
+  requireNonEmptyString(stage, 'stage');
+  return `${CANONICAL_RUBRIC_DOCUMENT_REF}#${stage}`;
+}
 
 function cloneJson(value) {
   return JSON.parse(canonicalJson(value));
@@ -127,7 +134,11 @@ function assertReviewIdentity(state, payload) {
 function assertReviewBinding(payload) {
   requireNonEmptyString(payload.reviewer, 'reviewer');
   assertIndependence(payload.independence);
-  requireNonEmptyString(payload.rubricRef, 'rubricRef');
+  if (payload.rubricRef !== canonicalRubricRef(payload.stage)) {
+    throw new Error(
+      `rubricRef 必须是 canonical binding ${canonicalRubricRef(payload.stage)}`,
+    );
+  }
   requireSha256(payload.rubricSha256, 'rubricSha256');
   requireSha256(payload.reviewSha256, 'reviewSha256');
   requireSha256(payload.artifactSha256, 'artifactSha256');

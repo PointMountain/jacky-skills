@@ -6,8 +6,15 @@ import {
   addArtifact,
   importArtifact,
 } from './lib/artifact-ledger.mjs';
+import {
+  recordDeploymentPreflight,
+  recordDeploymentPublish,
+} from './lib/deployment-store.mjs';
+import { finalizeRun } from './lib/finalize-store.mjs';
+import { validatePackage } from './lib/package-validator.mjs';
 import { recordGateDecision } from './lib/gate-store.mjs';
 import { recordReview } from './lib/review-store.mjs';
+import { validateRun } from './lib/validators.mjs';
 import {
   initializeRun,
   recordSourcePlan,
@@ -94,6 +101,25 @@ export async function main(args = process.argv.slice(2)) {
     return recordGateDecision({ runDir, ...input });
   }
 
+  if (command === 'deploy') {
+    const [runDir, ...deployOptions] = options;
+    if (target !== 'record' || !runDir) {
+      throw new Error('deploy 仅支持 record <runDir>');
+    }
+    const mode = readFlag(deployOptions, '--mode');
+    const input = await readJson(
+      readFlag(deployOptions, '--input-file'),
+      'deployment input',
+    );
+    if (mode === 'preflight') {
+      return recordDeploymentPreflight({ runDir, ...input });
+    }
+    if (mode === 'publish') {
+      return recordDeploymentPublish({ runDir, ...input });
+    }
+    throw new Error('deploy record mode 必须是 preflight 或 publish');
+  }
+
   if (command === 'source') {
     const [runDir, ...sourceOptions] = options;
     if (!runDir) throw new Error(`source ${target ?? ''} 需要 runDir`);
@@ -142,6 +168,32 @@ export async function main(args = process.argv.slice(2)) {
       throw new Error('reconcile 仅接受 runDir');
     }
     return reconcileRun(target);
+  }
+
+  if (command === 'validate-run') {
+    if (!target) throw new Error('validate-run 需要 runDir');
+    const requireTerminal = options.includes('--require-terminal');
+    const allowed = requireTerminal ? ['--require-terminal'] : [];
+    if (options.some((option) => !allowed.includes(option))) {
+      throw new Error('validate-run 仅支持 --require-terminal');
+    }
+    return validateRun(target, { requireTerminal });
+  }
+
+  if (command === 'finalize') {
+    if (!target) throw new Error('finalize 需要 runDir');
+    const input = await readJson(
+      readFlag(options, '--input-file'),
+      'finalize input',
+    );
+    return finalizeRun({ runDir: target, ...input });
+  }
+
+  if (command === 'validate-package') {
+    if (options.length > 0) {
+      throw new Error('validate-package 最多接受一个 packageRoot');
+    }
+    return validatePackage(target);
   }
 
   throw new Error(`未知命令：${command ?? ''}`);

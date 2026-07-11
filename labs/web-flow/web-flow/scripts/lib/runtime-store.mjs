@@ -19,8 +19,11 @@ import {
   workflowEventReducer,
 } from './workflow-contract.mjs';
 import { resolveSourceDirectory } from './artifact-store.mjs';
+import { deploymentEventReducer } from './deployment-contract.mjs';
+import { finalizationEventReducer } from './finalize-contract.mjs';
 import { gateEventReducer } from './gate-contract.mjs';
 import { reviewEventReducer } from './review-contract.mjs';
+import { assertNoSensitiveContent } from './sensitive-scan.mjs';
 import {
   captureGitBaseline,
   captureManagedPath,
@@ -36,7 +39,9 @@ function replayRuntimeEvents(events) {
   return replayEvents(events, (state, event) =>
     workflowEventReducer(state, event) ??
     reviewEventReducer(state, event) ??
-    gateEventReducer(state, event),
+    gateEventReducer(state, event) ??
+    deploymentEventReducer(state, event) ??
+    finalizationEventReducer(state, event),
   );
 }
 
@@ -148,6 +153,8 @@ export async function ensureRuntimeIgnored(projectRoot) {
 }
 
 export async function initializeRun({ projectRoot, input, metadata }) {
+  assertNoSensitiveContent(canonicalJson({ input, metadata }), '初始化输入');
+  if (input?.projectRoot !== '.') throw new Error('projectRoot 必须严格为 .');
   const absoluteProjectRoot = path.resolve(projectRoot);
   const sourceTarget = await resolveSourceDirectory({
     projectRoot: absoluteProjectRoot,
@@ -158,6 +165,7 @@ export async function initializeRun({ projectRoot, input, metadata }) {
   let baseline = null;
   if (input.source.mode === 'update') {
     baseline = await captureGitBaseline(absoluteProjectRoot);
+    assertNoSensitiveContent(canonicalJson(baseline), 'source baseline');
   }
 
   const ignoreChanged = await ensureRuntimeIgnored(absoluteProjectRoot);
@@ -175,6 +183,7 @@ export async function initializeRun({ projectRoot, input, metadata }) {
     },
   };
   const { event, state } = createRunInitialization(effectiveInput, metadata);
+  assertNoSensitiveContent(canonicalJson(event), 'run_initialized event');
   const runsRoot = path.join(absoluteProjectRoot, '.web-flow', 'runs');
   const runDir = path.join(runsRoot, state.runId);
 
@@ -250,6 +259,7 @@ export async function reconcileRun(runDir) {
 }
 
 export async function appendRuntimeEvent(runDir, event) {
+  assertNoSensitiveContent(canonicalJson(event), 'runtime event');
   const { events, state } = await assertProjectionMatchesEvents(runDir);
   const existing = events.find((candidate) => candidate.eventId === event.eventId);
 

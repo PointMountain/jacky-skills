@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-11-web-flow-v3-design.md`
 
-**JS file budgets:** `state-contract.mjs` ≤ 375 行；`runtime-store.mjs` ≤ 325 行；`artifact-store.mjs`、`artifact-ledger.mjs`、`source-safety.mjs` 各 ≤ 300 行；`workflow-contract.mjs`、`review-contract.mjs`、`review-store.mjs`、`gate-contract.mjs`、`gate-store.mjs`、`deployment-contract.mjs`、`deployment-store.mjs` 各 ≤ 350 行；`validators.mjs` ≤ 350 行；CLI ≤ 250 行。逼近预算时按职责拆函数，不把业务判断塞进 CLI。
+**JS file budgets:** `state-contract.mjs` ≤ 375 行；`runtime-store.mjs` ≤ 325 行；`artifact-store.mjs`、`artifact-ledger.mjs`、`source-safety.mjs` 各 ≤ 300 行；各领域 contract/store 与 `sensitive-scan.mjs` 各 ≤ 350 行；`validators.mjs` ≤ 350 行；`package-validator.mjs` ≤ 250 行；CLI ≤ 250 行。逼近预算时按职责拆函数，不把业务判断塞进 CLI。
 
 ---
 
@@ -114,12 +114,12 @@
 - Modify: `labs/web-flow/web-flow/scripts/lib/artifact-store.mjs`
 - Modify: `labs/web-flow/web-flow/scripts/web-flow-runtime.mjs`
 
-- [ ] 写 `deploy preflight` 失败测试：未请求/未授权不能记录外部写操作；publish 必须声明晚期 preflight 已重跑。
-- [ ] 写 `deploy binding` 失败测试：publish 前实时重算 build hash；deployment evidence 文档 hash 与 build ref/hash 进入事件；旧 build 或漂移证据被拒绝。
-- [ ] 写 `deploy facts` 失败测试：成功必须有 HTTP、真实浏览器和 console 三项 passed；任一失败只能留下 failed deployment result，后续 run 至多 partial。
-- [ ] 运行 `node --test labs/web-flow/web-flow/tests/deployment-contract.test.mjs`；预期新增测试失败。
-- [ ] 实现 `deploy record --mode preflight|publish`；只登记并验证 Agent 提供的证据，不执行网络、浏览器或部署。
-- [ ] 重跑 deployment 测试；预期全部通过。
+- [x] 写 `deploy preflight` 失败测试：未请求/未授权不能记录外部写操作；publish 必须声明晚期 preflight 已重跑。
+- [x] 写 `deploy binding` 失败测试：publish 前实时重算 build hash；deployment evidence 文档 hash 与 build ref/hash 进入事件；旧 build 或漂移证据被拒绝。
+- [x] 写 `deploy facts` 失败测试：成功必须有 HTTP、真实浏览器和 console 三项 passed；任一失败只能留下 failed deployment result，后续 run 至多 partial。
+- [x] 运行 `node --test labs/web-flow/web-flow/tests/deployment-contract.test.mjs`；预期新增测试失败。
+- [x] 实现 `deploy record --mode preflight|publish`；只登记并验证 Agent 提供的证据，不执行网络、浏览器或部署。
+- [x] 重跑 deployment 测试；预期全部通过。
 
 ### Task 7：run validator、秘密扫描与 finalize
 
@@ -127,18 +127,23 @@
 - Modify: `labs/web-flow/web-flow/tests/state-contract.test.mjs`
 - Modify: `labs/web-flow/web-flow/tests/artifacts-paths.test.mjs`
 - Modify: `labs/web-flow/web-flow/tests/deployment-contract.test.mjs`
+- Create: `labs/web-flow/web-flow/tests/finalization-contract.test.mjs`
+- Create: `labs/web-flow/web-flow/scripts/lib/sensitive-scan.mjs`
+- Create: `labs/web-flow/web-flow/scripts/lib/finalize-contract.mjs`
+- Create: `labs/web-flow/web-flow/scripts/lib/finalize-store.mjs`
+- Create: `labs/web-flow/web-flow/scripts/lib/terminal-validator.mjs`
 - Create: `labs/web-flow/web-flow/scripts/lib/validators.mjs`
 - Modify: `labs/web-flow/web-flow/scripts/lib/runtime-store.mjs`
 - Modify: `labs/web-flow/web-flow/scripts/web-flow-runtime.mjs`
 
-- [ ] 写 `sensitive scan` 失败测试：机器状态与 Markdown 中已知 token、Authorization header、用户绝对路径、localhost/私网 URL 被有限扫描拒绝；公共 URL 与相对路径允许。
-- [ ] 写 `terminal matrix` 失败测试：success 需当前 G3；请求且授权 deploy 的 success 需同 build hash deployment evidence；partial 需 G3+未完成说明；failed/cancelled 不要求 preview但要求原因。
-- [ ] 写 `finalize` 失败测试：缺 `skill-usage.md`/`retrospective.md`、artifact/review/gate 文档漂移、投影不一致均不得提交 terminal event。
-- [ ] 写 `finalize recovery` 测试：terminal event 已落而投影未替换时 reconcile；finalize 完成后 `validate-run --require-terminal` 再验证真实终态。
-- [ ] 运行 `node --test labs/web-flow/web-flow/tests/*.test.mjs`；预期新增测试失败。
-- [ ] 实现有限模式 scanner、事件重放/run/artifact 文档对账、projected-terminal 预验证与 finalize 后验证。
-- [ ] 接入 `validate-run`、`finalize`；重跑 Node 全测试，预期全部通过。
-- [ ] 运行 `wc -l` 检查五个 JS 文件预算；超出时按既定职责拆分后再次测试。
+- [x] 写 `sensitive scan` 失败测试：机器状态与 Markdown 中已知 token、Authorization header、用户绝对路径、localhost/私网 URL 被有限扫描拒绝；公共 URL 与相对路径允许。
+- [x] 写 `terminal matrix` 失败测试：success 需当前 G3；请求且授权 deploy 的 success 需同 build hash deployment evidence；partial 需 G3+未完成说明；failed/cancelled 不要求 preview但要求原因。
+- [x] 写 `finalize` 失败测试：缺 `skill-usage.md`/`retrospective.md`、artifact/review/gate 文档漂移、投影不一致均不得提交 terminal event。
+- [x] 写 `finalize recovery` 测试：terminal event 已落而投影未替换时 reconcile；finalize 完成后 `validate-run --require-terminal` 再验证真实终态。
+- [x] 运行 `node --test labs/web-flow/web-flow/tests/*.test.mjs`；预期新增测试失败。
+- [x] 实现有限模式 scanner、事件重放/run/artifact 文档对账、projected-terminal 预验证与 finalize 后验证。
+- [x] 接入 `validate-run`、`finalize`；重跑 Node 全测试，预期全部通过。
+- [x] 运行 `wc -l` 检查五个 JS 文件预算；超出时按既定职责拆分后再次测试。
 
 ---
 
@@ -153,19 +158,19 @@
 - Create: `labs/web-flow/web-flow/references/runtime-state.md`
 - Create: `labs/web-flow/web-flow/references/external-capabilities.md`
 - Modify: `labs/web-flow/web-flow/SKILL.md`
-- Modify: `labs/web-flow/web-flow/scripts/lib/validators.mjs`
+- Create: `labs/web-flow/web-flow/scripts/lib/package-validator.mjs`
 - Modify: `labs/web-flow/web-flow/scripts/web-flow-runtime.mjs`
 - Delete: `labs/web-flow/web-flow/workflow.yaml`
 - Delete: `labs/web-flow/web-flow/external-skills.yaml`
 
-- [ ] 先修改现有 Python 合约，使其期待主 Skill 链接 `references/workflow.md`、调用 benchmark、阶段拥有 memory 候选且无中心 memory。
-- [ ] 运行 `python3 -m unittest tests.test_trigger_contracts -v`；预期因新 Markdown 尚不存在/主 Skill仍指向 YAML 而失败。
-- [ ] 写 package 失败测试：必要 references、语义导航、独立 YAML 禁令、旧文件名禁令、archive/memory 排除，以及所有活跃 Markdown 的相对链接可解析。
-- [ ] 运行 `node --test labs/web-flow/web-flow/tests/package-validation.test.mjs`；预期失败。
-- [ ] 写 `workflow.md`、`runtime-state.md`、`external-capabilities.md`；JS 是机器事实源，Markdown 只解释与导航。
-- [ ] 精简主 Skill 为触发边界、不变量、入口与“何时/为何读”的链接；删除两个主 YAML。
-- [ ] 实现 `validate-package` 的 required files、broken relative link、禁 YAML/旧引用与有限敏感扫描。
-- [ ] 运行 `node --test labs/web-flow/web-flow/tests/package-validation.test.mjs` 与 `python3 -m unittest tests.test_trigger_contracts -v`；预期通过。
+- [x] 先修改现有 Python 合约，使其期待主 Skill 链接 `references/workflow.md`、调用 benchmark、阶段拥有 memory 候选且无中心 memory。
+- [x] 运行 `python3 -m unittest tests.test_trigger_contracts -v`；预期因新 Markdown 尚不存在/主 Skill仍指向 YAML 而失败。
+- [x] 写 package 失败测试：必要 references、语义导航、独立 YAML 禁令、旧文件名禁令、archive/memory 排除，以及所有活跃 Markdown 的相对链接可解析。
+- [x] 运行 `node --test labs/web-flow/web-flow/tests/package-validation.test.mjs`；预期失败。
+- [x] 写 `workflow.md`、`runtime-state.md`、`external-capabilities.md`；JS 是机器事实源，Markdown 只解释与导航。
+- [x] 精简主 Skill 为触发边界、不变量、入口与“何时/为何读”的链接；删除两个主 YAML。
+- [x] 实现 `validate-package` 的 required files、broken relative link、禁 YAML/旧引用与有限敏感扫描。
+- [x] 运行 `node --test labs/web-flow/web-flow/tests/package-validation.test.mjs` 与 `python3 -m unittest tests.test_trigger_contracts -v`；预期通过。
 
 ### Task 9：迁移 research
 
@@ -173,10 +178,10 @@
 - Modify: `labs/web-flow/web-flow/tests/package-validation.test.mjs`
 - Modify: `labs/web-flow/web-flow-research/SKILL.md`
 
-- [ ] 加失败断言：research 不引用 YAML，确切产物为 `research/content-spec.md`、`reference-evidence.md`、`asset-requirements.md`、`stage-result.md`，并包含五类内容来源。
-- [ ] 运行 package test；预期 research 断言失败。
-- [ ] 更新 research SOP、按需能力与 benchmark 交接；保留 internal-only 触发边界。
-- [ ] 重跑 package test；预期通过。
+- [x] 加失败断言：research 不引用 YAML，确切产物为 `research/content-spec.md`、`reference-evidence.md`、`asset-requirements.md`、`stage-result.md`，并包含五类内容来源。
+- [x] 运行 package test；预期 research 断言失败。
+- [x] 更新 research SOP、按需能力与 benchmark 交接；保留 internal-only 触发边界。
+- [x] 重跑 package test；预期通过。
 
 ### Task 10：迁移 prototype
 
@@ -184,9 +189,9 @@
 - Modify: `labs/web-flow/web-flow/tests/package-validation.test.mjs`
 - Modify: `labs/web-flow/web-flow-prototype/SKILL.md`
 
-- [ ] 加失败断言：wireframe 与 full prototype 的确切 HTML/stage-result 路径、G1/G2、attempt/review 版本路径、fast 的 G2 not applicable。
-- [ ] 运行 package test；预期 prototype 断言失败。
-- [ ] 更新两个模式的 SOP 与 artifact/review/gate 登记步骤；重跑 package test，预期通过。
+- [x] 加失败断言：wireframe 与 full prototype 的确切 HTML/stage-result 路径、G1/G2、attempt/review 版本路径、fast 的 G2 not applicable。
+- [x] 运行 package test；预期 prototype 断言失败。
+- [x] 更新两个模式的 SOP 与 artifact/review/gate 登记步骤；重跑 package test，预期通过。
 
 ### Task 11：迁移 design
 
@@ -194,9 +199,9 @@
 - Modify: `labs/web-flow/web-flow/tests/package-validation.test.mjs`
 - Modify: `labs/web-flow/web-flow-design/SKILL.md`
 
-- [ ] 加失败断言：fast 消费 approved wireframe、full 消费 approved prototype；确切产物为 `design/design-tokens.css`、`layout-contract.md`、`stage-result.md`。
-- [ ] 运行 package test；预期 design 断言失败。
-- [ ] 更新 design SOP，明确 run 内 CSS 是契约证据、实际样式由 build 写入 sourceDir；重跑测试，预期通过。
+- [x] 加失败断言：fast 消费 approved wireframe、full 消费 approved prototype；确切产物为 `design/design-tokens.css`、`layout-contract.md`、`stage-result.md`。
+- [x] 运行 package test；预期 design 断言失败。
+- [x] 更新 design SOP，明确 run 内 CSS 是契约证据、实际样式由 build 写入 sourceDir；重跑测试，预期通过。
 
 ### Task 12：迁移 build 与 update 安全 SOP
 
@@ -204,10 +209,10 @@
 - Modify: `labs/web-flow/web-flow/tests/package-validation.test.mjs`
 - Modify: `labs/web-flow/web-flow-build/SKILL.md`
 
-- [ ] 加失败断言：源码只写 `sourceDir`；确切证据为 `preexisting-state.md`、`build/preview-evidence.md`、`build/stage-result.md`；禁止并行写同一源码树。
-- [ ] 加失败断言：update 在 build 前 source plan、dirty conflict 阻断、build 后 allowlist/baseline 验证。
-- [ ] 运行 package test；预期 build 断言失败。
-- [ ] 更新 build SOP 与 G3 流程；重跑 package test，预期通过。
+- [x] 加失败断言：源码只写 `sourceDir`；确切证据为 `preexisting-state.md`、`build/preview-evidence.md`、`build/stage-result.md`；禁止并行写同一源码树。
+- [x] 加失败断言：update 在 build 前 source plan、dirty conflict 阻断、build 后 allowlist/baseline 验证。
+- [x] 运行 package test；预期 build 断言失败。
+- [x] 更新 build SOP 与 G3 流程；重跑 package test，预期通过。
 
 ### Task 13：迁移 benchmark
 
@@ -219,11 +224,11 @@
 - Delete: `labs/web-flow/web-flow-benchmark/rubrics.yaml`
 - Delete: `labs/web-flow/web-flow-benchmark/score-result.template.yaml`
 
-- [ ] 加失败断言：六阶段 rubric 小节、must-pass/权重/阈值/0-3-5 锚点、review template 必需字段、版本化 review 路径，无 YAML 引用。
-- [ ] 运行 package test；预期 benchmark 断言失败。
-- [ ] 把现有 rubric 迁入 Markdown并补 factual claim、实时 hash、桌面/移动、HTTP/browser/console 证据。
-- [ ] 写 review template；精简 benchmark Skill 为独立性、两轮/recheck、按需 rubric 与 Node 登记命令；删除两个 YAML。
-- [ ] 重跑 package 与 Node 全测试；预期通过。
+- [x] 加失败断言：六阶段 rubric 小节、must-pass/权重/阈值/0-3-5 锚点、review template 必需字段、版本化 review 路径，无 YAML 引用。
+- [x] 运行 package test；预期 benchmark 断言失败。
+- [x] 把现有 rubric 迁入 Markdown并补 factual claim、实时 hash、桌面/移动、HTTP/browser/console 证据。
+- [x] 写 review template；精简 benchmark Skill 为独立性、两轮/recheck、按需 rubric 与 Node 登记命令；删除两个 YAML。
+- [x] 重跑 package 与 Node 全测试；预期通过。
 
 ### Task 14：迁移 provider-neutral deploy
 
@@ -232,10 +237,10 @@
 - Modify: `labs/web-flow/web-flow-deploy/SKILL.md`
 - Modify: `labs/web-flow/web-flow/tests/package-validation.test.mjs`
 
-- [ ] 加失败断言：入口 provider-neutral；Cloudflare 命令只在 reference；确切产物为 `preflight/deployment-readiness.md`、`deploy/deployment-evidence.md`、`deploy/stage-result.md`。
-- [ ] 加失败断言：G3 后 finalize 前补授权、publish 前重新 preflight、`deploy record` 绑定 build hash 与三项事实证据、失败保持 preview/partial。
-- [ ] 运行 package test；预期 deploy 断言失败。
-- [ ] 更新 deploy Skill 与 Cloudflare reference；重跑 package/deployment tests，预期通过。
+- [x] 加失败断言：入口 provider-neutral；Cloudflare 命令只在 reference；确切产物为 `preflight/deployment-readiness.md`、`deploy/deployment-evidence.md`、`deploy/stage-result.md`。
+- [x] 加失败断言：G3 后 finalize 前补授权、publish 前重新 preflight、`deploy record` 绑定 build hash 与三项事实证据、失败保持 preview/partial。
+- [x] 运行 package test；预期 deploy 断言失败。
+- [x] 更新 deploy Skill 与 Cloudflare reference；重跑 package/deployment tests，预期通过。
 
 ### Task 15：更新 README 与显式分发边界
 
@@ -243,10 +248,10 @@
 - Modify: `labs/web-flow/README.md`
 - Modify: `labs/web-flow/web-flow/tests/package-validation.test.mjs`
 
-- [ ] 加失败断言：README 包含七条具体 `j-skills link "$JACKY_SKILLS_DIR/labs/web-flow/<skill>"`、labs 不进入 `install.sh`、archive 不参与运行、Node 自检命令。
-- [ ] 运行 package test；预期 README 断言失败。
-- [ ] 更新 README 的 V3 概念、安装/链接、Node 前置、运行证据与验证命令。
-- [ ] 重跑 package test 与两个 Python 合约测试；预期通过。
+- [x] 加失败断言：README 包含七条具体 `j-skills link "$JACKY_SKILLS_DIR/labs/web-flow/<skill>"`、labs 不进入 `install.sh`、archive 不参与运行、Node 自检命令。
+- [x] 运行 package test；预期 README 断言失败。
+- [x] 更新 README 的 V3 概念、安装/链接、Node 前置、运行证据与验证命令。
+- [x] 重跑 package test 与两个 Python 合约测试；预期通过。
 
 ---
 
@@ -257,10 +262,10 @@
 **Files:**
 - Create: `labs/web-flow/web-flow/tests/runtime-smoke.test.mjs`
 
-- [ ] 写一个使用 `spawnSync(process.execPath, [cli, ...])` 的 fast-profile smoke：临时 Git 项目中执行 init、artifact add、typed transition、review record、G1/G3 gate、finalize success、删除 run.json 后 reconcile。
-- [ ] smoke 内断言：`.gitignore` 仅一条 `.web-flow/`；`site/` 在项目根且不在 runDir；events sequence 连续；review/gate hash 匹配；final `status=success`；reconcile 前后 `stateHash` 相同。
-- [ ] 运行 `node --test labs/web-flow/web-flow/tests/runtime-smoke.test.mjs`；若暴露命令缺口，先保留失败，再最小修复对应模块。
-- [ ] 重跑同一命令；预期 `1..1`、pass 1、fail 0、退出码 0。
+- [x] 写一个使用 `spawnSync(process.execPath, [cli, ...])` 的 fast-profile smoke：临时 Git 项目中执行 init、artifact add、typed transition、review record、G1/G3 gate、finalize success、删除 run.json 后 reconcile。
+- [x] smoke 内断言：`.gitignore` 仅一条 `.web-flow/`；`site/` 在项目根且不在 runDir；events sequence 连续；review/gate hash 匹配；final `status=success`；reconcile 前后 `stateHash` 相同。
+- [x] 运行 `node --test labs/web-flow/web-flow/tests/runtime-smoke.test.mjs`；若暴露命令缺口，先保留失败，再最小修复对应模块。
+- [x] 重跑同一命令；预期 `1..1`、pass 1、fail 0、退出码 0。
 
 ### Task 17：独立实现 review
 
@@ -268,9 +273,9 @@
 - Review: `docs/superpowers/specs/2026-07-11-web-flow-v3-design.md`
 - Review: `labs/web-flow/**` 活跃文件
 
-- [ ] 派发未参与实现的 reviewer，对照规格检查 Markdown-first/JS-first、事件权威、源码归属、update 安全、gate/review 漂移、部署和终态矩阵。
-- [ ] 每个阻断问题先补精确失败测试，再做最小修复；重复 review 直到 Approved。
-- [ ] 运行 `wc -l labs/web-flow/*/SKILL.md`，确认每个 Skill ≤500 行；运行 package test 确认 frontmatter 名称与目录一致。
+- [x] 派发未参与实现的 reviewer，对照规格检查 Markdown-first/JS-first、事件权威、源码归属、update 安全、gate/review 漂移、部署和终态矩阵。
+- [x] 每个阻断问题先补精确失败测试，再做最小修复；重复 review 直到 Approved。
+- [x] 运行 `wc -l labs/web-flow/*/SKILL.md`，确认每个 Skill ≤500 行；运行 package test 确认 frontmatter 名称与目录一致。
 
 ### Task 18：分层完成验证
 
@@ -279,13 +284,13 @@
 - Test: `tests/test_trigger_contracts.py`
 - Test: `tests/test_benchmark_naming_contract.py`
 
-- [ ] 运行 `node --test labs/web-flow/web-flow/tests/*.test.mjs`；预期全部通过。
-- [ ] 运行 `node labs/web-flow/web-flow/scripts/web-flow-runtime.mjs validate-package`；预期输出 `WebFlow package valid`、退出码 0。
-- [ ] 运行 `python3 -m unittest tests.test_trigger_contracts tests.test_benchmark_naming_contract -v`；预期 5 项通过。
-- [ ] 运行 `python3 -m unittest discover -s tests -p 'test_*.py' -v`。
-- [ ] 运行 `python3 scripts/audit_skills.py --scan-shared-content`。
-- [ ] 运行 `bash -n install.sh` 与 `claude plugin validate --strict .`。
-- [ ] 运行 `git diff --check`。
-- [ ] 运行 `rg -n 'workflow\.yaml|external-skills\.yaml|rubrics\.yaml|score-result\.template\.yaml|validate_web_flow\.py' labs/web-flow --glob '!**/archive/**' --glob '!**/memory/**'`；预期无输出。
-- [ ] 若全仓验证被用户既有无关改动阻断，保留现场并区分 WebFlow scoped 结果与外部失败；不修、不回滚无关文件。
-- [ ] 不 commit、不 push、不清理 ignored memory、不删除机器上的历史断链。
+- [x] 运行 `node --test labs/web-flow/web-flow/tests/*.test.mjs`；预期全部通过。
+- [x] 运行 `node labs/web-flow/web-flow/scripts/web-flow-runtime.mjs validate-package labs/web-flow`；预期输出 `valid: true` 的 JSON、退出码 0。
+- [x] 运行 `python3 -m unittest tests.test_trigger_contracts tests.test_benchmark_naming_contract -v`；预期 5 项通过。
+- [x] 运行 `python3 -m unittest discover -s tests -p 'test_*.py' -v`。
+- [x] 运行 `python3 scripts/audit_skills.py --scan-shared-content`。
+- [x] 运行 `bash -n install.sh` 与 `claude plugin validate --strict .`。
+- [x] 运行 `git diff --check`。
+- [x] 运行 `rg -n 'workflow\.yaml|external-skills\.yaml|rubrics\.yaml|score-result\.template\.yaml|validate_web_flow\.py' labs/web-flow --glob '!**/archive/**' --glob '!**/memory/**'`；预期无输出。
+- [x] 若全仓验证被用户既有无关改动阻断，保留现场并区分 WebFlow scoped 结果与外部失败；不修、不回滚无关文件。
+- [x] 不 commit、不 push、不清理 ignored memory、不删除机器上的历史断链。
