@@ -1,0 +1,31 @@
+{
+  "name": "ai-studio",
+  "version": "1.0.0",
+  "description": "AI Studio - AI 外接生成能力域：图像 / 音频 / 网页 / 视频演示的生成底座与场景封装。收敛散落各处的 AI 生成类 skill，并纳管上游 garden-skills 的精品能力。",
+  "author": {
+    "name": "Jacky Wang",
+    "email": "wangjs.jacky@gmail.com",
+    "url": "https://github.com/wangjs-jacky"
+  },
+  "homepage": "https://github.com/wangjs-jacky/jacky-skills/tree/main/plugins/ai-studio",
+  "repository": "https://github.com/wangjs-jacky/jacky-skills",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "ai-generation",
+    "image",
+    "audio",
+    "web",
+    "video",
+    "presentation",
+    "gpt-image"
+  ],
+  "skills": [
+    "./gpt-image-2/",
+    "./web-design-engineer/",
+    "./subtitle-to-audio/",
+    "./warm-doodle/",
+    "./article-with-images/",
+    "./web-video-presentation/"
+  ]
+}
