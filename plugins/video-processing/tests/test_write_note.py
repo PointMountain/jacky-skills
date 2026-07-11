@@ -1,93 +1,56 @@
-import json
-import subprocess
+import importlib.util
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-SCRIPT = REPO_ROOT / "plugins/video-processing/skills/write-obsidian-note/scripts/write_note.py"
+SCRIPT = (
+    REPO_ROOT
+    / "plugins/video-processing/skills/audio-to-subtitle/scripts/transcribe.py"
+)
 
 
-class WriteNoteCliTests(unittest.TestCase):
-    def run_cli(self, args: list[str]) -> tuple[int, dict]:
-        cmd = ["python3", str(SCRIPT)] + args
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        payload = json.loads(result.stdout.strip())
-        return result.returncode, payload
+def load_transcribe_module():
+    spec = importlib.util.spec_from_file_location("audio_to_subtitle_transcribe", SCRIPT)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"无法加载转录脚本: {SCRIPT}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
-    def test_write_and_skip_when_exists(self) -> None:
+
+transcribe = load_transcribe_module()
+
+
+class AudioToSubtitleContractTests(unittest.TestCase):
+    def test_formats_transcription_as_supported_subtitle_types(self) -> None:
+        result = transcribe.TranscriptionResult(
+            segments=[transcribe.Segment(start=1.25, end=3.5, text="第一段")],
+            language="zh",
+            duration=3.5,
+            text="第一段",
+        )
+
+        self.assertIn("00:00:01,250 --> 00:00:03,500", transcribe.to_srt(result))
+        self.assertIn("00:00:01.250 --> 00:00:03.500", transcribe.to_vtt(result))
+        self.assertEqual(transcribe.to_txt(result), "第一段")
+        self.assertIn("- **0:01** 第一段", transcribe.to_md(result))
+
+    def test_discovers_only_supported_audio_and_video_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            obsidian_repo = Path(tmp) / "vault"
-            obsidian_repo.mkdir(parents=True, exist_ok=True)
+            directory = Path(tmp)
+            for name in ("b.MP4", "a.mp3", "notes.txt"):
+                (directory / name).touch()
 
-            input_json = Path(tmp) / "payload.json"
-            input_json.write_text(
-                json.dumps(
-                    {
-                        "metadata": {
-                            "title": "测试标题",
-                            "author": "作者A",
-                            "url": "https://example.com/video",
-                            "duration": "10:00",
-                        },
-                        "transcript": "第一行\n第二行\n第三行",
-                        "category": "Audio",
-                        "extraContent": {"extraTags": ["demo tag", "#already_ok"]},
-                    },
-                    ensure_ascii=False,
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
+            files = transcribe.find_audio_files(str(directory))
 
-            code, payload = self.run_cli(
-                ["--input-json", str(input_json), "--obsidian-repo", str(obsidian_repo)]
-            )
-            self.assertEqual(code, 0)
-            self.assertTrue(payload["success"])
-            original = Path(payload["files"]["originalPath"])
-            summary = Path(payload["files"]["summaryPath"])
-            self.assertTrue(original.exists())
-            self.assertTrue(summary.exists())
-
-            text = original.read_text(encoding="utf-8")
-            self.assertIn("https://example.com/video", text)
-            self.assertIn("版权声明", text)
-            self.assertIn("#demo_tag", text)
-            self.assertIn("#already_ok", text)
-
-            code2, payload2 = self.run_cli(
-                ["--input-json", str(input_json), "--obsidian-repo", str(obsidian_repo)]
-            )
-            self.assertEqual(code2, 0)
-            self.assertTrue(payload2["success"])
-            self.assertTrue(payload2.get("skipped"))
-
-    def test_sanitize_filename_for_invalid_chars(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            obsidian_repo = Path(tmp) / "vault"
-            obsidian_repo.mkdir(parents=True, exist_ok=True)
-
-            code, payload = self.run_cli(
-                [
-                    "--obsidian-repo",
-                    str(obsidian_repo),
-                    "--title",
-                    "A/B:C*D?E",
-                    "--author",
-                    "AA|BB",
-                    "--url",
-                    "https://example.com",
-                    "--transcript",
-                    "hello",
-                ]
-            )
-            self.assertEqual(code, 0)
-            self.assertTrue(payload["success"])
-            original = Path(payload["files"]["originalPath"])
-            self.assertIn("A_B_C_D_E-原文.md", original.name)
-            self.assertIn("AA_BB", str(original.parent))
+        self.assertEqual(
+            [Path(path).name for path in files],
+            ["a.mp3", "b.MP4"],
+        )
 
 
 if __name__ == "__main__":

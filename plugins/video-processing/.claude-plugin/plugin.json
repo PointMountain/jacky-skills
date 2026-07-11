@@ -1,6 +1,6 @@
 {
   "name": "video-processing",
-  "version": "3.0.0",
+  "version": "3.0.2",
   "description": "音视频处理工具集 - ASR 转录能力",
   "author": {
     "name": "Jacky Wang",

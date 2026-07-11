@@ -195,8 +195,26 @@ mp3 转 srt
 ### 首次安装
 
 ```bash
-# 一键安装脚本
-bash "$(dirname "$0")/scripts/setup.sh"
+# 优先使用 Agent 当前加载到的 Skill 目录；也可显式设置该变量。
+AUDIO_TO_SUBTITLE_SKILL_DIR="${AUDIO_TO_SUBTITLE_SKILL_DIR:-}"
+if [ -z "$AUDIO_TO_SUBTITLE_SKILL_DIR" ]; then
+  for candidate in \
+    "$HOME/.j-skills/linked/audio-to-subtitle" \
+    "$HOME/.claude/skills/audio-to-subtitle" \
+    "$HOME/.codex/skills/audio-to-subtitle" \
+    "$HOME/.agents/skills/audio-to-subtitle"; do
+    if [ -f "$candidate/scripts/setup.sh" ]; then
+      AUDIO_TO_SUBTITLE_SKILL_DIR="$candidate"
+      break
+    fi
+  done
+fi
+
+[ -n "$AUDIO_TO_SUBTITLE_SKILL_DIR" ] || {
+  echo "未找到 audio-to-subtitle；请设置 AUDIO_TO_SUBTITLE_SKILL_DIR" >&2
+  exit 1
+}
+bash "$AUDIO_TO_SUBTITLE_SKILL_DIR/scripts/setup.sh"
 ```
 
 或手动安装：
@@ -343,4 +361,3 @@ python3 scripts/transcribe.py audio.mp3 -l zh
     火山引擎豆包语音识别 API 文档。
   </ref>
 </reference>
-

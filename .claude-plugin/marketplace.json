@@ -1,0 +1,114 @@
+{
+  "name": "jacky-skills",
+  "owner": {
+    "name": "Jacky Wang",
+    "email": "wangjs.jacky@gmail.com"
+  },
+  "metadata": {
+    "description": "模块化 Agent Skills 集合，可按 Plugin 安装"
+  },
+  "plugins": [
+    {
+      "name": "claude-config",
+      "source": "./plugins/claude-config",
+      "description": "Claude Code 配置管理",
+      "version": "0.3.0"
+    },
+    {
+      "name": "dev-tools",
+      "source": "./plugins/dev-tools",
+      "description": "发布、任务管理、联网与效率审计工具",
+      "version": "2.5.2"
+    },
+    {
+      "name": "distiller-tools",
+      "source": "./plugins/distiller-tools",
+      "description": "资源蒸馏与知识提炼工具",
+      "version": "1.1.0"
+    },
+    {
+      "name": "evaluators",
+      "source": "./plugins/evaluators",
+      "description": "任务产出与 Agent Skill 设计质量评估工具",
+      "version": "1.1.0"
+    },
+    {
+      "name": "knowledge-base",
+      "source": "./plugins/knowledge-base",
+      "description": "开发教程、经验总结与参考方案",
+      "version": "1.3.0"
+    },
+    {
+      "name": "language-skills",
+      "source": "./plugins/language-skills",
+      "description": "语言学习与表达训练工具",
+      "version": "1.0.1"
+    },
+    {
+      "name": "learning-tools",
+      "source": "./plugins/learning-tools",
+      "description": "仓库学习、文档教程与技术调研工具",
+      "version": "2.4.1"
+    },
+    {
+      "name": "monitoring",
+      "source": "./plugins/monitoring",
+      "description": "Claude Code 运行监控与历史查询工具",
+      "version": "2.5.5"
+    },
+    {
+      "name": "obsidian-tools",
+      "source": "./plugins/obsidian-tools",
+      "description": "Obsidian 同步、采集、编译与知识库管理工具",
+      "version": "2.13.1"
+    },
+    {
+      "name": "skill-stats",
+      "source": "./plugins/skill-stats",
+      "description": "Skill 调用统计与使用分析",
+      "version": "0.1.1"
+    },
+    {
+      "name": "skill-tooling",
+      "source": "./plugins/skill-tooling",
+      "description": "Skill 优化与调研工具",
+      "version": "1.1.1"
+    },
+    {
+      "name": "skills-management",
+      "source": "./plugins/skills-management",
+      "description": "Skills 链接、安装与批量管理工具",
+      "version": "1.0.2"
+    },
+    {
+      "name": "thinking-tools",
+      "source": "./plugins/thinking-tools",
+      "description": "结构化对话与思考工具",
+      "version": "0.1.0"
+    },
+    {
+      "name": "ticktick-manager",
+      "source": "./plugins/ticktick-manager",
+      "description": "滴答清单任务与日程管理工具",
+      "version": "1.2.1"
+    },
+    {
+      "name": "translation-tools",
+      "source": "./plugins/translation-tools",
+      "description": "单文件与多文件并行翻译工具",
+      "version": "1.0.1"
+    },
+    {
+      "name": "troubleshooting",
+      "source": "./plugins/troubleshooting",
+      "description": "CLI、浏览器自动化与 Tauri 故障排查工具",
+      "version": "1.1.1"
+    },
+    {
+      "name": "video-processing",
+      "source": "./plugins/video-processing",
+      "description": "音视频 ASR 转录工具",
+      "version": "3.0.2"
+    }
+  ]
+}
