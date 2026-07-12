@@ -39,7 +39,7 @@
 | Skill | Skill | Skill |
 |-------|-------|-------|
 | codex-harness | crafted-web | spec-debate |
-| topic-debate | tutorial-to-hyperframes-demo | |
+| topic-debate | tutorial-to-hyperframes-demo | [happy-app-experience](./skills/happy-app-experience) |
 
 ## Harness Ops Skills
 
@@ -60,6 +60,7 @@
 `labs/` 用于验证尚未稳定的新型 Skill 和轻量 Workflow，不计入正式独立 Skill。当前实验包括：
 
 - [web-flow](./labs/web-flow)：渐进串联网站调研、原型、设计、实现、评审与部署。
+- [app-flow](./labs/app-flow/app-flow)：不固定技术栈、阶段或交付形式的长任务 App Workflow，按任务证据动态组织工作。
 
 ## 兼容性边界
 
@@ -89,6 +90,7 @@ J_SKILLS_ENVS=claude-code,codex,cursor ./install.sh --all
 
 ```bash
 ./install.sh --skill youtube-study-note
+./install.sh --skill happy-app-experience
 ./install.sh --plugin dev-tools
 ```
 
@@ -160,12 +162,15 @@ jacky-skills/
 │   ├── troubleshooting/
 │   └── video-processing/
 ├── skills/                    # 不属于 Plugin 的独立 Skills
+│   └── happy-app-experience/
 ├── harness/                   # 工程/工具的长期经验 Ops Skills（统一以 -ops 结尾）
 │   ├── CLAUDE.md
 │   ├── happy-ops/
 │   ├── opencli-ops/
 │   └── hyperframes-ops/
 ├── labs/                      # 实验性 Skill 与轻量 Workflow（预览版）
+│   ├── app-flow/
+│   │   └── app-flow/
 │   └── web-flow/
 ├── archived/                  # 不参与安装的历史归档
 ├── .github/workflows/validate.yml

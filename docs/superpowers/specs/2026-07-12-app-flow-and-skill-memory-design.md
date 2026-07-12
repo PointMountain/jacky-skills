@@ -1,7 +1,7 @@
 # App Flow 与可记忆 Skills 设计
 
-**日期：** 2026-07-12  
-**状态：** 待书面审阅  
+**日期：** 2026-07-12
+**状态：** 已通过独立审阅
 **范围：** `labs/app-flow`、`happy-app-experience` 与通用本地 Memory 协议
 
 ## 1. 背景
@@ -52,11 +52,12 @@
 
 `app-flow` 不硬编码 `happy-app-experience`。当用户说“参考 Happy 的经验”，或当前任务与其 description 高度匹配时，Agent 才加载它。没有安装或不相关时，流程正常继续。
 
-能力发现只依赖宿主已经暴露的 Skill metadata 目录，接口是 `name`、`description` 和可读入口，而不是 `app-flow` 内的一份固定清单。每次只围绕“下一项行动”查询：
+能力发现只依赖宿主已经暴露的 Skill metadata 目录，接口是 `name`、`description` 和可读入口，而不是 `app-flow` 内的一份固定清单。每次只围绕“下一项行动”查询；宿主检索最多返回 5 个 metadata 候选：
 
 - 没有匹配项时，使用模型与现有工具继续，或在确实缺少能力时报告阻塞；
 - 只有一个可读匹配项时加载它；
-- 有多个匹配项时按意图具体度、现场适配度、证据质量和加载成本排序，只加载完成当前行动所需的最小集合；
+- 有多个匹配项时先按 description 与当前意图的具体匹配度排序；同等匹配时优先入口可读且更小者；一次只探查一个入口，当前行动最多探查 2 个候选；
+- 证据质量只在入口已经加载后评估，不能假装它存在于 metadata 中；第一个候选足够完成行动时不再读取第二个；
 - 入口缺失或不可读时跳过该候选并保留诊断，不让整个 Flow 失败；
 - 不得为了方便而把候选名称回写成固定阶段或硬编码 Skill 列表。
 
@@ -107,7 +108,7 @@
 
 ### 3.1 任务身份与唯一恢复点
 
-一次 `app-flow` 激活会形成一个 `run-id` 和一个稳定 `task-key`。`task-key` 由 Repo 命名空间加显式 Goal/Task/Feature ID 组成；没有显式 ID 时才使用规范化 WorkTree 或分支标识。
+一次 `app-flow` 激活会形成一个 `run-id` 和一个稳定 `task-key`。Repo 命名空间由路径中的 `repo-key` 单独表示；`task-key` 只由显式 Goal/Task/Feature ID 形成，没有显式 ID 时才使用规范化 WorkTree 或分支标识。
 
 跨 Skill 的任务级恢复点只由最外层 `app-flow` 实例拥有。能力 Skill 和经验包可以保存自己的局部 Memory 与证据，但不能各自宣称“整个任务最新状态”。子 Agent 把状态返回给 Flow owner，由 owner 统一写恢复点。
 
@@ -119,6 +120,8 @@ app-flow/local/maps/resume/<repo-key>/<task-key>.md
 ```
 
 Checkpoint 是不可变文件；指针最后以临时文件加原子 rename 更新。恢复时只读该指针和它指向的 checkpoint，校验 Repo、WorkTree、目标摘要与证据路径后继续，不递归扫描所有 Skill 的 `local/`。指针损坏或证据失效时降级为读取当前现场并新建恢复点，而不是猜测旧状态。
+
+同一 `repo-key/task-key` 同时只能有一个 Flow owner。owner 通过旁路 task lease 获得严格递增的 `generation` 和随机 fencing token；lease 每 10 秒或每个行动边界续租，最长 30 秒，过期即允许接管，不以进程是否仍存活为例外。每个 checkpoint 和恢复指针都携带 `generation`、run 内递增 `sequence` 与 token。更新指针前必须确认 task lease token 未变，并且新 `(generation, sequence)` 大于当前指针；旧 owner 即使晚完成也不能覆盖新 generation。不能取得 owner lease 的同任务实例只读最新 checkpoint 并退出或作为子 Agent 把结果交给 owner，不建立第二条任务恢复线。
 
 ### 3.2 完成条件
 
@@ -134,7 +137,7 @@ Checkpoint 是不可变文件；指针最后以临时文件加原子 rename 更�
 
 ### 3.4 失败、预算与停止
 
-- 激活时建立 execution envelope：优先采用用户给出的时间、费用和资源限制；否则采用宿主可见的剩余资源，并预留验证与交付所需空间；
+- 激活时建立 execution envelope：优先采用用户给出的时间、费用和资源限制；否则采用宿主可见的剩余资源，并预留验证与交付所需空间；两者都没有时，单次激活默认最多运行 4 小时，并至少保留最后 15 分钟做验证、checkpoint 和交付说明；
 - “实质进展”必须至少产生一项可核验变化：验收条件被满足、相关测试/检查通过、根因范围缩小、阻塞被解除，或新增了能改变下一步的证据；
 - 同一失败签名连续两次出现且没有新增证据时，不再原样重试，必须先诊断或换假设；
 - 每个行动都要有假设、预期证据和成本上界；不存在尚未尝试且在 envelope 内可行的行动时，进入阻塞而不是无限换方案；
@@ -200,7 +203,7 @@ local/
 ├── INDEX.md
 ├── maps/
 │   ├── <topic>.md
-│   └── features/<feature-key>.md
+│   └── features/<repo-key>/<feature-key>.md
 ├── memories/<memory-id>.md
 ├── runs/<run-id>/
 └── archive/
@@ -211,6 +214,8 @@ local/
 - Memory 一个主题或根因一个 Markdown；
 - Run 保存可选的全量资料、临时文件、证据和恢复点；
 - archive 日常不读。
+
+只有 `app-flow` 在通用结构上额外使用 `maps/resume/<repo-key>/<task-key>.md` 和对应 task lease；能力 Skill 与经验包不创建 `resume/`。
 
 Memory 可以达到数 GB，因为运行时禁止递归全读；容量和上下文成本解耦。
 
@@ -233,8 +238,10 @@ maps/features/<repo-key>/<feature-key>.md
 - `repo-key` 优先取去掉协议、凭据、查询参数和 `.git` 后的规范化远程标识，再附其 SHA-256 前 12 位；没有远程时对仓库 realpath 做哈希，索引中不暴露绝对路径；
 - `feature-key` 由显式 ID、WorkTree 或分支的安全 slug 加原值哈希形成，避免大小写、斜杠和同名冲突；
 - Memory 文件使用时间有序 ID 加随机后缀，只新增、不原地覆盖；修正通过 `supersedes` 指向旧记录；
-- 每个 run 只有 Flow owner 或它指定的单一 memory writer 更新同一 Skill 的 map；跨 run 更新使用原子创建的 per-map lock，持锁后重新读取并按 Memory ID 合并，写唯一临时文件后 rename；
-- 无法在 execution envelope 内取得锁时，保留不可变 Memory 和 `pending-index` 指针，下一次使用先做有界合并，绝不覆盖未知的新内容。
+- 每个 run 只有 Flow owner 或它指定的单一 memory writer 更新同一 Skill 的 map；跨 run 更新使用原子创建的 per-map lock；锁记录 `owner = run-id + process/session-id`、随机 fencing token、创建时间和 30 秒租约，持锁者每 10 秒续租并在写入前再次确认 token；
+- map 写入只执行“持锁后重读 → 按 Memory ID 合并 → 写唯一临时文件 → 再验 token → 原子 rename”。正常写入应在租约内完成；
+- 租约到期后，无论旧进程是否仍存活，竞争者都可以把旧锁原子 rename 到 `archive/locks/` 后获取新 token；旧 writer 因 token 不匹配不得提交 map。这样挂起进程也不会永久占锁；
+- 无法在 execution envelope 内取得锁时，保留不可变 Memory 和 `pending-index` 指针。下一次成功持锁后只合并当前 run 和最多 50 个时间最新的 pending 指针，其余保留游标供后续有界合并，绝不覆盖未知的新内容。
 
 相同 Repo 下的相同 Feature key 可以让多个会话和 Agent 找到同一批资料。根索引找不到入口时按当前现场继续，不扫描全部 Memory。
 
@@ -245,16 +252,16 @@ maps/features/<repo-key>/<feature-key>.md
 ```text
 id
 scope: repo / worktree / feature / run
-status: raw | observed | verified | superseded
+status: raw | observed | verified
 created-at / verified-at
 evidence: 相对源码路径、测试命令、日志或 URL
 supersedes
 sensitivity: public | redacted | local-private
 ```
 
-正文只写结论或决策、适用边界、证据解释和“下次如何用”。`verified` 必须有仍可访问的证据；没有证据只能是 `raw` 或 `observed`。旧结论失效时新增记录并标记替代关系，不静默改写历史。
+正文只写结论或决策、适用边界、证据解释和“下次如何用”。`verified` 必须有仍可访问的证据；没有证据只能是 `raw` 或 `observed`。旧结论失效时新增记录，通过新记录的 `supersedes` 指向旧 ID；旧文件保持不变，map 用 `superseded-by: <new-id>` 表达派生生命周期。读取者以 map 中最新的有效指针为准，不把不可变历史文件内的 `status` 改成 `superseded`。
 
-Token、密码、私钥、完整环境变量、个人聊天原文和未经授权的第三方私密数据永不写入 Memory；日志先脱敏，必须保留的敏感资料只记录受控位置的指针。读取时遇到缺字段、断链或损坏条目就跳过并把 map 标为待修复，继续使用当前证据，不让一条坏 Memory 阻塞任务。
+敏感信息规则覆盖整个 `local/`，包括 `runs/`、原始证据、临时文件、checkpoint、map 和 Memory。Token、密码、私钥、完整环境变量、个人聊天原文和未经授权的第三方私密数据永不写入；“允许全量保存”只表示保存全部有用且已脱敏的任务资料，不表示无条件逐字落盘。日志先脱敏，必须保留的敏感资料只记录受控位置的指针。读取时遇到缺字段、断链或损坏条目就跳过并把 map 标为待修复，继续使用当前证据，不让一条坏 Memory 阻塞任务。
 
 ### 5.5 自主进化
 

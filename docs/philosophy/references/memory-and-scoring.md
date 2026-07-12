@@ -88,7 +88,7 @@ retrospective:
 1. **事实可证伪**：写成可被当前或未来证据推翻的陈述，而不是感受。
 2. **证据可定位**：能回到产物、测试、日志、评分或用户确认。
 3. **适用边界明确**：说明对哪个 Skill、阶段、环境或输入成立。
-4. **已查重与查冲突**：同一根因更新原条目；新事实与旧经验冲突时更新旧状态。
+4. **已查重与查冲突**：同一根因新增不可变记录并用 `supersedes` 指向旧 ID；map 记录 `superseded-by`。
 5. **归宿正确**：运行流水留在本轮，私有事实留本地，通用规则回流到可分享的 Skill。
 
 Skills 的调用次数、单次成功率或一次失败本身都不是经验；它们只是帮助发现模式的事实样本。
@@ -100,8 +100,13 @@ Skills 的调用次数、单次成功率或一次失败本身都不是经验；�
 ```markdown
 ---
 id: stable-id
-applies_to: [stage-or-skill]
-status: active
+scope: repo/worktree/feature/run
+status: raw # raw | observed | verified
+created-at: 2026-07-12T00:00:00Z
+verified-at:
+evidence: []
+supersedes:
+sensitivity: redacted
 ---
 # 人能理解的错误标题
 
@@ -112,7 +117,7 @@ status: active
 - 适用边界：什么场景成立，什么场景不成立。
 ```
 
-同一根因再次发生时更新原文，不追加重复日志。失效经验标记 `superseded` 或 `archived`。
+同一根因再次发生时新增记录，不改写旧文件；新记录用 `supersedes` 指向旧 ID，map 用 `superseded-by` 标记旧记录的派生状态。重复日志仍留在 Run，不制造多条等价原子 Memory。
 
 ## 决策轨迹不等于长期记忆
 
@@ -130,7 +135,7 @@ status: active
 - `local/`、其中的动态索引、Feature map、memories、runs 与 archive 默认全部被 Git 忽略；
 - 通用且多次验证的方法上移到对应 Skill 或 reference，让分享出去的 Skill 同样受益；
 - memory 不保存密钥，也不替代配置文件；
-- 当前证据与旧经验冲突时，以当前证据为准并更新旧记忆状态。
+- 当前证据与旧经验冲突时，以当前证据为准，新增替代记录并更新 map 指针，不原地改写旧记忆。
 
 ## 停止规则
 
