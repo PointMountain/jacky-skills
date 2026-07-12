@@ -381,11 +381,17 @@ test ! -e labs/self-learning/self-learning-hyperframes
 cp -R \
   skills/tutorial-to-hyperframes-demo \
   labs/self-learning/self-learning-hyperframes
+
+LINKED_OLD_ROOT="${JACKY_SKILLS_DIR:-$HOME/jacky-github/jacky-skills}/skills/tutorial-to-hyperframes-demo"
+if test -f "$LINKED_OLD_ROOT/experience.local.md"; then
+  cp "$LINKED_OLD_ROOT/experience.local.md" \
+    labs/self-learning/self-learning-hyperframes/experience.local.md
+fi
 ```
 
-Expected: 新旧目录暂时并存；若旧目录存在 `experience.local.md`，新目录也保留该 ignored 私有文件。
+Expected: 新旧目录暂时并存；若当前全局旧源目录存在 `experience.local.md`，新目录也保留该 ignored 私有文件。
 
-- [ ] **Step 2: 在任何修改前运行复制后的 60 项基线测试**
+- [ ] **Step 2: 在任何修改前运行复制后的 178 项基线测试**
 
 Run:
 
@@ -396,7 +402,7 @@ python3 -m unittest discover \
   -v
 ```
 
-Expected: 原有 60 项全部 PASS，证明机械复制本身没有破坏相对路径。
+Expected: 当前原有 178 项全部 PASS，证明机械复制本身没有破坏相对路径。
 
 - [ ] **Step 3: 先增加旧持久 marker 迁移测试**
 
@@ -443,7 +449,7 @@ python3 -m unittest discover \
   -v
 ```
 
-Expected: 现有 60 项加新增兼容测试全部 PASS。
+Expected: 当前 178 项加新增兼容测试全部 PASS。
 
 - [ ] **Step 7: 用官方校验器检查迁移后的 Skill**
 
@@ -720,7 +726,7 @@ rg -n 'tutorial-to-hyperframes-demo' \
   tests/test_self_learning_lab_contract.py
 ```
 
-Expected: 两份 README、两个公开 `SKILL.md`、`agents/openai.yaml` 和哲学文档零命中；允许 `init_run.py` 与迁移测试中明确标注的 legacy marker 命中。
+Expected: 两份 README、两个公开 `SKILL.md`、`agents/openai.yaml` 和哲学文档零命中；允许 `init_run.py` 与 `test_init_safety.py` 中明确标注的 legacy marker，以及 `test_self_learning_lab_contract.py` 用于证明旧入口已移除的 `OLD_NAME` 断言命中。
 
 - [ ] **Step 5: 用三个无上下文新鲜子 Agent 前向测试全局发现**
 

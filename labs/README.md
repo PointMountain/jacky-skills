@@ -10,7 +10,8 @@
 
 - [`web-flow`](./web-flow/)：面向网站交付的固定阶段 Workflow，依次串联调研、原型、设计、实现、评审与部署。
 - [`app-flow`](./app-flow/app-flow/)：面向长任务 App 交付的薄套件——薄总入口 `app-flow` 加三个窄能力 `app-flow-build`、`app-flow-delivery`、`app-flow-reviewer`；不预设固定技术栈、阶段或交付形式，而是根据任务证据动态选能。
-- [`ai-video-flow`](./ai-video-flow/)：AI 生成视频实验（原 `tutorial-to-hyperframes-demo`）——自主学习本地教学音视频或公开视频链接，把教程方法与可观察动效复刻为有证据、可恢复、可渲染的 HyperFrames Demo，并沉淀学习账本。
+- [`ai-video-flow`](./ai-video-flow/)：AI 生成视频实验——自主学习本地教学音视频或公开视频链接，把教程方法与可观察动效复刻为有证据、可恢复、可渲染的 HyperFrames Demo，并沉淀学习账本。
+- [`self-learning`](./self-learning/)：让 AI 从视频、文章或主题自主学习、扩展调研并生成可验证产物；HyperFrames 产出能力由子 Skill `self-learning-hyperframes` 承担。
 
 `web-flow` 适合沿固定交付阶段推进网站任务；`app-flow` 则为长任务 App Workflow 动态选择能力与交付物。
 
@@ -46,4 +47,13 @@ j-skills install app-flow -g --env claude-code,codex
 ```bash
 j-skills link ./labs/ai-video-flow
 j-skills install ai-video-flow -g --env claude-code,codex
+```
+
+要试用 `self-learning` 套件，按需链接父入口与 HyperFrames 产出能力：
+
+```bash
+j-skills link ./labs/self-learning/self-learning
+j-skills link ./labs/self-learning/self-learning-hyperframes
+j-skills install self-learning -g --env claude-code,codex
+j-skills install self-learning-hyperframes -g --env claude-code,codex
 ```

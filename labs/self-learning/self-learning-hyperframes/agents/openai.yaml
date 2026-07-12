@@ -1,0 +1,4 @@
+interface:
+  display_name: "Self Learning · HyperFrames"
+  short_description: "从教学素材学习并产出可验证 HyperFrames Demo"
+  default_prompt: "Use $self-learning-hyperframes to learn this tutorial, build a verified HyperFrames demo, and record its evidence-backed learning ledger."

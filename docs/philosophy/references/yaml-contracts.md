@@ -12,27 +12,17 @@
 
 ## `workflow.yaml`
 
-复杂工作流用一份最小事实源，主 Skill 只解释怎么读取它：
+`workflow.yaml` 是例外，不是复杂任务的默认答案。开放任务默认由 Agent 维护运行时计划；需要让人阅读、协作或长期说明时，优先使用 Markdown 表达意图与边界。
 
-```yaml
-version: 2
-stages:
-  - id: research
-    skill: example-research
-    inputs: [intent]
-    outputs: [content_spec]
-    score: research
-    next: prototype
-  - id: prototype
-    skill: example-prototype
-    inputs: [content_spec]
-    outputs: [prototype, decision_trace]
-    score: prototype
-    human_gate: visual_prototype
-    next: build
-```
+只有以下三项同时满足时，才考虑把工作流写成 `workflow.yaml`：
 
-阶段细节只在对应 Skill 中定义；rubric 细节只在评分配置中定义，避免三处重复。
+1. 这套真实 SOP 已经过反复运行和验证，阶段与交接边界足够稳定；
+2. 存在确定性机器解析、跨进程交换或 schema 校验需求；
+3. Markdown 已不足以可靠承载这种机器契约。
+
+如果缺少其中任何一项，就不应为了形式整齐而创建 `workflow.yaml`。即使满足例外条件，YAML 也只保留必要的机器事实；阶段细节留在对应 Skill 或 reference，解释与判断边界继续留在 Markdown，避免多处重复。
+
+`SKILL.md` frontmatter、`agents/openai.yaml` 等平台协议强制要求的 YAML 不属于 `workflow.yaml` 的选择判断，继续按外部协议使用。
 
 ## 阶段结果与决策轨迹
 
