@@ -465,7 +465,7 @@ class LearningDocsTests(unittest.TestCase):
                     "display_name": "HyperFrames Apprentice",
                     "short_description": "从教程自主学习、复盘并产出可验证 HyperFrames Demo",
                     "default_prompt": (
-                        "Use $tutorial-to-hyperframes-demo to learn this tutorial, "
+                        "Use $ai-video-flow to learn this tutorial, "
                         "build a verified HyperFrames demo, and record its evidence-backed "
                         "learning ledger."
                     ),

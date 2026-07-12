@@ -1093,7 +1093,7 @@ class LearningRuntimeTests(unittest.TestCase):
         self.record_required_decisions()
         manifest, ledger, retrospective = self._finalize_drafts()
         env = dict(os.environ)
-        env["TUTORIAL_TO_HYPERFRAMES_LEARNING_FAULT"] = "after-output-1"
+        env["AI_VIDEO_FLOW_LEARNING_FAULT"] = "after-output-1"
         failed = self.cli(
             "finalize",
             "--manifest-input",
@@ -1144,7 +1144,7 @@ class LearningRuntimeTests(unittest.TestCase):
         def invoke(fault: bool) -> subprocess.CompletedProcess[str]:
             env = dict(os.environ)
             if fault:
-                env["TUTORIAL_TO_HYPERFRAMES_LEARNING_FAULT"] = "after-output-1"
+                env["AI_VIDEO_FLOW_LEARNING_FAULT"] = "after-output-1"
             return self.cli(
                 "finalize",
                 "--manifest-input",

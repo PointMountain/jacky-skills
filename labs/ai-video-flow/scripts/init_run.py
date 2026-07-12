@@ -30,15 +30,23 @@ PRIVATE_IGNORE_RULES = {
     "runs": "/.learning/runs/",
     "lock": "/.learning.lock",
 }
-PRIVATE_IGNORE_BLOCK_BEGIN = "# >>> tutorial-to-hyperframes-demo private state >>>"
-PRIVATE_IGNORE_BLOCK_END = "# <<< tutorial-to-hyperframes-demo private state <<<"
+PRIVATE_IGNORE_BLOCK_BEGIN = "# >>> ai-video-flow private state >>>"
+PRIVATE_IGNORE_BLOCK_END = "# <<< ai-video-flow private state <<<"
 LEGACY_PRIVATE_IGNORE_COMMENT = "# tutorial-to-hyperframes-demo 私有运行状态"
-NESTED_IGNORE_BLOCK_BEGIN = "# >>> tutorial-to-hyperframes-demo private runs >>>"
-NESTED_IGNORE_BLOCK_END = "# <<< tutorial-to-hyperframes-demo private runs <<<"
+LEGACY_PRIVATE_IGNORE_BLOCK_MARKERS = (
+    "# >>> tutorial-to-hyperframes-demo private state >>>",
+    "# <<< tutorial-to-hyperframes-demo private state <<<",
+)
+NESTED_IGNORE_BLOCK_BEGIN = "# >>> ai-video-flow private runs >>>"
+NESTED_IGNORE_BLOCK_END = "# <<< ai-video-flow private runs <<<"
+LEGACY_NESTED_IGNORE_BLOCK_MARKERS = (
+    "# >>> tutorial-to-hyperframes-demo private runs >>>",
+    "# <<< tutorial-to-hyperframes-demo private runs <<<",
+)
 NESTED_RUNS_IGNORE_RULE = "/runs/"
 BIND_INTENT_NAME = "binding-intent.json"
 BIND_OWNER_NAME = "binding-owner.json"
-FAULT_ENV = "TUTORIAL_TO_HYPERFRAMES_FAULT"
+FAULT_ENV = "AI_VIDEO_FLOW_FAULT"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = SKILL_ROOT / "references" / "workflows" / f"{WORKFLOW_VERSION}.json"
 
@@ -210,7 +218,10 @@ def bootstrap_non_git_ignore(repo: Path) -> None:
         rules=tuple(PRIVATE_IGNORE_RULES.values()),
         block_begin=PRIVATE_IGNORE_BLOCK_BEGIN,
         block_end=PRIVATE_IGNORE_BLOCK_END,
-        legacy_comments=(LEGACY_PRIVATE_IGNORE_COMMENT,),
+        legacy_comments=(
+            LEGACY_PRIVATE_IGNORE_COMMENT,
+            *LEGACY_PRIVATE_IGNORE_BLOCK_MARKERS,
+        ),
     )
 
     learning = repo / ".learning"
@@ -225,6 +236,7 @@ def bootstrap_non_git_ignore(repo: Path) -> None:
             rules=(NESTED_RUNS_IGNORE_RULE,),
             block_begin=NESTED_IGNORE_BLOCK_BEGIN,
             block_end=NESTED_IGNORE_BLOCK_END,
+            legacy_comments=LEGACY_NESTED_IGNORE_BLOCK_MARKERS,
         )
 
 

@@ -62,7 +62,7 @@ DESTINATIONS = {
     "backlog",
 }
 RETROSPECTIVE_RESULTS = {"success", "success_with_residuals"}
-FAULT_ENV = "TUTORIAL_TO_HYPERFRAMES_LEARNING_FAULT"
+FAULT_ENV = "AI_VIDEO_FLOW_LEARNING_FAULT"
 PROBE_RESULTS = {"passed", "degraded", "failed", "missing"}
 BASIS_VALUES = {
     "observed",

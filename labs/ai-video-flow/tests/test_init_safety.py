@@ -147,10 +147,10 @@ class InitSafetyTests(unittest.TestCase):
         rewritten = gitignore_path.read_text(encoding="utf-8")
         self.assertTrue(
             rewritten.endswith(
-                "# >>> tutorial-to-hyperframes-demo private state >>>\n"
+                "# >>> ai-video-flow private state >>>\n"
                 "/.learning/runs/\n"
                 "/.learning.lock\n"
-                "# <<< tutorial-to-hyperframes-demo private state <<<\n"
+                "# <<< ai-video-flow private state <<<\n"
             )
         )
 
@@ -202,9 +202,9 @@ class InitSafetyTests(unittest.TestCase):
         self.assertIn(original_nested.rstrip(), rewritten)
         self.assertTrue(
             rewritten.endswith(
-                "# >>> tutorial-to-hyperframes-demo private runs >>>\n"
+                "# >>> ai-video-flow private runs >>>\n"
                 "/runs/\n"
-                "# <<< tutorial-to-hyperframes-demo private runs <<<\n"
+                "# <<< ai-video-flow private runs <<<\n"
             )
         )
 
@@ -242,6 +242,39 @@ class InitSafetyTests(unittest.TestCase):
         ).stdout
         self.assertNotIn(".learning/runs/", status)
 
+    def test_non_git_bootstrap_migrates_legacy_named_block(self) -> None:
+        gitignore_path = self.repo / ".gitignore"
+        gitignore_path.write_text(
+            "\n".join(
+                [
+                    "# 用户规则",
+                    "node_modules/",
+                    "# >>> tutorial-to-hyperframes-demo private state >>>",
+                    "/.learning/runs/",
+                    "/.learning.lock",
+                    "# <<< tutorial-to-hyperframes-demo private state <<<",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        first = self.start("legacy-migrate")
+
+        self.assertEqual(first.returncode, 0, first.stderr)
+        rewritten = gitignore_path.read_text(encoding="utf-8")
+        self.assertNotIn("tutorial-to-hyperframes-demo", rewritten)
+        self.assertIn("node_modules/", rewritten)
+        self.assertEqual(rewritten.count("# >>> ai-video-flow private state >>>"), 1)
+        self.assertTrue(
+            rewritten.endswith(
+                "# >>> ai-video-flow private state >>>\n"
+                "/.learning/runs/\n"
+                "/.learning.lock\n"
+                "# <<< ai-video-flow private state <<<\n"
+            )
+        )
+
     def test_bind_retry_adopts_same_number_after_sigkill_following_mkdir(self) -> None:
         started = self.start("crash-run")
         self.assertEqual(started.returncode, 0, started.stderr)
@@ -268,7 +301,7 @@ class InitSafetyTests(unittest.TestCase):
             "--json",
         )
         fault_env = os.environ.copy()
-        fault_env["TUTORIAL_TO_HYPERFRAMES_FAULT"] = "kill_after_demo_mkdir"
+        fault_env["AI_VIDEO_FLOW_FAULT"] = "kill_after_demo_mkdir"
 
         crashed = self.run_cli(*command, env=fault_env)
 

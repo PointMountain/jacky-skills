@@ -39,7 +39,7 @@
 | Skill | Skill | Skill |
 |-------|-------|-------|
 | codex-harness | crafted-web | spec-debate |
-| topic-debate | tutorial-to-hyperframes-demo | [happy-app-experience](./skills/happy-app-experience) |
+| topic-debate | [happy-app-experience](./skills/happy-app-experience) | |
 
 ## Harness Ops Skills
 
@@ -61,6 +61,7 @@
 
 - [web-flow](./labs/web-flow)：渐进串联网站调研、原型、设计、实现、评审与部署。
 - [app-flow](./labs/app-flow/app-flow)：不固定技术栈、阶段或交付形式的长任务 App Workflow，按任务证据动态组织工作。
+- [ai-video-flow](./labs/ai-video-flow)：AI 生成视频实验（原 `tutorial-to-hyperframes-demo`）——自主学习教学音视频，把教程方法与动效复刻为可验证、可渲染的 HyperFrames Demo，并沉淀证据化学习账本。
 
 ## 兼容性边界
 
@@ -169,6 +170,7 @@ jacky-skills/
 │   ├── opencli-ops/
 │   └── hyperframes-ops/
 ├── labs/                      # 实验性 Skill 与轻量 Workflow（预览版）
+│   ├── ai-video-flow/
 │   ├── app-flow/
 │   │   └── app-flow/
 │   └── web-flow/
