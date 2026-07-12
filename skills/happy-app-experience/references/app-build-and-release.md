@@ -67,3 +67,26 @@ runtime 是互不相通的独立通道。
 
 **迁移到其他 App：** 按技术栈替换具体命令，但保留「静态检查 → 预览 → 真机 → 授权后正式」这个
 不可颠倒的 gate 顺序。外部副作用（push、Release、production OTA、部署）每次都要重新确认授权。
+
+## Android sideload APK 的最小交付顺序（易漏点在此固化）
+
+面向「本机 / 内测把可直接安装的 Android 包交到真机手上」。**做 APK 交付前先读本 skill 的 local
+经验拿到本机精确命令**，别跳过、也别临时发明一套本地裸打——历史上就因此漏了下面 3、4 两步。
+
+1. **先判交付形态**：sideload 内测包 ≠ 商店包。sideload 用 debug 签名即可直接安装（不可上架）；
+   商店包走托管构建（如 EAS）并用正式签名。先定哪种再选路径。
+2. **原生工程按需重建**：`android/` 是 gitignore 的 prebuild 产物；首次 / 换机 / 原生配置变更后
+   `expo prebuild` 重建，已存在可跳过。
+3. **只打真机架构（最易漏）**：release 构建务必限定 `-PreactNativeArchitectures=arm64-v8a`。
+   不限定会打成含 `x86 / x86_64 / armeabi-v7a` 的 **universal 包**（体积膨胀 2–3 倍，真机全用不到）。
+   产物固定在 `android/app/build/outputs/apk/release/app-release.apk`。
+4. **发到「带版本 tag 的 Release」通道（不是塞仓库或临时链接）**：sideload 包的规范落点是版本化
+   Release。tag 用平台前缀（如 `android-v<version>`）与其他端 / 上游区分；version 取自 **App 配置**
+   （不是 `package.json` 的占位版本）。同版本重发前先删旧 tag/release 或递增版本。
+5. **APK 是构建产物，不进 git**。
+6. **发布后验活**：`apksigner verify` 核签名、`aapt dump badging` 核 applicationId/version/权限、
+   核对 SHA256 与大小、Release asset HEAD 200，并在真机实际安装启动跑一遍关键路径。
+7. **外部副作用先授权**：推 tag、建 Release 都是外部动作，按 delivery 授权门每次重核当次意图。
+
+> 想直接装到连着的真机 / 模拟器而不产出 APK 文件，用「run/install」型命令（assemble + install）
+> 而非只 assemble。国内网络下 Gradle 依赖与 wrapper 下载需要走代理（systemProp / GRADLE_OPTS）。
