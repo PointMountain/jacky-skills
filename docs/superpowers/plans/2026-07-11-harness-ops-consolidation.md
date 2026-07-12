@@ -66,7 +66,7 @@
 ### Task 5: 生成设计理念 DOCX
 
 **Files:**
-- Create: `docs/Harness 与 Ops 设计理念.docx`
+- Create: `docs/Harness 与 Ops 设计理念.docx` → 后迁移为 `docs/harness-ops-philosophy/README.md`
 - Create temporarily: document builder and render QA artifacts outside final deliverables
 
 - [x] 使用 `standard_business_brief` 预设和 `memo_masthead` 首屏结构生成文章。
