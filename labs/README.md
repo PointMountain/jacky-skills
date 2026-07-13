@@ -10,7 +10,6 @@
 
 - [`web-flow`](./web-flow/)：面向网站交付的固定阶段 Workflow，依次串联调研、原型、设计、实现、评审与部署。
 - [`app-flow`](./app-flow/app-flow/)：面向长任务 App 交付的薄套件——薄总入口 `app-flow` 加三个窄能力 `app-flow-build`、`app-flow-delivery`、`app-flow-reviewer`；不预设固定技术栈、阶段或交付形式，而是根据任务证据动态选能。
-- [`ai-video-flow`](./ai-video-flow/)：AI 生成视频实验——自主学习本地教学音视频或公开视频链接，把教程方法与可观察动效复刻为有证据、可恢复、可渲染的 HyperFrames Demo，并沉淀学习账本。
 - [`self-learning`](./self-learning/)：让 AI 从视频、文章或主题自主学习、扩展调研并生成可验证产物；HyperFrames 产出能力由子 Skill `self-learning-hyperframes` 承担。
 
 `web-flow` 适合沿固定交付阶段推进网站任务；`app-flow` 则为长任务 App Workflow 动态选择能力与交付物。
@@ -41,13 +40,6 @@ j-skills install app-flow -g --env claude-code,codex
 ```
 
 链接后，对每个想启用的 Skill 分别执行 `j-skills install <skill-name> -g --env claude-code,codex`；这是逐 Skill 安装，不是聚合命令。只处理窄任务时可只链接对应子 Skill；长任务通常链接薄父入口与当下需要的能力，后续再按证据扩展。
-
-要试用 `ai-video-flow`，同样单独链接并安装：
-
-```bash
-j-skills link ./labs/ai-video-flow
-j-skills install ai-video-flow -g --env claude-code,codex
-```
 
 要试用 `self-learning` 套件，按需链接父入口与 HyperFrames 产出能力：
 
