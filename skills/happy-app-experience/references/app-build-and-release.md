@@ -51,6 +51,30 @@ runtime 是互不相通的独立通道。
 **迁移到其他 App：** 先确认更新运行时、原生依赖、权限、包标识、更新端点；任一项跨过现有二进制
 兼容边界，就选新包而不是 OTA。具体桶/FC/频道映射见 `local/`。
 
+## 内测 OTA 版本切换（preview-only 悬浮球）
+
+内测回归常见痛点：真机上不知道当前跑的是哪个 commit 的 OTA，也无法单机切到某个历史版本。一套可迁移的解法（preview 与 production **都有 OTA**，差别只在"切换器"）：
+
+- **双频道语义决定切换能力**：preview 包（内测）要"知道当前是哪个版本 + 自由切历史版本"；production 包（正式）永远跟随 latest、**不提供**定向切换、也**不显示**任何开发浮层。频道由构建期写死的 channel 映射决定。
+- **preview-only 悬浮球**：只在 preview / dev 包挂一个可拖拽、贴边吸附的浮动入口，打开"OTA 版本"列表。用**运行期门控**判定是否显示（channel === 'preview'、或 dev/preview 的 applicationId、或本地 devMode 开），production 判定为 false 就不挂载——浮层永不进正式包。
+- **单机定向切换、不影响他人**：机制 = expo-updates 的 `setExtraParamAsync('<target-key>', '<version-stamp>')` 持久化目标版本 + `reloadApp()`；清空该 param 即回到跟随 latest。更新服务端读 `Expo-Extra-Params` 头，命中定向版本返回该 stamp 的 manifest，否则返回 latest。**切换只对本设备生效**。
+- **版本可发现**：发布 OTA 时除 `latest.json` 外，按 stamp 各留一份历史 manifest（永不删，可回滚）+ 一份轻量 meta（stamp / id / git commit / 时间）。可再配一个同桶静态站列出 preview 所有版本 + 二维码（deep link 带 channel+stamp），扫码即切。
+- **边界**：只解决"浏览 + 定向切换"，不做删除/管理后台；production 频道不接入。只改 JS/资产走 OTA，原生/权限/runtime 变化仍要重打包。
+
+> 是否给某个 App 上这套（新建或复用 FC + OSS、preview 包带浮层、production 不带）属于启动时**授权信封**该前置问清的一项——它牵涉"部署 FC"这类外部动作与"preview 包要不要加浮层功能"的范围决定，别等打完包才发现要返工补 OTA。
+
+## OTA CI 流水线（PR 发 preview / 合并发 production）
+
+OTA 要**和 CI 结合才闭环**，别只留本地手动发布。可迁移的两条 workflow：
+
+- **preview（PR 触发）**：同仓库分支的 PR 一开/更新就 export + 发到 preview 频道的**时间戳版本**、**不覆盖 latest**（`--skip-latest`），并把 stamp / updateId / manifest 评论回 PR。多个 PR 并行互不顶掉 latest；装了 preview 包的设备用悬浮球锁到该 PR 的 stamp 验证。concurrency 按 PR 号 `cancel-in-progress`。
+- **production（合并 main 触发）**：push 到 main 命中 app 路径就 export（production 频道）+ 发布并**覆盖 latest**，正式包冷启动即拉到。concurrency **不**取消正在进行的发布。
+- **安全**：fork PR 拿不到 secret，用 `head.repo.full_name == repository` 守卫自动跳过，避免泄露云凭据；job 内先 guard secret 存在再跑。凭据用**最小权限**（只授权该 OSS 桶的 RAM 子账号 AK），存仓库 Actions Secrets。
+- **与包管理器解耦**：monorepo/pnpm 用 `pnpm install` + `working-directory`；单包/npm 用 `npm ci` + 根目录。发布脚本在 CI 里把 `ota_id/stamp/channel/runtime/manifest_url` 写进 `GITHUB_OUTPUT` 供评论步骤引用。
+- **前提**：OTA 只推纯 JS/资产改动；原生/权限/runtime 变化必须重打 APK；runtimeVersion 必须与线上装机包一致，否则该机永远跳过更新。
+- **FC 部署不在此流水线**：更新服务是一次性部署（或独立 workflow），CI 只发 JS bundle。
+- **凭据前提（授权信封该一并问清）**：CI/preview OTA 发布需要一把**对 OSS 桶有写权限的 AK**存成仓库 Secret。**用户若没有现成 key，又选择要 preview/CI OTA，必须先自备**（建议最小权限 RAM 子账号）——没有 key 则 CI 的 secret guard 直接失败、发布走不通。因此"要不要 OTA"和"有没有 OSS key"要在启动信封里一起确认，别等 workflow 跑挂才发现缺凭据。
+
 ## 发布前 release-doctor 与验证 gate
 
 **决策：** 正式发布前先跑一遍准备度自检，再按顺序验证，不跳步：
@@ -67,3 +91,26 @@ runtime 是互不相通的独立通道。
 
 **迁移到其他 App：** 按技术栈替换具体命令，但保留「静态检查 → 预览 → 真机 → 授权后正式」这个
 不可颠倒的 gate 顺序。外部副作用（push、Release、production OTA、部署）每次都要重新确认授权。
+
+## Android sideload APK 的最小交付顺序（易漏点在此固化）
+
+面向「本机 / 内测把可直接安装的 Android 包交到真机手上」。**做 APK 交付前先读本 skill 的 local
+经验拿到本机精确命令**，别跳过、也别临时发明一套本地裸打——历史上就因此漏了下面 3、4 两步。
+
+1. **先判交付形态**：sideload 内测包 ≠ 商店包。sideload 用 debug 签名即可直接安装（不可上架）；
+   商店包走托管构建（如 EAS）并用正式签名。先定哪种再选路径。
+2. **原生工程按需重建**：`android/` 是 gitignore 的 prebuild 产物；首次 / 换机 / 原生配置变更后
+   `expo prebuild` 重建，已存在可跳过。
+3. **只打真机架构（最易漏）**：release 构建务必限定 `-PreactNativeArchitectures=arm64-v8a`。
+   不限定会打成含 `x86 / x86_64 / armeabi-v7a` 的 **universal 包**（体积膨胀 2–3 倍，真机全用不到）。
+   产物固定在 `android/app/build/outputs/apk/release/app-release.apk`。
+4. **发到「带版本 tag 的 Release」通道（不是塞仓库或临时链接）**：sideload 包的规范落点是版本化
+   Release。tag 用平台前缀（如 `android-v<version>`）与其他端 / 上游区分；version 取自 **App 配置**
+   （不是 `package.json` 的占位版本）。同版本重发前先删旧 tag/release 或递增版本。
+5. **APK 是构建产物，不进 git**。
+6. **发布后验活**：`apksigner verify` 核签名、`aapt dump badging` 核 applicationId/version/权限、
+   核对 SHA256 与大小、Release asset HEAD 200，并在真机实际安装启动跑一遍关键路径。
+7. **外部副作用先授权**：推 tag、建 Release 都是外部动作，按 delivery 授权门每次重核当次意图。
+
+> 想直接装到连着的真机 / 模拟器而不产出 APK 文件，用「run/install」型命令（assemble + install）
+> 而非只 assemble。国内网络下 Gradle 依赖与 wrapper 下载需要走代理（systemProp / GRADLE_OPTS）。
