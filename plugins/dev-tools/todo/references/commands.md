@@ -1,113 +1,78 @@
-# 命令详细说明
+# Todo CLI 命令
 
-## 命令列表
+> 人工使用全局 `todo` 命令；Agent 使用 `node <skill-dir>/bin/todo.mjs`。所有命令默认操作全局目录。
 
-| 命令 | 用途 | 参数 |
-|------|------|------|
-| `/todo add <内容>` | 添加 Todo 条目（自动生成 checkpoint） | `--idea` 添加到 Ideas 区 |
-| `/todo resolve` | 提取批次 → 读取 checkpoint → 执行任务 | 交互式选择 |
+## 作用域参数
 
-## /todo add
+| 参数 | 作用 |
+|---|---|
+| 无 | `~/.agent-tasks/` |
+| `--current-project` | 当前 Git 根目录下的 `.agent-tasks/` |
+| `--project <path>` | 指定 Git 根目录下的 `.agent-tasks/` |
+| `--root <path>` | 直接指定任务根目录，主要用于测试 |
 
-添加新的待办条目，**同时自动生成 checkpoint 文件**。
+## 命令速查
 
-**默认行为**：添加到 `## 📋 Todo` 分区，并生成 `cp-{timestamp}.md`
+```bash
+# 新增
+todo add "任务标题"
+todo add "任务标题" --current-project
+todo add "任务标题" --status canDurable --basis human-confirmed
 
-**选项**：
-- `--idea`：添加到 `## 💡 Ideas` 分区（不生成 checkpoint）
+# 查询
+todo list
+todo list --status shaping
+todo show TSK-k7m3x9p2
+todo stats --format yaml
 
-**checkpoint 自动生成的内容**：
-- 当前任务描述
-- 做到哪了（进度）
-- 为什么选 A 不选 B（关键决策）
-- 下一步具体操作
-- 正在编辑的文件列表
+# 修改字段
+todo set TSK-k7m3x9p2 --title "新标题"
+todo set TSK-k7m3x9p2 --project-name jacky-skills
+todo set TSK-k7m3x9p2 --workspace /path/to/repo
+todo set TSK-k7m3x9p2 --references "references/设计.md,OBA-w8s3k7p2"
 
-**示例**：
-```
-/todo add 完成 CDP Proxy 笔记的 WebSocket 管理部分
-  → 自动生成 cp-20260427-143000.md（当前会话快照）
-  → todo.md 新增：- [ ] 完成 CDP Proxy 笔记... @context:cp-20260427-143000.md
+# 状态
+todo status TSK-k7m3x9p2 shaping
+todo status TSK-k7m3x9p2 canDurable --basis ai-assessed
 
-/todo add --idea 用 WebSocket 实现实时通知
-  → 只添加 Ideas 条目，不生成 checkpoint
-```
+# 正文
+todo section show TSK-k7m3x9p2 "目标"
+todo section set TSK-k7m3x9p2 "目标" --content "形成可运行 POC"
+printf '%s' "补充决定" | todo section append TSK-k7m3x9p2 "关键决定"
 
-## /todo resolve
+# 维护
+todo index
+todo doctor
+todo delete TSK-k7m3x9p2
+todo move TSK-k7m3x9p2 --to-current-project
 
-提取待办条目到批次文件，读取 checkpoint 上下文，执行任务。
+# Web
+todo web
+todo web --current-project
 
-**流程**：
-1. 读取 `todo.md`，展示所有待处理条目
-2. 用户确认要处理的条目（全部或选择部分）
-3. 扫描已有 `todo-N.md`，取最大 N+1 作为新批次号
-4. 将选中条目写入 `todo-{N}.md`（status: pending）
-5. 清空 `todo.md` 已提取的条目（用户可继续新增）
-6. 逐条读取 `@context` 指向的 checkpoint 文件
-7. 带着完整上下文执行任务
-8. 完成后：
-   - 标记 `todo-{N}.md` 中已完成条目，status → done
-   - 删除对应的 `cp-xxx.md` 文件
-
-**示例**：
-```
-用户: /todo resolve
-Claude:
-  📋 待处理条目：
-    [1] 完成 CDP Proxy 笔记 @context:cp-20260427-143000.md
-    [2] 重构 API 错误处理 @context:cp-20260427-150000.md
-
-  确认处理哪些？[全部/编号/取消]
-用户: 全部
-Claude:
-  ✅ 提取到 todo-1.md，清空 todo.md
-  📖 读取 cp-20260427-143000.md → 恢复上下文
-  🔧 开始处理任务...
+# 旧格式
+todo migrate
+todo migrate --apply
 ```
 
-## 使用场景示例
+## 输出格式
 
-### 场景 1：上下文快满了，保存状态
+`add`、`list`、`show`、`set`、`status` 和 `doctor` 支持 `--json` 时，脚本应优先使用 JSON。
 
-```
-用户: /todo add 完成笔记的 WebSocket 管理部分，还差超时处理和重连逻辑
-Claude:
-  📸 生成 checkpoint: cp-20260427-143000.md
-  ✅ 添加到 todo.md: - [ ] 完成笔记... @context:cp-20260427-143000.md
+`stats` 支持：
 
-  checkpoint 记录了：
-  - 当前任务：写 06-cdp-proxy-code-walkthrough.md
-  - 进度：已完成 HTTP API 部分，正在写 WebSocket
-  - 决策：选择逐行精读而非概览方式
-  - 下一步：补充超时处理、重连逻辑、错误码对照表
+```text
+table
+json
+yaml
 ```
 
-### 场景 2：新会话恢复上下文并处理
+## CUI
 
-```
-# 新会话启动，SessionStart hook 显示有 2 个待办
+人工运行时，以下缺参场景进入交互式输入：
 
-用户: /todo resolve
-Claude:
-  📋 待处理条目：
-    [1] 完成笔记 WebSocket 部分 @context:cp-20260427-143000.md
+- `todo add`
+- `todo status <TSK-ID>`
+- `todo delete <TSK-ID>` 未传 `--yes`
 
-  确认处理？[全部/编号/取消]
-用户: 全部
-Claude:
-  ✅ 提取到 todo-1.md
-  📖 读取 checkpoint → 恢复上下文：
-    - 任务：写 06-cdp-proxy-code-walkthrough.md
-    - 进度：WebSocket 管理部分写到一半
-    - 下一步：补充超时处理和重连逻辑
-
-  🔧 开始处理...
-  （带着完整上下文继续工作）
-```
-
-### 场景 3：记录想法
-
-```
-用户: /todo add --idea 考虑给 demo 加 fallback 处理
-Claude: ✅ 已记录到 Ideas（不生成 checkpoint）
-```
+Agent 必须补齐参数，避免停在交互输入。

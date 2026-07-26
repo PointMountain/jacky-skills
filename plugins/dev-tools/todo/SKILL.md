@@ -1,244 +1,179 @@
 ---
 name: todo
-description: "上下文快照 + 批次处理：add 时自动保存会话上下文到 checkpoint 文件，resolve 时读取 checkpoint 无缝续接"
+description: "通过 Node CLI 管理结构化 Markdown 任务：默认全局，可显式使用项目级；支持状态、Durable 准备度、上下文章节、统计、索引、完整性检查和本地 Web 看板。"
 ---
 
-<role>上下文快照 + 批次调度。add 时自动冻结当前会话状态，resolve 时解冻上下文并执行任务。</role>
+# Todo
 
-## 核心理念
+Todo 是自然语言适配层。任务数据保存在 `.agent-tasks/tasks/*.md`，确定性读写全部交给本 Skill 自带的 Node CLI。
 
-`todo.md` 是任务入口，`cp-{timestamp}.md` 是上下文快照。add 时存快照、写死路径；resolve 时读路径、还原上下文、执行任务。
+## 硬约束
 
-## 存储位置
+1. **禁止直接编辑任务文件、YAML、`index.md` 或归档目录。**
+2. 新增、修改、查询、移动、归档和正文更新都必须调用 CLI。
+3. 未明确指定范围时始终使用全局 `~/.agent-tasks/`，即使当前位于 Git 仓库。
+4. 只有用户明确说“当前项目”或提供项目路径时才使用项目级目录。
+5. 用户只要求记录、查看或修改任务时，不得执行任务本身。
+6. `list` 只查询，不调研、不实现、不创建额外上下文文件。
+7. `index.md` 是生成视图，`tasks/*.md` 是唯一数据源。
 
-`.agent-tasks/` 目录是 AI 智能体专用的待办存储，可被 Claude Code、Codex、Gemini CLI 等所有 agent 识别和读写。
+## CLI 调用
 
-## 语义映射（新增）
+Skill 内调用：
 
-为减少口头指令歧义，以下自然语言应映射为固定行为：
-
-1. 用户说“全局待办任务 / 全局 Todo / global todo”：
-   - 强制等价于 `--global`
-   - 固定操作文件：`~/.agent-tasks/todo.md`
-   - 忽略当前是否位于 git 仓库
-2. 用户说“项目待办任务 / 当前项目待办”：
-   - 强制使用项目级路径 `{git-root}/.agent-tasks/todo.md`
-   - 若当前不在 git 仓库，提示无法使用项目级并建议改用全局
-3. 用户只说”待办任务 / todo”未指定范围：
-   - 按路径解析规则处理（在 git 项目内时需询问用户选择项目级还是全局）
-
-### 双层结构
-
-| 层级 | 路径 | 用途 |
-|------|------|------|
-| **全局** | `~/.agent-tasks/` | 跨项目待办，所有环境共享 |
-| **项目级** | `{git-root}/.agent-tasks/` | 项目相关待办，跟随项目走 |
-
-### 路径解析规则
-
-1. 检测当前目录是否在 git 仓库内（向上查找 `.git/`）
-2. 若命中“全局待办任务”语义 → 强制使用全局 `~/.agent-tasks/`
-3. 若命中“项目待办任务”语义 → 强制使用 `{git-root}/.agent-tasks/`
-4. **在 git 项目内**（且未命中强制语义）→ **通过 AskUserQuestion 询问用户**选择项目级还是全局（仅 `add` 和 `resolve` 时询问，`list` 默认项目级）
-5. **不在 git 项目内** → 使用全局 `~/.agent-tasks/`
-6. `--global` 标志 → 强制使用全局路径，忽略项目
-
-### 目录结构
-
-```
-.agent-tasks/
-├── todo.md              # 任务入口
-├── cp-20260429-143000.md  # 上下文快照（checkpoint）
-├── cp-20260429-153000.md
-└── todo-1.md            # 批次文件（resolve 时生成）
+```bash
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" <command> [options]
 ```
 
-### 初始化
+如果宿主没有注入 `CLAUDE_SKILL_DIR`，使用当前 `SKILL.md` 所在目录的绝对路径。不要假设系统已经存在全局 `todo` 命令。
 
-首次使用时，如果 `.agent-tasks/` 目录不存在，自动创建并生成 `todo.md` 模板。
+人工安装全局命令、依赖检查和 Web 启动方法见 [`references/setup-guide.md`](references/setup-guide.md)。
 
-## 三个命令
+## 作用域
 
-### `list`
+| 用户表达 | CLI 参数 | 存储位置 |
+|---|---|---|
+| “添加待办”“全局待办”或未说明 | 无 | `~/.agent-tasks/` |
+| “当前项目待办” | `--current-project` | `{当前 git-root}/.agent-tasks/` |
+| “某项目待办”并提供路径 | `--project <path>` | `{指定 git-root}/.agent-tasks/` |
 
-仅列出当前待办，**绝不创建 checkpoint、绝不执行任务、绝不触发任何调研或实现动作**。
+明确项目无法解析时报告错误，不静默写入全局。
 
-**执行步骤**：
+## 意图映射
 
-1. 解析存储路径（项目级 or 全局，遵循“语义映射”优先）
-2. 若 `todo.md` 不存在，仅初始化模板文件
-3. 输出 Todo/Ideas 条目清单
-4. 结束，不做任何额外操作
+### 新增任务
 
-### `add <内容>`
-
-添加一条待办，**同时自动生成 checkpoint 文件**。
-
-**执行步骤**：
-
-1. 解析存储路径（项目级 or 全局，遵循”语义映射”优先）。若在 git 项目内且未命中强制语义，**必须通过 AskUserQuestion 询问用户**选择项目级还是全局
-2. 确保 `.agent-tasks/` 目录存在（不存在则创建）
-3. 生成 checkpoint 文件 `{storage}/cp-{YYYYMMDD-HHmmss}.md`
-4. 将当前会话上下文写入 checkpoint：
-   - 当前任务（在做什么）
-   - 进度（做到哪了）
-   - 关键决策（为什么选 A 不选 B）
-   - 下一步（具体操作）
-   - 正在编辑的文件（工作集）
-5. 在 `{storage}/todo.md` 添加条目，**写死 checkpoint 路径**：
-
-```
-- [ ] 完成用户认证模块 @context:cp-20260427-143000.md
-  已写完 3 个 case，还差错误处理分支
+```bash
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" add "<标题>" \
+  --status idea \
+  --json
 ```
 
-- `--idea` → 写入 💡 Ideas 分区（不生成 checkpoint）
-- `--global` → 强制写入全局 `~/.agent-tasks/`
-- 默认 → 写入 📋 Todo 分区（自动生成 checkpoint）
+添加当前项目任务时追加 `--current-project`。添加指定项目任务时追加 `--project <git-root>`。
 
-**注意**：checkpoint 是 add 那一刻的会话快照，不是 todo 条目本身。条目可以写续行补充细节。
+创建后向用户返回：
 
-### `resolve`
+- `task_id`
+- 标题和状态
+- 实际文件路径
 
-提取条目到批次文件，**使用 Multi Teams 并行处理**：每个条目分配一个 teammate，各自带着 checkpoint 上下文独立执行。
+### 查询任务
 
-**执行步骤**：
-
-1. 解析存储路径（项目级 or 全局，遵循”语义映射”优先）。若在 git 项目内且未命中强制语义，**通过 AskUserQuestion 询问用户**选择项目级还是全局
-2. 读取 `{storage}/todo.md`，展示所有待处理条目
-3. 用户确认要处理的条目
-4. 扫描已有 `{storage}/todo-N.md`，取最大 N+1
-5. 将选中条目提取到 `{storage}/todo-{N}.md`（带 `@context` 路径）
-6. 清空 `{storage}/todo.md`（保留模板结构），用户可继续新增条目
-7. **创建团队**：`TeamCreate` 创建 `todo-resolve-{N}` 团队
-8. **创建任务**：为每个条目调用 `TaskCreate`，描述中包含 checkpoint 完整路径和续行上下文
-9. **并行派发 teammates**：每个条目 spawn 一个 `general-purpose` 类型 teammate（带 `team_name` 和 `name`，如 `todo-task-1`）：
-   - teammate 读取自己的 `{storage}/cp-xxx.md` 还原上下文
-   - teammate 独立执行任务
-   - 完成后 `TaskUpdate` 标记已完成，通过 `SendMessage` 向 team lead 汇报结果
-10. **主会话监控**：通过 `TaskList` 跟踪进度，接收 teammate 消息
-11. **全部完成后**：
-    - 标记 `{storage}/todo-{N}.md` 中已完成条目
-    - 清理对应的 `{storage}/cp-xxx.md` 文件
-    - `SendMessage` shutdown 所有 teammates
-    - `TeamDelete` 清理团队资源
-
-**teammate prompt 模板**：
-
-```
-你是一个独立执行任务的 agent。请完成以下工作：
-
-1. 读取 checkpoint 文件还原上下文：{storage}/cp-xxx.md
-2. 根据 checkpoint 中的「下一步」和「正在编辑的文件」，继续完成任务
-3. 任务完成后，通过 SendMessage 向 team lead 汇报：
-   - 完成了什么
-   - 修改了哪些文件
-   - 是否有问题需要 team lead 处理
-4. 通过 TaskUpdate 将任务标记为 completed
-
-**Checkpoint 文件**: {storage 的完整绝对路径}/cp-xxx.md
-**任务描述**: {todo 条目内容 + 续行上下文}
+```bash
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" list
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" list --status canDurable
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" show <TSK-ID>
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" stats --format yaml
 ```
 
-## todo.md 文件格式
+### 修改 YAML
 
-```markdown
-# TODO
-
-最后更新: YYYY-MM-DD
-
-## 📋 Todo
-- [ ] 任务描述 @context:cp-20260427-143000.md
-  续行补充上下文
-
-## 💡 Ideas
-- [ ] 想法描述
+```bash
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" set <TSK-ID> \
+  --project-name "<项目名>" \
+  --workspace "<路径>"
 ```
 
-## todo-N.md 批次文件格式
+Reference 使用逗号分隔：
 
-```markdown
----
-source: todo.md
-created: "2026-04-27"
-status: pending
----
-
-## 📋 Todo
-- [ ] 任务描述 @context:cp-20260427-143000.md
-  续行补充上下文
-
-## 💡 Ideas
-- [ ] 想法描述
+```bash
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" set <TSK-ID> \
+  --references "references/设计.md,OBA-w8s3k7p2"
 ```
 
-## cp-xxx.md checkpoint 格式
+### 修改 Markdown 章节
 
-```markdown
----
-type: checkpoint
-created: "2026-04-27T14:30:00"
----
+Skill 更新上下文时使用标准输入，避免 shell 引号破坏正文：
 
-## 当前任务
-一句话描述在做什么
-
-## 进度
-- 已完成的事项
-- 正在进行的事项
-
-## 关键决策
-- 为什么选 A 不选 B
-
-## 下一步
-1. 具体操作
-2. 具体操作
-
-## 正在编辑的文件
-- path/to/file1
-- path/to/file2
+```bash
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" section set <TSK-ID> "目标"
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" section append <TSK-ID> "关键决定"
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" section show <TSK-ID> "当前进度"
 ```
 
-## resolve 流程图
+将正文通过标准输入传入。`set` 替换指定二级章节，`append` 保留旧内容后追加；两者不得影响其他章节。
 
-```
-.agent-tasks/
-├── todo.md                    cp-xxx.md (多个)
-│     │                              │
-│     └──── resolve ─────────────────┤
-│             │                      │
-│             ▼                      ▼
-│        todo-1.md  ←──── 提取 @context 路径
-│             │
-│             ▼
-│        TeamCreate("todo-resolve-1")
-│             │
-│             ├─→ TaskCreate(条目1) ──→ teammate-1 读 cp-A → 执行 → 完成
-│             ├─→ TaskCreate(条目2) ──→ teammate-2 读 cp-B → 执行 → 完成
-│             └─→ TaskCreate(条目3) ──→ teammate-3 读 cp-C → 执行 → 完成
-│             │
-│             ▼
-│        全部完成 → 清理 cp-xxx.md + shutdown teammates + TeamDelete
+### 修改状态
+
+状态流：
+
+```text
+idea → shaping → canDurable → doing → waitingHuman → done
 ```
 
-## 安全规则
+状态可以按真实进展前后调整，不强制线性迁移。
 
-1. resolve 前必须经用户确认
-2. checkpoint 文件路径必须在 `.agent-tasks/` 目录内
-3. 清理 checkpoint 前确认任务已完成
-4. 所有 teammates 完成后必须 shutdown 并 TeamDelete，避免资源残留
-5. 单个 teammate 失败不影响其他 teammate，team lead 负责收集失败结果并报告
-6. `.agent-tasks/` 应加入 `.gitignore`，避免待办数据进入版本控制（除非团队有意共享）
-7. 当用户只要求 `list` 或“添加待办”时，禁止执行待办内容本身；仅允许文件级增删改查
-8. 未收到用户明确授权前，禁止调研系统、禁止创建守护进程、禁止落地自动化脚本
+```bash
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" status <TSK-ID> shaping
+```
 
-## 推荐触发词（新增）
+进入 `canDurable` 必须记录判断依据：
 
-建议优先使用下列短语，模型更容易稳定命中正确路径：
+```bash
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" status <TSK-ID> canDurable \
+  --basis human-confirmed
+```
 
-- 列表查询：`全局待办`、`看下全局待办`、`列出全局待办任务`
-- 添加任务：`加到全局待办：<内容>`、`全局待办新增：<内容>`
-- 完成批次：`处理全局待办`、`resolve 全局待办`
-- 项目范围：`当前项目待办`、`这个仓库的待办`
+合法依据：
 
-其中“全局待办任务”是最高优先级别名，默认指向 `~/.agent-tasks/todo.md`。
+- `poc-passed`
+- `human-confirmed`
+- `ai-assessed`
+
+## Durable 判断
+
+`canDurable` 表示上下文已经足够，让 AI 可以持续执行长程任务，并且明确：
+
+- 目标与产物
+- 完成标准
+- 执行路线
+- 所需能力与前置检查
+- 人工介入点
+
+当内容基本完整时：
+
+1. 建议用户先跑一次最小闭环 POC，并询问现在是否有时间参与。
+2. POC 通过时使用 `poc-passed`。
+3. 用户不跑 POC但明确确认时使用 `human-confirmed`。
+4. 用户不在场时允许 AI 自主评估；信息充分则使用 `ai-assessed`，并向用户标明可靠性较低。
+5. AI 判断信息不足时保持 `shaping`，列出缺失内容。
+
+POC 是推荐路径，不是硬门槛。
+
+## 移动、归档与检查
+
+```bash
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" move <TSK-ID> \
+  --to-current-project
+
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" delete <TSK-ID> --yes
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" index
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" doctor
+```
+
+`delete` 实际移动到 `archive/`，不永久删除。
+
+## Web 看板
+
+当用户要求打开或启动 Todo 看板时：
+
+```bash
+node "${CLAUDE_SKILL_DIR}/bin/todo.mjs" web
+```
+
+项目级看板显式追加作用域参数。Web 只监听 `127.0.0.1`，与 CLI 读取同一份 Markdown 数据。
+
+## 渐进式资料
+
+- 需要完整命令参数时读 [`references/commands.md`](references/commands.md)。
+- 需要任务 YAML、正文和目录格式时读 [`references/file-format.md`](references/file-format.md)。
+- 需要安装、依赖或 Web 启动排查时读 [`references/setup-guide.md`](references/setup-guide.md)。
+- 需要产品范围和验收条件时读 [`references/poc-spec.md`](references/poc-spec.md)。
+
+## 错误处理
+
+1. CLI 返回非零退出码时报告真实错误，不绕过 CLI 直接改文件。
+2. Task ID 必须是 `TSK-xxxxxxxx`；标题不能代替 ID。
+3. `canDurable` 缺少合法依据时不得强行写入。
+4. `doctor` 报告非法 YAML、重复 ID、文件名不一致或 Reference 失效时，先修复数据再继续。
+5. 旧格式只通过 `migrate` 尽力转换；迁移失败不阻塞新系统使用。
