@@ -1,7 +1,7 @@
 {
   "name": "dev-tools",
-  "version": "2.7.1",
-  "description": "核心开发工具集 - 发布、任务管理、联网、浏览器操控、效率审计",
+  "version": "2.8.0",
+  "description": "核心开发工具集 - 发布、任务管理、Durable 长任务、联网、浏览器操控、效率审计",
   "author": {
     "name": "Jacky Wang",
     "email": "wangjs.jacky@gmail.com",
@@ -20,6 +20,7 @@
     "./github-repo-publish/",
     "./efficiency-audit/",
     "./todo/",
+    "./durable/",
     "./web-search/",
     "./browser-control/",
     "./animate-prompt/",
