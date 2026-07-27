@@ -1,0 +1,4 @@
+interface:
+  display_name: "Durable"
+  short_description: "将复杂任务塑形后持续执行，并完成测试、评审与真实交付"
+  default_prompt: "使用 $durable 先把这个复杂任务塑形清楚；经我明确开始后持续执行，并完成真实验收。"
