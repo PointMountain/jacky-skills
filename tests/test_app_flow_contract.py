@@ -145,6 +145,15 @@ class AppFlowContractTests(unittest.TestCase):
             # 不硬编码可选经验包。
             self.assertNotIn("happy-app-experience", body)
 
+    def test_delivery_reuses_explicit_project_scoped_preview_authority(self) -> None:
+        metadata, body = load_skill(LABS_APP_FLOW / "app-flow-delivery")
+        description = str(metadata["description"])
+
+        for phrase in ("项目级", "preview OTA", "持续授权", "自动发布"):
+            self.assertIn(phrase, description + body)
+        for phrase in ("不再逐次确认", "local/", "正式", "原生变化"):
+            self.assertIn(phrase, body)
+
     def test_app_flow_local_memory_is_ignored_and_progressive(self) -> None:
         _, body = load_skill(APP_FLOW)
         self.assert_progressive_local_memory(APP_FLOW, body)
