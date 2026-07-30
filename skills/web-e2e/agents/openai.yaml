@@ -1,0 +1,4 @@
+interface:
+  display_name: "Web E2E"
+  short_description: "复用并持续沉淀 Web Playwright E2E 的已验证经验"
+  default_prompt: "Use $web-e2e to reuse an existing Web E2E case, run it when authorized, and write back verified lessons."

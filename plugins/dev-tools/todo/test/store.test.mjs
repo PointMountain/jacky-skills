@@ -45,9 +45,28 @@ test('创建、查询、更新状态并生成索引', async () => {
   );
   assert.equal(durable.data.durable_basis, 'human-confirmed');
 
+  const doing = await setTaskStatus(root, task.id, 'doing');
+  assert.equal(doing.data.status, 'doing');
+  assert.equal(doing.data.durable_basis, 'human-confirmed');
+
+  const done = await setTaskStatus(root, task.id, 'done');
+  assert.equal(done.data.durable_basis, 'human-confirmed');
+
+  const reshaped = await setTaskStatus(root, task.id, 'shaping');
+  assert.equal(reshaped.data.durable_basis, undefined);
+
+  await assert.rejects(
+    updateTask(root, task.id, {
+      status: 'shaping',
+      durable_basis: 'ai-assessed',
+    }),
+    /不能保留 durable_basis/,
+  );
+
+  await setTaskStatus(root, task.id, 'canDurable', 'human-confirmed');
   const index = await readFile(path.join(root, 'index.md'), 'utf8');
   assert.match(index, /TSK-a1b2c3d4/);
-  assert.match(index, /human-confirmed/);
+  assert.match(index, /Durable: human-confirmed/);
 
   const renamed = await updateTask(root, task.id, { title: '更新后的标题' });
   assert.equal(renamed.data.title, '更新后的标题');

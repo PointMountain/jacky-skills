@@ -4,8 +4,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
-const cliPath = path.resolve('bin/todo.mjs');
+const cliPath = fileURLToPath(new URL('../bin/todo.mjs', import.meta.url));
 
 function run(root, args, input) {
   return spawnSync(process.execPath, [cliPath, ...args], {

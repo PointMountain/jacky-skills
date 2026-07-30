@@ -27,6 +27,13 @@ export const DURABLE_BASES = [
   'ai-assessed',
 ];
 
+export const DURABLE_STATUSES = [
+  'canDurable',
+  'doing',
+  'waitingHuman',
+  'done',
+];
+
 export const TASK_ID_PATTERN = /^TSK-[a-z0-9]{8}$/;
 
 const REQUIRED_FIELDS = ['task_id', 'title', 'status', 'created', 'updated'];
@@ -113,14 +120,19 @@ function assertTitle(title) {
 }
 
 export function assertDurableBasis(status, durableBasis) {
-  if (status === 'canDurable') {
-    if (!DURABLE_BASES.includes(durableBasis)) {
-      throw new Error(
-        `canDurable 必须指定 durable_basis：${DURABLE_BASES.join(', ')}`,
-      );
-    }
-  } else if (durableBasis !== undefined && durableBasis !== null) {
-    throw new Error('只有 canDurable 状态可以设置 durable_basis');
+  const hasBasis = durableBasis !== undefined && durableBasis !== null;
+  if (status === 'canDurable' && !hasBasis) {
+    throw new Error(
+      `canDurable 必须指定 durable_basis：${DURABLE_BASES.join(', ')}`,
+    );
+  }
+  if (hasBasis && !DURABLE_BASES.includes(durableBasis)) {
+    throw new Error(`无效 durable_basis：${DURABLE_BASES.join(', ')}`);
+  }
+  if (hasBasis && !DURABLE_STATUSES.includes(status)) {
+    throw new Error(
+      `状态 ${status} 不能保留 durable_basis；请使用：${DURABLE_STATUSES.join(', ')}`,
+    );
   }
 }
 
@@ -319,17 +331,20 @@ export async function updateTask(root, taskId, fields) {
     assertTitle(fields.title);
   }
   const nextStatus = fields.status ?? task.data.status;
-  const nextBasis =
+  let nextBasis =
     fields.durable_basis !== undefined
       ? fields.durable_basis || undefined
       : task.data.durable_basis;
 
-  if (nextStatus !== 'canDurable') fields.durable_basis = null;
+  if (!DURABLE_STATUSES.includes(nextStatus)) {
+    if (fields.durable_basis) {
+      assertDurableBasis(nextStatus, fields.durable_basis);
+    }
+    fields.durable_basis = null;
+    nextBasis = undefined;
+  }
   assertStatus(nextStatus);
-  assertDurableBasis(
-    nextStatus,
-    nextStatus === 'canDurable' ? nextBasis : undefined,
-  );
+  assertDurableBasis(nextStatus, nextBasis);
 
   const body =
     fields.title !== undefined
@@ -344,10 +359,10 @@ export async function updateTask(root, taskId, fields) {
 
 export async function setTaskStatus(root, taskId, status, durableBasis) {
   assertStatus(status);
-  assertDurableBasis(status, durableBasis);
+  if (status === 'canDurable') assertDurableBasis(status, durableBasis);
   return updateTask(root, taskId, {
     status,
-    durable_basis: status === 'canDurable' ? durableBasis : null,
+    ...(status === 'canDurable' ? { durable_basis: durableBasis } : {}),
   });
 }
 
@@ -412,10 +427,9 @@ export async function replaceTaskBody(root, taskId, body) {
 }
 
 function indexTaskLine(task) {
-  const basis =
-    task.data.status === 'canDurable'
-      ? ` — ${task.data.durable_basis}`
-      : '';
+  const basis = task.data.durable_basis
+    ? ` — Durable: ${task.data.durable_basis}`
+    : '';
   const project = task.data.project ? ` · ${task.data.project}` : '';
   return `- [[tasks/${task.id}|${task.data.title}]] \`${task.id}\`${project}${basis}`;
 }

@@ -2,6 +2,7 @@ const state = {
   meta: null,
   tasks: [],
   selectedTaskId: null,
+  selectedDurableBasis: null,
 };
 
 const board = document.querySelector('#board');
@@ -175,14 +176,18 @@ function fillSelect(selectElement, values) {
 }
 
 function toggleBasis() {
-  const visible = taskStatus.value === 'canDurable';
+  const clearsDurable = ['idea', 'shaping'].includes(taskStatus.value);
+  const visible =
+    taskStatus.value === 'canDurable' ||
+    (Boolean(state.selectedDurableBasis) && !clearsDurable);
   basisField.hidden = !visible;
-  taskBasis.required = visible;
+  taskBasis.required = taskStatus.value === 'canDurable';
 }
 
 async function openTask(taskId) {
   const task = await request(`/api/tasks/${encodeURIComponent(taskId)}`);
   state.selectedTaskId = taskId;
+  state.selectedDurableBasis = task.durable_basis || null;
   document.querySelector('#dialog-task-id').textContent = task.task_id;
   document.querySelector('#task-title').value = task.title || '';
   taskStatus.value = task.status;
@@ -238,8 +243,9 @@ taskForm.addEventListener('submit', async (event) => {
   const payload = {
     title: document.querySelector('#task-title').value.trim(),
     status: taskStatus.value,
-    durable_basis:
-      taskStatus.value === 'canDurable' ? taskBasis.value : null,
+    durable_basis: ['idea', 'shaping'].includes(taskStatus.value)
+      ? null
+      : taskBasis.value || state.selectedDurableBasis,
     project: document.querySelector('#task-project').value.trim() || null,
     workspace: document.querySelector('#task-workspace').value.trim() || null,
     references: document

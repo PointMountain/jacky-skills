@@ -50,11 +50,10 @@ description: PC Web 产品的独立交互评审与验收专家。用于根据截
 每次先独立完成视觉主矛盾扫描，再读取
 [review-feedback-loop.md](references/review-feedback-loop.md)
 的“当前生效规则”补漏。用户明确纠正评审结果时，按该 reference 更新
-[review-feedback-cases.md](references/review-feedback-cases.md)；产品特例只写入对应产品基线，不提升为通用规则。
+[review-feedback-cases.md](references/review-feedback-cases.md)；产品、账号或本机特例只写入同目录
+`experience.local.md`，不写入共享 reference，也不提升为通用规则。
 
-反馈沉淀在本 Skill 仓库，不写入个人 auto memory。历史案例不是当前页面证据；评审特定已知基线时，必须先独立发现，再按相关基线对照。
-
-评审 Happy/Paws 的已知反馈时，只有在建立独立发现清单后才读取 [happy-pc-feedback-baseline.md](references/happy-pc-feedback-baseline.md)；盲测阶段不得预读。
+通用反馈沉淀在本 Skill 仓库，不写入个人 auto memory。历史案例不是当前页面证据。评审带有已知反馈基线的产品时，盲测阶段不得读取 `experience.local.md`；必须先完成评审并冻结独立发现清单，再按需读取其中对应产品的基线进行补漏、对照或回归。文件不存在或没有对应基线时直接跳过，不得为此猜测预期答案。
 
 ## 完成门
 

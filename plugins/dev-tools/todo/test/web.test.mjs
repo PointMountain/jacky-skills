@@ -71,6 +71,19 @@ test('Web 与 CLI 核心共享同一份 Markdown 数据', async (context) => {
   assert.equal(task.data.durable_basis, 'poc-passed');
   assert.match(task.body, /验证完整闭环/);
 
+  const doingResponse = await fetch(
+    `${baseUrl}/api/tasks/${created.task_id}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'doing' }),
+    },
+  );
+  assert.equal(doingResponse.status, 200);
+  const doing = await readTask(root, created.task_id);
+  assert.equal(doing.data.status, 'doing');
+  assert.equal(doing.data.durable_basis, 'poc-passed');
+
   const archivedResponse = await fetch(
     `${baseUrl}/api/tasks/${created.task_id}`,
     { method: 'DELETE' },

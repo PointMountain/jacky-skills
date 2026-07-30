@@ -47,6 +47,21 @@ durable_basis: human-confirmed
 
 - 自动化测试通过
 - CLI 与 Web 可以修改同一任务
+
+## 最终验收
+
+- 最终产物：本地 Web 看板
+- 回归入口：http://127.0.0.1:4173
+- 用户动作：新增任务并修改状态，确认 CLI 可以读取同一结果
+- 自动验证：CLI、Store 和 Web 测试全部通过
+
+## 执行记录
+
+### Skills 与工具
+- `todo`：维护任务状态与恢复上下文
+
+### 验证
+- `npm test`：通过
 ```
 
 ## 字段
@@ -66,7 +81,18 @@ durable_basis: human-confirmed
 - `references`
 - `durable_basis`
 
-`durable_basis` 只能与 `status: canDurable` 同时存在。
+`durable_basis` 表示任务已经通过 Durable 准备度判断：
+
+- `canDurable` 必须设置。
+- 进入 `doing`、`waitingHuman` 或 `done` 后继续保留，作为任务曾具备无人值守条件的证据。
+- 退回 `idea` 或 `shaping` 时自动移除。
+- 普通短任务可以直接进入 `doing` / `done`，此时不要求设置。
+
+`## 最终验收` 与 `## 执行记录` 是推荐的 Durable 正文章节，不新增 YAML 工作流字段：
+
+- `最终验收` 定义最终回归入口，不罗列中间文档检查点。
+- `执行记录` 保存 Skills/工具、关键决策、问题、验证和提效机会。
+- 中间文档只进入 `references`，不自动触发 `waitingHuman`。
 
 ## Reference
 

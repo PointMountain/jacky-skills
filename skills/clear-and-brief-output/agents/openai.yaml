@@ -1,0 +1,4 @@
+interface:
+  display_name: "清晰简明输出"
+  short_description: "核验真实完成状态，清楚交代证据、阻塞原因和用户下一步"
+  default_prompt: "使用 $clear-and-brief-output 检查当前任务是否真正完成，并生成清晰、简明且可执行的回复。"

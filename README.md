@@ -14,7 +14,7 @@
 | Plugin | 版本 | 说明 | Skills |
 |--------|------|------|--------|
 | [claude-config](./plugins/claude-config) | 0.3.0 | Claude Code 配置 | statusline-setup |
-| [dev-tools](./plugins/dev-tools) | 2.8.2 | 发布、任务管理、Durable 长任务、联网、浏览器操控与效率审计 | github-repo-publish, efficiency-audit, todo, durable, web-search, browser-control, animate-prompt, web-connect, remote-dev-sync, ssh-connect |
+| [dev-tools](./plugins/dev-tools) | 2.8.3 | 发布、任务管理、Durable 长任务、联网、浏览器操控与效率审计 | github-repo-publish, efficiency-audit, todo, durable, web-search, browser-control, animate-prompt, web-connect, remote-dev-sync, ssh-connect |
 | [distiller-tools](./plugins/distiller-tools) | 1.1.0 | 资源蒸馏与知识提炼 | distiller |
 | [evaluators](./plugins/evaluators) | 1.1.0 | 任务目标与 Skill 设计质量评估 | harness-benchmark, skill-design-benchmark |
 | [knowledge-base](./plugins/knowledge-base) | 1.3.0 | 开发教程、经验与参考方案 | npm-publish, vsix-publish, vscode-extension-dev, gh-workflow-generator, github-profile-coolify, chrome-ext-ai-script, web-to-tauri-migration-loop, llm-wiki, codex-env-config |
@@ -23,7 +23,7 @@
 | [media-toolkit](./plugins/media-toolkit) | 1.0.0 | 媒体流下载与视频文件修复 | m3u8-dl, fix-neat-video |
 | [monitoring](./plugins/monitoring) | 2.5.5 | Claude Code 运行监控与历史查询 | claude-monitor, cc-history |
 | [obsidian-tools](./plugins/obsidian-tools) | 2.13.1 | Obsidian 同步、采集、编译与知识库管理 | config-obsidian, ob-collect, ob-index, ob-chat, ob-tidy, ob-project-log, ob-benchmark, ob-topic, ob-bridge, ob-compile, ob-router |
-| [skill-stats](./plugins/skill-stats) | 0.1.1 | Skill 调用统计与使用分析 | skill-stats |
+| [skill-stats](./plugins/skill-stats) | 0.1.2 | Skill 调用统计与使用分析 | skill-stats |
 | [skill-tooling](./plugins/skill-tooling) | 1.1.1 | Skill 优化与调研 | skill-optimizer, skill-researcher |
 | [skills-management](./plugins/skills-management) | 1.0.2 | Skills 链接、安装与批量管理 | j-skills, link-all-skills |
 | [thinking-tools](./plugins/thinking-tools) | 0.1.0 | 结构化对话与思考 | sounding-board |
@@ -39,7 +39,9 @@
 | Skill | Skill | Skill |
 |-------|-------|-------|
 | codex-harness | crafted-web | spec-debate |
-| topic-debate | [happy-app-experience](./skills/happy-app-experience) | [pc-web-interaction-reviewer](./skills/pc-web-interaction-reviewer) |
+| topic-debate | [happy-app-experience](./skills/happy-app-experience) | grilling |
+| [skill-usage-audit](./skills/skill-usage-audit) | [web-e2e](./skills/web-e2e) | [pc-web-interaction-reviewer](./skills/pc-web-interaction-reviewer) |
+| [clear-and-brief-output](./skills/clear-and-brief-output) | | |
 
 ## Harness Ops Skills
 
@@ -167,7 +169,8 @@ jacky-skills/
 │   ├── troubleshooting/
 │   └── video-processing/
 ├── skills/                    # 不属于 Plugin 的独立 Skills
-│   └── happy-app-experience/
+│   ├── happy-app-experience/
+│   └── web-e2e/
 ├── harness/                   # 工程/工具的长期经验 Ops Skills（统一以 -ops 结尾）
 │   ├── CLAUDE.md
 │   ├── happy-ops/

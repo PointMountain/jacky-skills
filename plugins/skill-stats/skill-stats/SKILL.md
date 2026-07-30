@@ -9,9 +9,11 @@ description: "查看本机 skill 使用频率统计：哪些 skill 高频、哪�
 
 读取使用日志 `~/.claude/skill-usage.jsonl`，输出一张排行榜：每个 skill 用了多少次、其中多少是 AI 自动调用 / 多少是用户手输 `/命令`、近 7 天热度、最近一次使用时间，以及超过 30 天没再碰过的「僵尸 skill」。
 
-数据由本插件的**采集 hook 自动记录**（安装插件时通过 `hooks/hooks.json` 注册，无需手动改 settings.json），挂在两个事件上：
+数据由本插件的**采集 hook 自动记录**（Claude Code 通过 `hooks/hooks.json` 注册；Codex 通过 `~/.codex/hooks.json` 注册），挂在两个事件上：
 - **PostToolUse(Skill)** —— AI 每次主动调用 skill，记 `source=ai`
 - **UserPromptSubmit** —— 用户每次手输 `/xxx` 命令（已过滤 `/help`、`/clear` 等内置命令），记 `source=user`
+
+Codex 也会把这两个事件转发到同一个采集脚本，因此 Codex 中的 Skill 调用会写入同一份 `~/.claude/skill-usage.jsonl`。
 
 ## ⚠️ 强制规则
 
