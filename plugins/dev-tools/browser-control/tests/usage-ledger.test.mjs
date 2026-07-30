@@ -105,6 +105,7 @@ function validRun({
 - 时间：2026-07-11T10:00:00.000Z
 - 类型：static-page
 - 需要已有登录态：否
+- 登录态判断来源：intrinsic_context
 
 ## 候选探测
 
@@ -510,6 +511,7 @@ test("任务、路由和复盘的必填字段缺失或为空时拒绝运行记�
     "- 时间：2026-07-11T10:00:00.000Z",
     "- 类型：static-page",
     "- 需要已有登录态：否",
+    "- 登录态判断来源：intrinsic_context",
     "- 能力槽位：browser_without_existing_login",
     "- 检查候选：chrome-devtools",
     "- 实际链路：browser-control → chrome-devtools",
@@ -537,6 +539,14 @@ test("任务、路由和复盘的必填字段缺失或为空时拒绝运行记�
   for (const [from, to] of [
     ["- 需要已有登录态：否", "- 需要已有登录态：待填写"],
     ["- 需要已有登录态：否", "- 需要已有登录态：也许"],
+    [
+      "- 登录态判断来源：intrinsic_context",
+      "- 登录态判断来源：待填写",
+    ],
+    [
+      "- 登录态判断来源：intrinsic_context",
+      "- 登录态判断来源：guess",
+    ],
     ["- 模式：primary", "- 模式：待填写"],
     ["- 模式：primary", "- 模式：随便"],
     ["- 检查候选：chrome-devtools", "- 检查候选：待填写"],

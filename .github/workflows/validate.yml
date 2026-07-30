@@ -61,4 +61,4 @@ jobs:
           node-version: "18"
 
       - name: 运行 browser-control 测试
-        run: node --test plugins/dev-tools/browser-control/tests/routing-contract.test.mjs plugins/dev-tools/browser-control/tests/usage-ledger.test.mjs
+        run: node --test plugins/dev-tools/browser-control/tests/login-state-registry.test.mjs plugins/dev-tools/browser-control/tests/route-provider.test.mjs plugins/dev-tools/browser-control/tests/usage-ledger.test.mjs

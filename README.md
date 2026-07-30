@@ -14,7 +14,7 @@
 | Plugin | 版本 | 说明 | Skills |
 |--------|------|------|--------|
 | [claude-config](./plugins/claude-config) | 0.3.0 | Claude Code 配置 | statusline-setup |
-| [dev-tools](./plugins/dev-tools) | 2.8.0 | 发布、任务管理、Durable 长任务、联网、浏览器操控与效率审计 | github-repo-publish, efficiency-audit, todo, durable, web-search, browser-control, animate-prompt, web-connect, remote-dev-sync, ssh-connect |
+| [dev-tools](./plugins/dev-tools) | 2.8.2 | 发布、任务管理、Durable 长任务、联网、浏览器操控与效率审计 | github-repo-publish, efficiency-audit, todo, durable, web-search, browser-control, animate-prompt, web-connect, remote-dev-sync, ssh-connect |
 | [distiller-tools](./plugins/distiller-tools) | 1.1.0 | 资源蒸馏与知识提炼 | distiller |
 | [evaluators](./plugins/evaluators) | 1.1.0 | 任务目标与 Skill 设计质量评估 | harness-benchmark, skill-design-benchmark |
 | [knowledge-base](./plugins/knowledge-base) | 1.3.0 | 开发教程、经验与参考方案 | npm-publish, vsix-publish, vscode-extension-dev, gh-workflow-generator, github-profile-coolify, chrome-ext-ai-script, web-to-tauri-migration-loop, llm-wiki, codex-env-config |

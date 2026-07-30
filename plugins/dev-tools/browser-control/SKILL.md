@@ -14,15 +14,44 @@ description: 本地 AI 浏览器操控的唯一通用入口。用于打开或操
 先判断任务是否只是搜索；浏览器任务的第一路由键始终是：**是否需要复用已有登录态**。
 
 1. 只是搜索或发现信息：委派 `web-search`，不进入浏览器 provider 选择。
-2. 需要已有 Cookie、账号会话、内部系统、当前已登录标签页：选择 `browser_with_existing_login`，使用 WebAccess。
+2. 需要已有 Cookie、账号会话、内部系统、当前已登录标签页：选择 `browser_with_existing_login`，默认只使用 Codex 自带的 Browser Control（`@Chrome`）控制用户现有 Chrome。它是可独立完成任务的主能力，不以 WebAccess 为默认依赖。
 3. 不需要已有登录态：选择 `browser_without_existing_login`，优先 Chrome DevTools。
-4. 无法判断且选错会改变结果时，只问用户“是否必须复用当前浏览器的已有登录态”。
+4. 用户没有明确说明、且选错会改变结果时，先查本地登录态记录；没有命中时只问用户“这个链接是否必须复用当前 Chrome 的已有登录态？”得到回答后才能选择槽位。
 
-本地静态页、`file://`、`localhost`、公开网页、截图、DOM、控制台、网络和性能调试通常都不需要已有登录态。**不能仅因页面是 SPA 或需要 JS 渲染就选择 WebAccess**。
+不能仅根据 URL、IP 地址、路由名称、页面可达性或“看起来像公开网页”推断无需登录态；用户提供链接也不等于授权使用隔离浏览器。只有本地静态页、`file://`、`localhost` 等上下文本身足以确定时，才可记为 `intrinsic_context`。**不能仅因页面是 SPA 或需要 JS 渲染就选择 WebAccess**。
+
+用户当前明确说明始终覆盖本地记录和历史观察。不得先用隔离浏览器打开目标页，再把看到登录页作为选择错误槽位的补救方式。
+
+Codex Browser Control 普通模式已经验证可复用现有登录态并读取增量 Console 与 Network；默认保持“完整 CDP”关闭。执行入口是环境内置的 `chrome:control-chrome` Skill，其底层由当前 Codex 会话连接 Chrome，但不应被描述为需要另装或改用 WebAccess。内部使用调试器能力不等于必须开启产品设置中的“完整 CDP”。只有普通模式缺少任务所需能力、用户理解风险且能够完成现场授权时，才考虑开启完整 CDP。
 
 ## 运行流程
 
-### 1. 建立本轮账本
+### 1. 确认并记录登录态
+
+先从已加载的 `SKILL.md` 定位本 Skill 目录，把脚本解析为绝对路径；不要假定当前工作目录就是 Skill 目录。对 HTTP(S) 链接，用以下本地注册表查询精确 URL 指纹：
+
+```bash
+node "<browser-control 的绝对路径>/scripts/login-state-registry.mjs" lookup <<'JSON'
+{"url":"<目标 URL>"}
+JSON
+```
+
+注册表未命中且用户没有明确说明时，先询问用户。确认后立即记录：
+
+```bash
+node "<browser-control 的绝对路径>/scripts/login-state-registry.mjs" record <<'JSON'
+{"url":"<目标 URL>","needsExistingLogin":true,"source":"user_confirmation"}
+JSON
+```
+
+注册表只保存 SHA-256 指纹、布尔判断、判断来源和时间，不保存原始 URL。相同链接可复用记录；不同链接或用户当前说法冲突时重新确认。允许的账本判断来源：
+
+- `user_confirmation`：Agent 询问后由用户确认。
+- `explicit_request`：用户原始请求已明确说明是否复用登录态。
+- `local_record`：精确 URL 指纹命中本地记录。
+- `intrinsic_context`：`file://`、本地静态页等上下文足以确定。
+
+### 2. 建立本轮账本
 
 生成不含目标名称、URL 或账号信息的 `run-id`，只允许小写字母、数字和连字符。先从已加载的 `SKILL.md` 定位本 Skill 目录，并把脚本解析为绝对路径；不要假定当前工作目录就是 Skill 目录：
 
@@ -30,9 +59,9 @@ description: 本地 AI 浏览器操控的唯一通用入口。用于打开或操
 node "<browser-control 的绝对路径>/scripts/usage-ledger.mjs" init <run-id>
 ```
 
-立即填写 `runs.local/<run-id>.md` 中的任务类型、登录态判断和候选。每个实际调用的下游 Skill 都必须保留独立条目；主候选失败后走 fallback 时，不得覆盖失败事实。
+立即填写 `runs.local/<run-id>.md` 中的任务类型、是否需要已有登录态、`登录态判断来源` 和候选。不能把 Agent 猜测写成任何合法来源。每个实际调用的下游 Skill 都必须保留独立条目；主候选失败后走 fallback 时，不得覆盖失败事实。
 
-### 2. 只读所需能力槽位
+### 3. 只读所需能力槽位
 
 读取 [`references/capabilities.md`](references/capabilities.md) 中与本轮相符的一个二级标题：
 
@@ -42,7 +71,42 @@ node "<browser-control 的绝对路径>/scripts/usage-ledger.mjs" init <run-id>
 
 如存在 `experience.local.md`，只读相关候选的当前能力卡和少量已晋升经验。它是本机能力地图，不是逐次流水。
 
-### 3. 最小探测与同槽位降级
+### 4. 运行确定性路由器
+
+每次探测或调用任何 provider 前，必须重新运行路由器。只能执行路由器本次返回的 provider，不得凭自然语言规则手工跳过高优先级候选：
+
+```bash
+node "<browser-control 的绝对路径>/scripts/route-provider.mjs" <<'JSON'
+{
+  "slot": "browser_with_existing_login",
+  "allowExternalFallback": false,
+  "providers": {
+    "codex-browser-control": {
+      "status": "not_checked",
+      "attempt": "not_attempted"
+    }
+  }
+}
+JSON
+```
+
+路由状态分为两条独立轴：
+
+- `status` 表示探测结果，只能是 `not_checked | available | degraded | missing`。
+- `attempt` 表示任务调用结果，只能是 `not_attempted | passed | degraded | failed`；只有 `available` 的 provider 可以带任务结果。
+
+严格处理路由器输出：
+
+- `probe`：只探测返回的 provider，更新 `status` 后重新运行路由器。
+- `use`：只调用返回的 provider，更新 `attempt` 后重新运行路由器。
+- `complete`：该 provider 已完成可交付路径；可能是完整通过，也可能是局部证据降级，停止 fallback 并进入证据验收。
+- `blocked`：候选已耗尽，停止调用并报告阻断原因。
+
+登录态槽位的 `allowExternalFallback` 默认是 `false`，此时有效优先级只有 Codex Browser Control。不得预先探测、加载或调用 WebAccess。只有 Codex Browser Control 真正 `missing`、整体 `degraded` 或任务调用 `failed`，并且用户明确允许使用外部后备后，才能把它设为 `true` 再次运行路由器。路由器会拒绝未经授权的 WebAccess 调用历史和低优先级 provider 抢跑。
+
+Codex Browser Control 的页面操作已完成、但局部 Console、Network、键盘或其他证据接口降级时，把任务结果记为 `attempt: degraded`。路由器仍返回 `complete`；如实报告证据缺口和置信度，不自动切换 WebAccess。
+
+### 5. 最小探测与同槽位降级
 
 首次使用、能力卡过期或候选调用失败时，执行能力地图规定的最小 probe。候选状态只允许：
 
@@ -53,9 +117,11 @@ node "<browser-control 的绝对路径>/scripts/usage-ledger.mjs" init <run-id>
 
 探测状态与任务结果分开记录；任务失败不代表 provider `missing`。Chrome DevTools 不可用时，只能尝试同一无登录态槽位的 `browser:control-in-app-browser`，不得静默升级到 WebAccess。
 
-### 4. 委派并用证据验收
+已有登录态槽位先探测当前会话是否真正暴露 `@Chrome`，不能仅凭本机安装了扩展就判定可用。若 Codex Browser Control 完成主要用户路径但缺少部分辅助证据，留在主能力并降级报告。只有它真正不可用或主路径失败时，先报告阻断并询问用户是否允许 WebAccess 作为外部后备；获得明确允许后才记录授权、重新运行路由器并加载 WebAccess。不得改用隔离浏览器假装复用了同一登录态。
 
-按能力地图加载实际候选，不预读所有下游 Skill。登录态下的普通控制直接使用 WebAccess；讲解当前 tab 或功能密集的配置页时，可调用 `web-connect` 作为适配层，由它执行 WebAccess 链路。
+### 6. 委派并用证据验收
+
+按路由器返回值加载实际候选，不预读所有下游 Skill。路由器返回 `codex-browser-control` 时，加载环境内置的 `chrome:control-chrome`，并按其浏览器选择与连接协议使用 Codex 自带 Browser Control；需要明确锁定用户 Chrome 时使用 `@Chrome`。仅在用户已经明确授权外部后备、且路由器随后返回 WebAccess 时，才加载 WebAccess；讲解当前 tab 或功能密集的配置页时，可调用 `web-connect` 作为适配层。
 
 不能把下游的“成功”文本当成唯一证据。按槽位输出契约验证可观察结果，并在“证据”章节登记：
 
@@ -63,7 +129,15 @@ node "<browser-control 的绝对路径>/scripts/usage-ledger.mjs" init <run-id>
 - 引用只能是本轮证据 ID、`run://` 引用或 `runs.local/` 内相对引用。
 - “证明”写可证伪的短结论，不复制页面正文。
 
-### 5. 校验、复盘与归档
+登录态 E2E 额外使用增量验收：
+
+1. 操作前记录 Console 与 Network 基线。
+2. 执行用户路径后验证路由或可见页面状态。
+3. 只比较本次操作新增的 Console 与 Network。
+4. 新增 Console error 或失败的 XHR/Fetch 默认判定为失败；已存在的 warning 记录为基线，不归因给本次操作。
+5. 页面跳转成功不代表 E2E 通过，必须同时报告页面、Console 与 Network 三类结果。
+
+### 7. 校验、复盘与归档
 
 完成、降级或失败都要填写“复盘”：总体结果、有效模式、已验证根因、下次规则候选和建议归宿。随后运行：
 
@@ -93,6 +167,10 @@ node "<browser-control 的绝对路径>/scripts/usage-ledger.mjs" finalize <run-
 ## 完成清单
 
 - [ ] 已按“是否需要已有登录态”选择能力槽位，且没有把 SPA/JS 当成登录态。
+- [ ] URL 登录态不明确时已查询本地指纹记录或询问用户，账本已填写合法的登录态判断来源。
+- [ ] 每次 provider 探测或调用前都已执行 `route-provider.mjs`，且只执行其返回的 provider。
+- [ ] 已有登录态槽位默认只使用 Codex Browser Control；局部证据接口降级没有触发自动 WebAccess，且没有用“本机已安装”代替“当前会话可调用”。
+- [ ] 若实际使用 WebAccess，Codex Browser Control 已真正不可用或主路径失败，且账本中有用户明确允许外部后备的依据。
 - [ ] 每个被考虑的候选都有独立探测状态，所有实际下游链与 fallback 均已保留。
 - [ ] 结果有可观察证据，不依赖自报成功。
 - [ ] 写操作已过安全门，账本不含敏感内容。

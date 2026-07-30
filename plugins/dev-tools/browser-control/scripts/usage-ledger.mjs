@@ -30,6 +30,12 @@ const PROBE_STATUSES = new Set([
 ]);
 const TASK_RESULTS = new Set(["passed", "degraded", "failed"]);
 const LOGIN_DECISIONS = new Set(["是", "否"]);
+const LOGIN_DECISION_SOURCES = new Set([
+  "user_confirmation",
+  "explicit_request",
+  "local_record",
+  "intrinsic_context",
+]);
 const ROUTE_MODES = new Set(["primary", "fallback"]);
 const CAPABILITY_SLOTS = new Set([
   "browser_without_existing_login",
@@ -87,6 +93,7 @@ export function buildRunTemplate(runId) {
 - 时间：${new Date().toISOString()}
 - 类型：待填写
 - 需要已有登录态：待填写
+- 登录态判断来源：待填写
 
 ## 候选探测
 
@@ -373,6 +380,11 @@ export function validateRunMarkdown(markdown, { expectedRunId } = {}) {
     time: exactlyOne(taskFields, "时间", "任务"),
     type: exactlyOne(taskFields, "类型", "任务"),
     needsExistingLogin: exactlyOne(taskFields, "需要已有登录态", "任务"),
+    loginDecisionSource: exactlyOne(
+      taskFields,
+      "登录态判断来源",
+      "任务",
+    ),
   };
   if (!isValidIsoTimestamp(task.time)) {
     throw new Error("任务时间不是有效 ISO-8601 时间");
@@ -380,6 +392,9 @@ export function validateRunMarkdown(markdown, { expectedRunId } = {}) {
   if (task.type === "待填写") throw new Error("任务类型仍是占位值");
   if (!LOGIN_DECISIONS.has(task.needsExistingLogin)) {
     throw new Error("是否需要已有登录态只能填写是或否");
+  }
+  if (!LOGIN_DECISION_SOURCES.has(task.loginDecisionSource)) {
+    throw new Error("登录态判断来源非法");
   }
   const probes = parseProbeStatuses(markdown);
   const routeFields = fieldsFrom(sectionLines(lines, "路由决定"));
