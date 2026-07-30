@@ -39,7 +39,7 @@
 | Skill | Skill | Skill |
 |-------|-------|-------|
 | codex-harness | crafted-web | spec-debate |
-| topic-debate | [happy-app-experience](./skills/happy-app-experience) | |
+| topic-debate | [happy-app-experience](./skills/happy-app-experience) | [pc-web-interaction-reviewer](./skills/pc-web-interaction-reviewer) |
 
 ## Harness Ops Skills
 
