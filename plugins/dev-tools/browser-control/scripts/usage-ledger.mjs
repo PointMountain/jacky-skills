@@ -645,7 +645,14 @@ async function publishLockDirectory(skillRoot, lockPath, token) {
 
 async function recoverDeadLock(lockPath) {
   const ownerPath = path.join(lockPath, "owner.md");
-  const owner = parseLockOwner(await readFile(ownerPath, "utf8"));
+  let ownerMarkdown;
+  try {
+    ownerMarkdown = await readFile(ownerPath, "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") return;
+    throw error;
+  }
+  const owner = parseLockOwner(ownerMarkdown);
   if (isProcessAlive(owner.pid)) {
     throw new Error("账本已锁定：另一个 finalize 正在进行中");
   }

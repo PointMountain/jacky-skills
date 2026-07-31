@@ -20,6 +20,13 @@ jobs:
           python-version: "3.11"
           cache: pip
 
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: plugins/dev-tools/todo/package-lock.json
+
       - name: 安装开发依赖
         run: python -m pip install --upgrade pip -r requirements-dev.txt
 
@@ -33,7 +40,9 @@ jobs:
         run: python -m unittest discover -s plugins/learning-tools/youtube-study-note/tests -p 'test_*.py' -v
 
       - name: 验证 todo
-        run: bash plugins/dev-tools/todo/tests/verify.sh
+        run: |
+          npm ci --prefix plugins/dev-tools/todo
+          npm test --prefix plugins/dev-tools/todo
 
       - name: 验证 video-processing
         run: python -m unittest discover -s plugins/video-processing/tests -p 'test_*.py' -v
