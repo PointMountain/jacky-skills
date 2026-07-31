@@ -41,7 +41,7 @@
 | codex-harness | crafted-web | spec-debate |
 | topic-debate | [happy-app-experience](./skills/happy-app-experience) | grilling |
 | [skill-usage-audit](./skills/skill-usage-audit) | [web-e2e](./skills/web-e2e) | [pc-web-interaction-reviewer](./skills/pc-web-interaction-reviewer) |
-| [clear-and-brief-output](./skills/clear-and-brief-output) | | |
+| [clear-and-brief-output](./skills/clear-and-brief-output) | [happy-visual-workflow](./skills/happy-visual-workflow) | |
 
 ## Harness Ops Skills
 
@@ -170,6 +170,7 @@ jacky-skills/
 │   └── video-processing/
 ├── skills/                    # 不属于 Plugin 的独立 Skills
 │   ├── happy-app-experience/
+│   ├── happy-visual-workflow/
 │   └── web-e2e/
 ├── harness/                   # 工程/工具的长期经验 Ops Skills（统一以 -ops 结尾）
 │   ├── CLAUDE.md

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Happy 视觉稿流程"
+  short_description: "Happy PC 视觉走查、修复、截图与 PR 合并闭环"
+  default_prompt: "Use $happy-visual-workflow to run the full Happy PC visual review, repair, evidence, PR, and merge workflow."
