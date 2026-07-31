@@ -16,6 +16,25 @@ def load_description(skill_name: str, root: Path | None = None) -> str:
 
 
 class TriggerContractTests(unittest.TestCase):
+    def test_happy_visual_workflow_has_short_trigger_and_delivery_gates(self) -> None:
+        description = load_description("happy-visual-workflow")
+        skill_root = REPO_ROOT / "skills" / "happy-visual-workflow"
+        skill = (skill_root / "SKILL.md").read_text(encoding="utf-8")
+        contract = (skill_root / "references" / "delivery-contract.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("视觉稿", description)
+        self.assertIn("Happy/Paws", description)
+        self.assertIn("独立复核", skill)
+        self.assertIn("逐 Case 前后截图", skill)
+        self.assertIn("Visible UI cases", skill)
+        self.assertIn("origin/main", skill)
+        self.assertIn("Happy Web 或 Playwright Harness", skill)
+        self.assertIn("expo start --web", skill)
+        self.assertIn("临时端口、PID", skill)
+        self.assertIn("40-char-head-sha", contract)
+
     def test_web_flow_children_are_internal_only(self) -> None:
         children = [
             "web-flow-research",
