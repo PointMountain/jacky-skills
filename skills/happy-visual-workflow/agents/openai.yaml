@@ -1,4 +1,4 @@
 interface:
-  display_name: "Happy 视觉稿流程"
-  short_description: "Happy PC 视觉走查、修复、截图与 PR 合并闭环"
-  default_prompt: "Use $happy-visual-workflow to run the full Happy PC visual review, repair, evidence, PR, and merge workflow."
+  display_name: "Happy 功能交付流程"
+  short_description: "开发、独立验收、E2E、交互评审与 PR 证据"
+  default_prompt: "Use $happy-visual-workflow to implement and validate a Happy feature through the required gates, then create an evidence-backed PR."

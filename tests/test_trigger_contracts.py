@@ -26,14 +26,13 @@ class TriggerContractTests(unittest.TestCase):
 
         self.assertIn("视觉稿", description)
         self.assertIn("Happy/Paws", description)
-        self.assertIn("独立复核", skill)
-        self.assertIn("逐 Case 前后截图", skill)
+        self.assertIn("独立验收", skill)
+        self.assertIn("按需一对一 E2E", skill)
+        self.assertIn("交互评审", skill)
+        self.assertIn("PR 前后对比", skill)
         self.assertIn("Visible UI cases", skill)
-        self.assertIn("origin/main", skill)
-        self.assertIn("Happy Web 或 Playwright Harness", skill)
-        self.assertIn("expo start --web", skill)
-        self.assertIn("临时端口、PID", skill)
-        self.assertIn("40-char-head-sha", contract)
+        self.assertIn("不自动包含等待 CI、OTA、合并和清理", skill)
+        self.assertIn("新增平台或测试框架时，只需提供同一返回契约", contract)
 
     def test_web_flow_children_are_internal_only(self) -> None:
         children = [

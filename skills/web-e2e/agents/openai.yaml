@@ -1,4 +1,4 @@
 interface:
   display_name: "Web E2E"
-  short_description: "复用并持续沉淀 Web Playwright E2E 的已验证经验"
-  default_prompt: "Use $web-e2e to reuse an existing Web E2E case, run it when authorized, and write back verified lessons."
+  short_description: "一对一复用 Web E2E，并按需生成验收视频"
+  default_prompt: "Use $web-e2e to map this requirement to one minimal browser case, run it, and record a validated MP4 only when requested."

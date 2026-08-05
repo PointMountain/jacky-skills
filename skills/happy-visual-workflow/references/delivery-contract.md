@@ -1,59 +1,56 @@
-# 视觉稿交付契约
+# 功能交付契约
 
-在阶段一建立本页的 Case 账本，在阶段四至六持续更新。不要等到 PR 创建后再反推截图数量。
+编排层维护一张最小 Case 表，其他 Skill 只返回当前 gate 的结果。
 
-## Case 账本
+## Case 表
 
-| Case ID | 页面/状态 | 修复前问题 | 严重度 | 复现步骤 | 验收标准 | Before | After | 结果 |
+| Case | 用户可观察结果 | Before/base | 独立验收 | E2E | 交互评审 | Video | After | PR |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
-计数规则：
+每个 gate 只使用四种状态：
 
-- `Visible UI cases` 只统计用户能直接观察到变化的 Case。
-- 每个可见 Case 必须有唯一的前后截图组。多个技术断言属于同一视觉变化时可共享一组，但要在表中说明。
-- 一张原始整页截图可以被多个 Case 裁切使用；每个 Case 仍需自己的裁切或标注结果。
-- 总览图、contact sheet、自动化日志和测试结果不计入截图组数。
+- `pass`：有新鲜证据通过；
+- `fail`：已观察到不符合通过标准；
+- `blocked`：缺环境、权限或证据，无法判断；
+- `not-required`：当前 Case 不需要该 gate，并附一句理由。
 
-## 文件命名
+## 委派返回契约
+
+任何被替换或新增的能力 Skill 都返回：
 
 ```text
-<batch>-<case-id>-<slug>-before-<viewport>.png
-<batch>-<case-id>-<slug>-after-<viewport>.png
-<batch>-<case-id>-<slug>-before-after.png
+case: 对应 Case ID
+status: pass | fail | blocked | not-required
+evidence: 支持结论的文件、截图、日志或命令结果
+artifacts: 测试、图片、视频或报告路径
+risks: 残余风险和未覆盖项
+next: 建议的唯一下一步
 ```
 
-在报告中记录 CSS 视口、DPR、缩放、页面状态和截图来源。对响应式问题增加对应断点文件，不用不同比例画面冒充前后对比。
+能力 Skill 不改变全局阶段、不代替其他 gate，也不自行创建 PR、等待 CI 或合并；这些转换由编排层决定。新增平台或测试框架时，只需提供同一返回契约，不必改写整条流程。
 
-## PR 正文模板
+## Before / After
 
-```markdown
-## Summary
+- 只为用户可见变化建立图片组；纯逻辑 Case 不凑图。
+- 每个可见 Case 对应一组可定位的 Before / After。共享图片时在 Case 表说明。
+- Before 可在开发前捕获，也可由记录的 base revision 和复现路径重放。
+- 前后图使用相同 CSS 视口、DPR、缩放和状态；只补与当前问题相关的断点。
+- 总览图可以补充上下文，不能替代多个 Case 的独立证据。
 
-- 修复范围与用户影响
+## 视频产物
 
-## Visual evidence
+视频至少返回：对应 Case、平台、绝对 MP4 路径、时长、分辨率、codec、完整解码结果和脱敏结果。
 
-Visible UI cases: 2
+移动端可见变化必须有视频；PC/Web 仅在用户要求或时序无法由截图证明时需要。文件卡片、HTTPS 或 PR 附件属于交付适配器，不改变 E2E 是否通过。
 
-### PC-001 — 问题名称
+## PR 边界
 
-![PC-001 before and after](https://raw.githubusercontent.com/<owner>/<repo>/<40-char-head-sha>/<path>/pc-001-before-after.png)
+PR 编排层消费各 gate 已有证据，不要求 reviewer 或 E2E Skill 再检查 PR。
 
-### PC-002 — 问题名称
+可见 UI PR 使用仓库模板，并保证：
 
-![PC-002 before and after](https://raw.githubusercontent.com/<owner>/<repo>/<40-char-head-sha>/<path>/pc-002-before-after.png)
-
-## Validation
-
-- 单测 / typecheck / E2E
-- 独立 PC 回归：通过项与未解决项
-- Browser Control 或 Playwright 的真实执行说明
+```text
+Visible UI cases = PR 中的可见 Case 行数 = Before/After 证据组数
 ```
 
-## 合并前核对
-
-1. PR 声明的 Case 数与 Case 账本一致。
-2. 每个可见 Case 都有独立小节和可渲染图片。
-3. 图片 URL 使用不可变 commit SHA 或 GitHub 上传附件。
-4. 独立验收者检查实际 PR，而非仅检查本地 Markdown。
-5. 图片缺失、链接失效、Case 错配或 CI 失败时不合并。
+创建 PR 的完成点是：提交已推送、PR 已创建、正文和图片已实际渲染、URL 已返回。CI、OTA、合并和分支清理属于后续动作，除非用户明确要求一起完成。
