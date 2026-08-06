@@ -1,4 +1,4 @@
 interface:
   display_name: "Happy 功能交付流程"
-  short_description: "开发、独立验收、E2E、交互评审与 PR 证据"
-  default_prompt: "Use $happy-visual-workflow to implement and validate a Happy feature through the required gates, then create an evidence-backed PR."
+  short_description: "开发、E2E 截图视频、独立评审与 PR 证据"
+  default_prompt: "Use $happy-visual-workflow to implement and validate a Happy feature through the required gates, deliver E2E screenshots and playable video when required, then create an evidence-backed PR."

@@ -23,6 +23,7 @@ case: 对应 Case ID
 status: pass | fail | blocked | not-required
 evidence: 支持结论的文件、截图、日志或命令结果
 artifacts: 测试、图片、视频或报告路径
+delivery: sent | local-ready | blocked | not-required
 risks: 残余风险和未覆盖项
 next: 建议的唯一下一步
 ```
@@ -41,7 +42,7 @@ next: 建议的唯一下一步
 
 视频至少返回：对应 Case、平台、绝对 MP4 路径、时长、分辨率、codec、完整解码结果和脱敏结果。
 
-移动端可见变化必须有视频；PC/Web 仅在用户要求或时序无法由截图证明时需要。文件卡片、HTTPS 或 PR 附件属于交付适配器，不改变 E2E 是否通过。
+移动端可见变化必须有视频。PC/Web Case 只要 E2E 为 `pass`，就必须保留同 Case 截图和最终通过视频；纯静态 Case 可将 E2E 与视频记为有理由的 `not-required`。运行时有 Happy/Paws 媒体能力时必须实际发送截图和 MP4，本机路径不等于跨设备交付。发送失败不改变 E2E verdict，但 `delivery` 必须保持 `local-ready` 或 `blocked`，不能写成 `sent`。
 
 ## PR 边界
 

@@ -18,13 +18,16 @@ class HappyVisualWorkflowContractTests(unittest.TestCase):
         ).read_text()
 
     def test_keeps_the_user_requested_gate_order(self):
-        expected = "开发 → 独立验收 → 按需一对一 E2E → 交互评审 → 按需视频 → PR 前后对比"
+        expected = "开发 → 独立验收 → 按需一对一 E2E → 交互评审 → 可视证据交付 → PR 前后对比"
         self.assertIn(expected, self.workflow)
 
-    def test_e2e_is_conditional_and_mobile_video_is_terminal_visible(self):
+    def test_e2e_is_conditional_and_visible_e2e_media_is_sent(self):
         self.assertIn("可以记为 `not-required`", self.workflow)
         self.assertIn("用户可见的移动端变化必须录制最终通过版本", self.workflow)
-        self.assertIn("输出稳定 MP4 绝对路径到终端", self.workflow)
+        self.assertIn("只要 Gate 3 要求 E2E", self.workflow)
+        self.assertIn("`mcp__happy__send_image`", self.workflow)
+        self.assertIn("`mcp__happy__send_file`", self.workflow)
+        self.assertIn("本机路径不等于跨设备交付", self.contract)
 
     def test_pr_creation_does_not_wait_for_ci_or_merge(self):
         self.assertIn("然后立即返回 PR URL", self.workflow)

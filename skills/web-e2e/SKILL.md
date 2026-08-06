@@ -1,6 +1,6 @@
 ---
 name: web-e2e
-description: "维护和复用 Web 应用的 Playwright E2E 实战经验。用于把需求与真实浏览器 Case 一对一对应、复跑或补充最小 E2E、按需录制验收视频、排查登录/启动/等待/选择器/真实服务问题，并把已验证解法写回经验。"
+description: "维护和复用 Web 应用的 Playwright E2E 实战经验。用于把需求与真实浏览器 Case 一对一对应、复跑或补充最小 E2E、为 UI 验收生成并直接交付截图与可播放视频、排查登录/启动/等待/选择器/真实服务问题，并把已验证解法写回经验。"
 ---
 
 # Web E2E
@@ -11,7 +11,7 @@ description: "维护和复用 Web 应用的 Playwright E2E 实战经验。用于
 
 - 当前任务与真实验收 Case 的一对一关系；
 - 已经验证可用的运行入口；
-- 普通运行与可选录像运行的真实结果；
+- 普通运行、UI 录像运行和媒体交付的真实结果；
 - 运行中遇到的问题、根因和下次可直接复用的解法。
 
 ## 先读取经验
@@ -51,16 +51,17 @@ EXP="$DIR/experience.local.md"
 
 E2E 的价值是提供机器可执行的验收终点。是否进入 Durable、Doing 或 Done 由对应任务系统决定，不在本 Skill 中定义。
 
-## 按需录制 E2E 视频
+## UI E2E 的可视交付门
 
-调用方或用户要求录制 Web E2E 时，完整读取并执行 [video-evidence.md](references/video-evidence.md)。先让普通 E2E 稳定通过，再录制同一个 Case。
+当用户把“E2E / 端到端”作为 UI 功能的完成或验收要求时，默认完整读取并执行 [video-evidence.md](references/video-evidence.md)，无需再询问是否录像：
 
-- 本 Skill 只负责 Web E2E 录像；原生移动端应使用目标平台的 E2E 或录屏能力。
-- 输出稳定 MP4 绝对路径、媒体校验和对应 Case，供终端或上层编排消费。
-- 运行时存在 Happy/Paws 文件发送能力时可以发送同一文件；发送、移动端确认和 PR 挂载属于交付适配器，不改变 E2E verdict。
-- 视频证明交互时序，不替代 UI Before / After 图片。
+1. 先让普通 E2E 稳定通过。
+2. 开启录像模式复跑同一个 Case，并为关键状态保留可辨认的操作节奏。
+3. 保留可比较的 PNG 截图；视频不能替代 UI Before / After。
+4. 转成经过媒体信息、完整解码和视觉覆盖检查的稳定 MP4。
+5. 运行时存在 Happy/Paws 媒体发送能力时，调用 `mcp__happy__send_image` 发送截图，并调用 `mcp__happy__send_file` 发送 MP4。只输出本机路径不算跨设备交付完成；发送失败必须明确报告为 `local-ready` 或 `blocked`，不能写成已交付。
 
-没有录像要求时不要把转码、上传或手机确认加入固定完成条件。
+本 Skill 只负责 Web E2E 录像；原生移动端应使用目标平台的 E2E 或录屏能力。只有用户明确要求“不录像 / 只要代码”，或任务只是没有用户可观察界面的逻辑诊断与回归时，才跳过可视交付门。
 
 ## 优先复用，不重新发明
 
@@ -117,6 +118,6 @@ E2E 的价值是提供机器可执行的验收终点。是否进入 Durable、Do
 - 发现了什么新问题；
 - 哪些经验已写回，下一次可以少走什么弯路。
 
-向上层编排返回 `case`、`status`、`evidence`、`artifacts`、`risks` 和 `next`。本 Skill 不自行创建 PR、等待 CI、执行交互评审或合并。
+向上层编排返回 `case`、`status`、`evidence`、`artifacts`、`delivery`、`risks` 和 `next`。`delivery` 至少区分 `sent`、`local-ready` 和 `blocked`。本 Skill 不自行创建 PR、等待 CI、执行交互评审或合并。
 
-视频、截图、Trace 和报告按当前任务价值决定；明确要求录像时按视频 reference 生成并校验 MP4。
+UI E2E 默认按可视交付门生成并发送截图与 MP4；Trace 和报告按当前任务价值决定。
