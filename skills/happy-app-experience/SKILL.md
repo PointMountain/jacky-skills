@@ -1,6 +1,6 @@
 ---
 name: happy-app-experience
-description: "在设计、开发或交付 App 时按需参考 Happy/Paws 经验，包括移动端架构、React Native/Expo 取舍、验证、OTA、安装包与 Release 边界。用于用户明确要求参考 Happy/Paws，或当前问题与这些真实工程经验高度匹配时；它只提供上下文，不是 App Workflow，也不强制复制 Happy 的技术栈。"
+description: "在设计、开发或交付 Happy/Paws App 与 PC Web 时按需参考 Happy/Paws 经验，包括移动端架构、React Native/Expo 取舍、PC Web 视觉基线、验证、OTA、安装包与 Release 边界。用于用户明确要求参考 Happy/Paws，或当前问题与这些真实工程经验高度匹配时；它只提供上下文，不是 Workflow，也不强制复制 Happy 的技术栈或具体尺寸。"
 ---
 
 # Happy App Experience
@@ -11,6 +11,7 @@ description: "在设计、开发或交付 App 时按需参考 Happy/Paws 经验�
 
 - 用户明确说“参考 Happy/Paws 的经验”；
 - 当前 App 或移动端问题与 description 高度匹配，且这些经验可能改变决策；
+- 当前任务要延续 Happy PC Web 的视觉语言，尤其涉及命令面板、搜索选择器、复杂菜单等桌面浮层的字体层级、密度、圆角、边框、阴影或主题状态；
 - 需要比较 OTA、重新构建、安装包、真机验证或 Release 的边界。
 
 不要因为任务提到 App 就自动加载，也**不强制** React Native、Expo 或任何其他技术栈。运行维护、daemon、中继和自托管排障属于运维经验，不在这里展开。
