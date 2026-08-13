@@ -1,0 +1,4 @@
+interface:
+  display_name: "照片风格动态"
+  short_description: "查看编号风格总览并输入编号，再生成动态照片与 MP4"
+  default_prompt: "Use $photo-to-styled-motion to show me a numbered style gallery, ask me to type a number without option buttons, then turn my selection into verified motion outputs."
