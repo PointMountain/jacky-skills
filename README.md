@@ -42,7 +42,8 @@
 | topic-debate | [happy-app-experience](./skills/happy-app-experience) | grilling |
 | [skill-usage-audit](./skills/skill-usage-audit) | [web-e2e](./skills/web-e2e) | [pc-web-interaction-reviewer](./skills/pc-web-interaction-reviewer) |
 | [clear-and-brief-output](./skills/clear-and-brief-output) | [happy-visual-workflow](./skills/happy-visual-workflow) | |
-| [photo-to-styled-motion](./skills/photo-to-styled-motion) | | |
+| [android-live-photo](./skills/android-live-photo) |  |  |
+| [photo-to-styled-motion](./skills/photo-to-styled-motion) |  |  |
 
 ## Harness Ops Skills
 
