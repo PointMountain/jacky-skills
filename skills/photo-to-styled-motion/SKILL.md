@@ -1,18 +1,19 @@
 ---
 name: photo-to-styled-motion
-description: "Turn a user portrait or photo into an identity-preserving styled motion clip, with a numbered Human-in-the-loop style gallery when the user has not chosen a look: create standalone candidates, build one selection sheet, generate and verify a MiniMax H3 MP4, then create a verified Android Motion Photo. Use for selfies, portraits, anime, manga, cinematic, graphic-novel, abstract, Live Photo, or motion-photo transformations."
+description: "Turn a user portrait or photo into an identity-preserving styled motion clip. When the user has not chosen a look, show the bundled numbered preset gallery first, then generate only the selected style from the user's photo; generate a custom nine-style comparison only when explicitly requested. Verify the MiniMax H3 MP4 and create an Android Motion Photo. Use for selfies, portraits, anime, manga, cinematic, graphic-novel, abstract, Live Photo, or motion-photo transformations."
 ---
 
 # Photo To Styled Motion
 
-Use `fast` mode when the user already chose a style. Otherwise use a numbered Human-in-the-loop `gallery` before video generation: generate the standalone style candidates, combine previews into one selection sheet, and let the user type a number or style name. An H3 submission is billable and always requires explicit confirmation for the exact batch.
+Use `fast` mode when the user already chose a style. Otherwise default to `preset-gallery`: send the bundled numbered reference image, let the user type a number or style name, then generate only that style from the user's photo. Use `custom-gallery` only when the user explicitly asks to compare all styles on their own photo. An H3 submission is billable and always requires explicit confirmation for the exact batch.
 
 ## Required capabilities
 
 - Use the host image generation/editing tool when available. Otherwise use the installed `gpt-image-2` skill according to its mode rules.
 - Use `minimax-h3` from `PATH` for MiniMax H3. It reads credentials from Keychain; never print or persist the key.
 - Use `ffmpeg` and `ffprobe` for media conversion and verification.
-- Use [scripts/build_style_gallery.py](scripts/build_style_gallery.py) to create numbered selection sheets. It requires Pillow and outputs both the gallery and an exact ID-to-source mapping.
+- Use [assets/preset-style-gallery.jpg](assets/preset-style-gallery.jpg) as the default numbered style-selection reference. It uses one fictional adult and contains no user media.
+- Use [scripts/build_style_gallery.py](scripts/build_style_gallery.py) only for an explicitly requested `custom-gallery`. It requires Pillow and outputs both the gallery and an exact ID-to-source mapping.
 - Use the installed `android-live-photo` dependency for the standard Android Motion Photo output:
 
 ```sh
@@ -22,7 +23,7 @@ node "${CODEX_HOME:-$HOME/.codex}/skills/android-live-photo/scripts/convert_moti
 ```
 
 - Require the converter to report `validation: passed`. It preserves the MP4 bytes unchanged inside the JPEG. Do not duplicate or replace this converter with an ad hoc wrapper.
-- In Happy, send the gallery and selected first-frame preview with `mcp__happy__send_image`, and every MP4 with `mcp__happy__send_file`. Do not flood the chat with every standalone candidate unless the user requests close inspection.
+- In Happy, send the bundled preset gallery or custom gallery and selected first-frame preview with `mcp__happy__send_image`, and every MP4 with `mcp__happy__send_file`. Do not flood the chat with standalone candidates unless the user requests close inspection.
 
 ## Gallery interaction rule
 
@@ -30,7 +31,7 @@ After sending a numbered style gallery, ask for selection in ordinary text only.
 
 Use one short prompt such as: `请输入图片中的编号或风格名，例如 02。`
 
-Accept a bare integer (`2`), zero-padded ID (`02`), exact display label, or unique preset slug. Resolve it through the generated `.mapping.json`. If the input is missing, ambiguous, or invalid, ask the user to type a valid number or style name in ordinary text; do not fall back to structured options.
+Accept a bare integer (`2`), zero-padded ID (`02`), exact display label, or unique preset slug. Resolve a bundled-gallery selection through the stable table in [references/style-presets.md](references/style-presets.md); resolve a custom-gallery selection through its generated `.mapping.json`. If the input is missing, ambiguous, or invalid, ask the user to type a valid number or style name in ordinary text; do not fall back to structured options.
 
 ## Workflow
 
@@ -40,25 +41,27 @@ Use the exact user-provided attachment path. Inspect dimensions, format, identit
 
 If the input may be a motion photo, check for embedded `ftyp`/`moov` data. Extract frames only when useful for reference. Keep the original file when Honor-style dynamic JPEG output may be requested; its vendor metadata and private MP4 `uuid` box are needed for best compatibility.
 
-### 2. Give one complete brief
+### 2. Choose the mode and time the brief
 
-Before generating any image or submitting a video, read [references/style-presets.md](references/style-presets.md) and give one compact brief containing:
+Read [references/style-presets.md](references/style-presets.md) before generating user-specific media. In `preset-gallery`, send the bundled gallery and collect the typed selection first; do not front-load generation, pricing, or output details before the user has chosen. Then, before generating the selected user-specific image or submitting a video, give one compact brief containing:
 
-- the available styles and a context-aware recommendation;
-- the mode: `fast` (one chosen first frame, no review pause) or `gallery` (all available presets as numbered static candidates, then selection);
-- the exact static batch in `gallery` mode, including candidate count and whether the active image backend is billable; obtain confirmation before a billable multi-image static batch;
+- the selected style and a context-aware recommendation;
+- the mode: `fast` (one chosen first frame), `preset-gallery` (bundled reference image, then one selected first frame), or explicitly requested `custom-gallery` (all presets rendered from the user's photo);
+- the exact static batch: one selected image for `fast`/`preset-gallery`, or the confirmed candidate count for a billable `custom-gallery` batch;
 - the exact paid batch: task count, resolution, duration, current public price estimate when available, actual invoice controls, and no automatic paid retry;
 - output chain: verified MP4 followed by a standard Android Motion Photo.
 
-Offer a single combined decision. For example: `日系胶片电影，极速模式，确认 1 个 768P/5 秒付费任务`.
+Offer a single combined decision when a decision is still needed. For example: `日系胶片电影，极速模式，确认 1 个 768P/5 秒付费任务`.
 
 If the user explicitly invokes this skill and chooses a style plus paid confirmation in that one response, continue without further human checkpoints: generate the first frame, inspect it, submit once, verify the MP4, and create the Motion Photo. A prior confirmation covers only the exact described batch.
 
-Use `fast` when the user explicitly chooses a style, including in the same message that invokes the skill. Use `gallery` when no style is selected or the user asks to compare, browse, or choose. Do not manufacture a style-selection pause in `fast` mode.
+Use `fast` when the user explicitly chooses a style, including in the same message that invokes the skill. Use `preset-gallery` when no style is selected or the user asks to browse or choose. Use `custom-gallery` only for an explicit request such as "show every style on my photo". Do not generate nine user-specific candidates by default.
+
+In `preset-gallery`, proceed to step 3 immediately and return to this brief only after the user selects a style. In `fast`, give the brief before generating. In `custom-gallery`, state and confirm the static comparison batch before generation; give the paid-video portion only after the user selects a candidate.
 
 ### 3. Run style selection or generate the chosen first frame
 
-Always generate one standalone image per style; never ask an image model to draw the gallery itself. This keeps every candidate eligible to become the video first frame. Preserve identity anchors explicitly:
+When generating any user-specific image, produce a standalone frame and preserve identity anchors explicitly:
 
 - face shape and feature spacing
 - age, ethnicity, and body proportions
@@ -70,12 +73,22 @@ Avoid title text, captions, dates, logos, watermarks, extra people, extra finger
 
 In `fast` mode, generate and inspect the one selected style, then continue without a review pause when it passes.
 
-In `gallery` mode:
+In `preset-gallery` mode:
+
+1. Send [assets/preset-style-gallery.jpg](assets/preset-style-gallery.jpg) immediately. Do not call an image-generation backend before selection.
+2. State that the image is a reusable style reference rendered with one fictional adult, not a preview of the user's own identity.
+3. Ask for the number or style name using **Gallery interaction rule**.
+4. Resolve the selection using the stable IDs in [references/style-presets.md](references/style-presets.md).
+5. Generate exactly one standalone first frame from the user's original photo using the selected preset. Inspect it before any H3 submission.
+6. Never use the bundled gallery or any cropped gallery tile as an H3 first frame.
+
+In an explicitly requested `custom-gallery` mode:
 
 1. Read the stable IDs from [references/style-presets.md](references/style-presets.md).
-2. Generate every available preset as a standalone candidate. Keep the same ID, slug, identity invariants, crop, and output dimensions across the batch. If the static image backend is billable, submit only the user-confirmed candidate count and never retry a failed candidate without renewed approval.
-3. Inspect all candidates. Exclude a failed candidate instead of showing misleading work, but never renumber the remaining styles. Regenerate a static candidate only when the image tool permits it and the user has not restricted static-generation cost.
-4. Write a manifest containing `id`, `slug`, `label`, and the original candidate image path. Build one numbered gallery:
+2. State the exact static candidate count and whether the backend is billable. Obtain confirmation before submitting the multi-image batch.
+3. Generate every confirmed preset as a standalone candidate. Keep the same ID, slug, identity invariants, crop, and output dimensions across the batch. Never retry a failed candidate without renewed approval.
+4. Inspect all candidates. Exclude a failed candidate instead of showing misleading work, but never renumber the remaining styles.
+5. Write a manifest containing `id`, `slug`, `label`, and the original candidate image path. Build one numbered gallery:
 
 ```bash
 python3 scripts/build_style_gallery.py \
@@ -95,9 +108,9 @@ Manifest shape:
 }
 ```
 
-5. Inspect the gallery for readable numbers, labels, correct crops, and one-to-one mapping. Send only this gallery first, then use the ordinary-text prompt defined in **Gallery interaction rule**. Do not repeat the full style list outside the image.
-6. Stop before every H3 call. The style selection and paid-video confirmation may be combined in the user's reply only if the exact task count, resolution, duration, and no-retry policy were already stated.
-7. Resolve the typed number or style name through the generated `.mapping.json`. Show or send the selected original candidate for confirmation when useful. Never crop a tile from the gallery and never use the gallery image as an H3 first frame.
+6. Inspect the gallery for readable numbers, labels, correct crops, and one-to-one mapping. Send only this gallery first, then use the ordinary-text prompt defined in **Gallery interaction rule**. Do not repeat the full style list outside the image.
+7. Stop before every H3 call. The style selection and paid-video confirmation may be combined in the user's reply only if the exact task count, resolution, duration, and no-retry policy were already stated.
+8. Resolve the typed number or style name through the generated `.mapping.json`. Show or send the selected original candidate for confirmation when useful. Never crop a tile from the gallery and never use the gallery image as an H3 first frame.
 
 Keep the manifest, mapping, gallery, all standalone candidates, and selected candidate beside the task artifacts for reproducibility.
 
@@ -112,7 +125,7 @@ MiniMax `create` and `create-json` are billable. Before every batch, state:
 
 Do not submit until the user explicitly confirms the paid calls. The confirmation may be given in the complete brief in step 2; do not ask again when it already covers the exact task.
 
-In `gallery` mode, a style number alone is not paid confirmation unless the user had already explicitly confirmed the exact H3 batch. Never infer paid approval from viewing or selecting a static style.
+In either gallery mode, a style number alone is not paid confirmation unless the user had already explicitly confirmed the exact H3 batch. Never infer paid approval from viewing or selecting a style.
 
 ### 5. Build and submit H3 requests
 
