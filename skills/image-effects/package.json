@@ -1,0 +1,11 @@
+{
+  "name": "@wangjs-jacky/image-effects",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "sharp": "0.35.3"
+  }
+}
