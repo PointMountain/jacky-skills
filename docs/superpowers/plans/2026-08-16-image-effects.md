@@ -214,8 +214,8 @@ Expected: 提交只包含 Task 2 声明文件；除尚未提交的计划文档�
 - Generate: `skills/image-effects/references/INDEX.md`
 - Generate: `skills/image-effects/assets/public-repo/THIRD_PARTY_NOTICES.md`
 - Generate: `skills/image-effects/gallery/api/library.json`
-- Generate: `skills/image-effects/gallery/media/healing-anime-scribble-v3.jpg`
-- Generate: `skills/image-effects/gallery/source/healing-anime-scribble-v3.md`
+- Generate: `skills/image-effects/gallery/media/healing-anime-scribble-v3@1.0.0.jpg`
+- Generate: `skills/image-effects/gallery/source/healing-anime-scribble-v3@1.0.0.md`
 
 - [ ] **Step 1: 写构建和验证失败测试**
 
@@ -669,8 +669,8 @@ Expected: `build_type=workflow`，精确公开提交的 Pages run 成功，API �
 ```bash
 curl --fail --location --retry 30 --retry-all-errors --retry-delay 2 https://wangjs-jacky.github.io/image-effects/ >/dev/null
 curl --fail --location --retry 30 --retry-all-errors --retry-delay 2 https://wangjs-jacky.github.io/image-effects/api/library.json >/dev/null
-curl --fail --location --retry 30 --retry-all-errors --retry-delay 2 https://wangjs-jacky.github.io/image-effects/media/healing-anime-scribble-v3.jpg >/dev/null
-curl --fail --location --retry 30 --retry-all-errors --retry-delay 2 https://wangjs-jacky.github.io/image-effects/source/healing-anime-scribble-v3.md >/dev/null
+curl --fail --location --retry 30 --retry-all-errors --retry-delay 2 'https://wangjs-jacky.github.io/image-effects/media/healing-anime-scribble-v3@1.0.0.jpg' >/dev/null
+curl --fail --location --retry 30 --retry-all-errors --retry-delay 2 'https://wangjs-jacky.github.io/image-effects/source/healing-anime-scribble-v3@1.0.0.md' >/dev/null
 gh api repos/wangjs-jacky/image-effects/contents/SKILL.md --jq .sha
 gh api repos/wangjs-jacky/image-effects/contents/.image-effects-export.json --jq .sha
 npx skills add wangjs-jacky/image-effects --list

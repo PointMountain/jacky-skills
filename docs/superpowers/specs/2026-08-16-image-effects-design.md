@@ -216,8 +216,8 @@ Skill 不承担全局锁、排队或并发限制。多个效果由宿主并发�
       "category": "portrait",
       "input": { "mode": "image", "min": 1, "max": 1, "formats": ["jpeg", "png"] },
       "outputCount": 1,
-      "previewUrl": "./media/healing-anime-scribble-v3.jpg",
-      "sourceUrl": "./source/healing-anime-scribble-v3.md",
+      "previewUrl": "./media/healing-anime-scribble-v3@1.0.0.jpg",
+      "sourceUrl": "./source/healing-anime-scribble-v3@1.0.0.md",
       "provenance": {
         "repository": "ConardLi/garden-skills",
         "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
@@ -237,7 +237,7 @@ Skill 不承担全局锁、排队或并发限制。多个效果由宿主并发�
 }
 ```
 
-效果按 `id`、SemVer 升序稳定排序。`SOURCE_DATE_EPOCH` 未设置时使用当前时间；测试和发布构建必须设置。构建脚本同时生成：
+效果按 ASCII code-unit `id`、SemVer 升序稳定排序；拒绝重复 `<id>@<version>`。Gallery 媒体与效果卡副本统一以 `<id>@<version>` 作为文件 stem，避免同一效果多版本互相覆盖。`SOURCE_DATE_EPOCH` 未设置时使用当前时间；测试和发布构建必须设置。构建脚本同时生成：
 
 - `references/INDEX.md`；
 - `gallery/api/library.json`；
