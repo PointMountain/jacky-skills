@@ -80,6 +80,8 @@ Pages source: GitHub Actions artifact from gallery/
 - `gallery/`
 - `scripts/`
 - `tests/`
+- `package.json`
+- `package-lock.json`
 - 从 `assets/public-repo/` 映射到公开根目录的 `README.md`、`README_CN.md`、`LICENSE`、`THIRD_PARTY_NOTICES.md`、`.gitignore` 与 `.github/workflows/pages.yml`
 
 导出器生成 `.image-effects-export.json`，记录：
@@ -99,6 +101,8 @@ Pages source: GitHub Actions artifact from gallery/
 skills/image-effects/
 ├── SKILL.md
 ├── agents/openai.yaml
+├── package.json                # 仅维护/验证脚本依赖；Agent 调用无需安装
+├── package-lock.json
 ├── references/
 │   ├── INDEX.md                 # 构建生成
 │   └── effects/
@@ -214,6 +218,19 @@ Skill 不承担全局锁、排队或并发限制。多个效果由宿主并发�
       "outputCount": 1,
       "previewUrl": "./media/healing-anime-scribble-v3.jpg",
       "sourceUrl": "./source/healing-anime-scribble-v3.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "...",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
       "invocation": "Use $image-effects effect healing-anime-scribble-v3@1.0.0 on my uploaded image."
     }
   ]
@@ -241,10 +258,10 @@ Gallery 使用原生 HTML、CSS 和 JavaScript，提供响应式大图卡片、�
 - ID、SemVer、枚举、输入基数与格式；
 - 来源 SHA、来源路径、许可证允许列表；
 - 来源路径与逐文件 SHA-256 等长映射、重复路径拒绝、Notice 确定性生成；
-- 预览可解码、尺寸有效、SHA 匹配；
+- 预览经锁定版本的 `sharp` 完整像素解码、尺寸有效、SHA 匹配；
 - JPEG/PNG 不含 EXIF、XMP、文本块、位置或设备元数据；
 - 生成的 INDEX、Library、预览和源码副本可重复；
-- Library schema、排序、相对 URL 与版本化 invocation；
+- Library schema、排序、相对 URL、来源/预览许可证投影与版本化 invocation；
 - Gallery 搜索、分类筛选、语言标题和多选复制模型；
 - 导出白名单、删除受管旧文件、保护未受管文件、清单哈希和 `--check` 漂移；
 - 公开内容不含绝对用户路径、密钥模式或私有附件路径。
