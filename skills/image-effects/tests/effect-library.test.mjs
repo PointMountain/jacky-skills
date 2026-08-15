@@ -114,6 +114,7 @@ test('parseEffect rejects YAML values outside strict simple scalars', async (t) 
     ['explicit tag', '!!map {foo: bar}'],
     ['anchor', '&shared value'],
     ['alias', '*shared'],
+    ['quoted scalar', '"Portrait"'],
   ];
 
   for (const [name, value] of invalidValues) {
@@ -126,9 +127,25 @@ test('parseEffect rejects YAML values outside strict simple scalars', async (t) 
   }
 });
 
+test('parseEffect rejects unsupported YAML comment syntax', async (t) => {
+  const invalidValues = [
+    ['comment-only value', '# comment'],
+    ['quoted empty value with comment', '"" # comment'],
+    ['null value with comment', 'null # comment'],
+  ];
+
+  for (const [name, value] of invalidValues) {
+    await t.test(name, () => {
+      assert.throws(() => parseEffect(card({ title_en: value })), /simple single-line scalar/i);
+    });
+  }
+});
+
 test('parseEffect does not treat null-like plain text as YAML null', () => {
   assert.equal(parseEffect(card({ title_en: 'Nullable portrait' })).title.en, 'Nullable portrait');
   assert.equal(parseEffect(card({ title_en: '~decorative title' })).title.en, '~decorative title');
+  assert.equal(parseEffect(card({ title_en: 'C# portrait' })).title.en, 'C# portrait');
+  assert.equal(parseEffect(card({ title_en: 'hash#tag portrait' })).title.en, 'hash#tag portrait');
 });
 
 test('parseEffect rejects absolute paths and traversal segments', async (t) => {
@@ -246,6 +263,18 @@ test('SemVer sorting preserves numeric precedence beyond Number safe integers', 
   assert.deepEqual(
     library.effects.map((effect) => effect.version),
     ['9007199254740992.0.0', '9007199254740993.0.0'],
+  );
+});
+
+test('SemVer prerelease text identifiers use ASCII code-unit order', () => {
+  const lowercase = parseEffect(card({ version: '1.0.0-a' }));
+  const uppercase = parseEffect(card({ version: '1.0.0-B' }));
+
+  const library = buildLibrary([lowercase, uppercase], '2026-08-16T00:00:00.000Z');
+
+  assert.deepEqual(
+    library.effects.map((effect) => effect.version),
+    ['1.0.0-B', '1.0.0-a'],
   );
 });
 

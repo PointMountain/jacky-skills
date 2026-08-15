@@ -37,7 +37,8 @@ const GIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/i;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const YAML_EMPTY_SCALAR_PATTERN = /^(?:null|~|"\s*"|'\s*')$/i;
-const YAML_COMPLEX_SCALAR_PATTERN = /^[\[\]{|}>!&*]/;
+const YAML_COMPLEX_SCALAR_PATTERN = /^["'\[\]{|}>!&*]/;
+const YAML_COMMENT_PATTERN = /(?:^|[ \t])#/;
 
 function fail(message, filePath) {
   const location = filePath ? ` in ${filePath}` : '';
@@ -76,7 +77,11 @@ function parseFrontmatter(markdown, filePath) {
     if (!value) {
       fail(`Empty frontmatter value for ${key}`, filePath);
     }
-    if (YAML_EMPTY_SCALAR_PATTERN.test(value) || YAML_COMPLEX_SCALAR_PATTERN.test(value)) {
+    if (
+      YAML_EMPTY_SCALAR_PATTERN.test(value) ||
+      YAML_COMPLEX_SCALAR_PATTERN.test(value) ||
+      YAML_COMMENT_PATTERN.test(value)
+    ) {
       fail(`Field ${key} must be a simple single-line scalar`, filePath);
     }
     fields[key] = value;
@@ -161,7 +166,7 @@ function comparePrerelease(left, right) {
     const rightNumber = /^\d+$/.test(right[index]);
     if (leftNumber && rightNumber) return compareNumericIdentifier(left[index], right[index]);
     if (leftNumber !== rightNumber) return leftNumber ? -1 : 1;
-    return left[index].localeCompare(right[index]);
+    return left[index] < right[index] ? -1 : 1;
   }
   return 0;
 }
