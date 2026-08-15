@@ -122,33 +122,6 @@ function parseCsv(value, field, filePath) {
   return items;
 }
 
-function containsUnsafeEncodedPath(value) {
-  let decoded = value;
-  for (let depth = 0; depth < value.length; depth += 1) {
-    let next;
-    try {
-      next = decodeURIComponent(decoded);
-    } catch {
-      return false;
-    }
-    if (next === decoded) return false;
-
-    const segments = next.split('/');
-    if (
-      path.posix.isAbsolute(next) ||
-      path.win32.isAbsolute(next) ||
-      next.includes('\\') ||
-      next.includes('`') ||
-      CONTROL_CHARACTER_PATTERN.test(next) ||
-      segments.some((segment) => segment === '' || segment === '.' || segment === '..')
-    ) {
-      return true;
-    }
-    decoded = next;
-  }
-  return false;
-}
-
 function assertCanonicalRelativePath(value, field, filePath) {
   const segments = value.split('/');
   if (
@@ -156,9 +129,9 @@ function assertCanonicalRelativePath(value, field, filePath) {
     path.win32.isAbsolute(value) ||
     value.includes('\\') ||
     value.includes('`') ||
+    /[%?#]/.test(value) ||
     CONTROL_CHARACTER_PATTERN.test(value) ||
-    segments.some((segment) => segment === '' || segment === '.' || segment === '..') ||
-    containsUnsafeEncodedPath(value)
+    segments.some((segment) => segment === '' || segment === '.' || segment === '..')
   ) {
     fail(`${field} must be a canonical POSIX relative path without . or .. segments`, filePath);
   }
@@ -449,13 +422,12 @@ export function renderThirdPartyNotices(effects, header) {
 
   const sections = sortEffects(effects).map((effect) => {
     const sourceLines = effect.sources.map(
-      (source) =>
-        `- Source: \`${escapeMarkdownText(source.path)}\` (SHA-256: \`${source.sha256}\`)`,
+      (source) => `- Source: \`${source.path}\` (SHA-256: \`${source.sha256}\`)`,
     );
     return [
       `## ${effect.ref}`,
       '',
-      `- Repository: \`${escapeMarkdownText(effect.sourceRepository)}\``,
+      `- Repository: \`${effect.sourceRepository}\``,
       `- Revision: \`${effect.sourceRevision}\``,
       ...sourceLines,
       `- License: [${effect.sourceLicense.spdx}](${markdownDestination(effect.sourceLicense.url)})`,

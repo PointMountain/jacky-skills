@@ -210,6 +210,28 @@ test('parseEffect rejects non-canonical or unsafe provenance fields', async (t) 
     );
   });
 
+  const urlUnsafeSourcePaths = [
+    'src/a%2Fb.md',
+    'src/file#fragment.md',
+    'src/file?ref=main',
+    'src/%ZZ.md',
+  ];
+  for (const source_paths of urlUnsafeSourcePaths) {
+    await t.test(`URL-unsafe source path ${source_paths}`, () => {
+      assert.throws(
+        () => parseEffect(card({ source_paths })),
+        /relative path|canonical path/i,
+      );
+    });
+  }
+
+  await t.test('URL-unsafe preview path', () => {
+    assert.throws(
+      () => parseEffect(card({ preview: 'assets/file?ref=main.jpg' })),
+      /relative path|canonical path/i,
+    );
+  });
+
   await t.test('NUL in scalar', () => {
     assert.throws(
       () => parseEffect(card({ adaptation_notice: 'safe\0unsafe' })),
@@ -456,7 +478,7 @@ test('buildLibrary gives every effect version distinct versioned artifact URLs',
 test('renderThirdPartyNotices emits the exact escaped machine protocol', () => {
   const effect = parseEffect(
     card({
-      source_paths: 'upstream/[guide](copy).md',
+      source_paths: 'upstream/source_file.md',
       adaptation_notice: 'Adapted [guide](https://evil.example).',
     }),
     'references/effects/healing-anime-scribble-v3.md',
@@ -470,7 +492,7 @@ test('renderThirdPartyNotices emits the exact escaped machine protocol', () => {
 
 - Repository: \`ConardLi/garden-skills\`
 - Revision: \`${REVISION}\`
-- Source: \`upstream/\\[guide\\]\\(copy\\).md\` (SHA-256: \`${SOURCE_SHA}\`)
+- Source: \`upstream/source_file.md\` (SHA-256: \`${SOURCE_SHA}\`)
 - License: [MIT](<https://github.com/ConardLi/garden-skills/blob/${REVISION}/LICENSE>)
 - Adaptation: Adapted \\[guide\\]\\(https://evil.example\\).
 `,
