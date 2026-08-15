@@ -102,6 +102,18 @@ function replaceFirstJpegSegment(buffer, marker, payload) {
   ]);
 }
 
+function insertAfterFirstJpegSegment(buffer, marker, payload) {
+  assert.equal(buffer.readUInt16BE(0), 0xffd8);
+  assert.equal(buffer[2], 0xff);
+  const length = buffer.readUInt16BE(4);
+  const end = 4 + length;
+  return Buffer.concat([
+    buffer.subarray(0, end),
+    jpegSegment(marker, payload),
+    buffer.subarray(end),
+  ]);
+}
+
 function removeJpegEntropyTail(buffer, byteCount) {
   assert.equal(buffer.readUInt16BE(buffer.length - 2), 0xffd9);
   assert.ok(buffer.length > byteCount + 2);
@@ -338,6 +350,37 @@ test('JPEG 接受结构合法的 APP14 Adobe 白名单段', async () => {
       await assertMetadataFreeImage(injectJpegSegment(jpeg, 0xee, adobe), 'jpeg'),
       { format: 'jpeg', width: 7, height: 5 },
     );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('JPEG 拒绝普通 JFXX 和嵌入 EXIF 或 COM 的 JFXX JPEG 缩略图', async (t) => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'image-effects-jpeg-jfxx-'));
+  try {
+    const { assertMetadataFreeImage } = await loadImageTools();
+    const { jpeg } = await createFixtures(directory);
+    const jfxxPrefix = Buffer.from('JFXX\0', 'binary');
+    const nestedExif = injectJpegSegment(jpeg, 0xe1, Buffer.from('Exif\0\0II*\0', 'binary'));
+    const nestedComment = injectJpegSegment(jpeg, 0xfe, Buffer.from('private comment'));
+    const samples = [
+      [
+        '普通 JFXX RGB 缩略图',
+        Buffer.concat([jfxxPrefix, Buffer.from([0x13, 1, 1, 12, 34, 56])]),
+      ],
+      ['嵌入 EXIF', Buffer.concat([jfxxPrefix, Buffer.from([0x10]), nestedExif])],
+      ['嵌入 COM', Buffer.concat([jfxxPrefix, Buffer.from([0x10]), nestedComment])],
+    ];
+
+    for (const [name, jfxx] of samples) {
+      await t.test(name, async () => {
+        await assert.rejects(
+          () =>
+            assertMetadataFreeImage(insertAfterFirstJpegSegment(jpeg, 0xe0, jfxx), 'jpeg'),
+          /APP0|JFXX|metadata/i,
+        );
+      });
+    }
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

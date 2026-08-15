@@ -118,38 +118,10 @@ function assertValidJfif(payload) {
   }
 }
 
-function assertValidJfxx(payload) {
-  if (!hasPrefix(payload, Buffer.from('JFXX\0', 'binary')) || payload.length < 6) {
-    throw new Error('JPEG APP0 must contain a structurally valid JFXX segment');
-  }
-
-  const extensionCode = payload[5];
-  if (extensionCode === 0x10) {
-    if (
-      payload.length < 10 ||
-      payload.readUInt16BE(6) !== 0xffd8 ||
-      payload.readUInt16BE(payload.length - 2) !== 0xffd9
-    ) {
-      throw new Error('JPEG APP0 contains an invalid JFXX JPEG thumbnail');
-    }
-    return;
-  }
-
-  if ((extensionCode === 0x11 || extensionCode === 0x13) && payload.length >= 8) {
-    const width = payload[6];
-    const height = payload[7];
-    const expectedLength =
-      extensionCode === 0x11 ? 8 + 768 + width * height : 8 + 3 * width * height;
-    if (payload.length === expectedLength) return;
-  }
-  throw new Error('JPEG APP0 contains an invalid JFXX structure');
-}
-
 function assertAllowedAppSegment(marker, payload) {
   if (marker === 0xe0) {
     if (hasPrefix(payload, Buffer.from('JFIF\0', 'binary'))) assertValidJfif(payload);
-    else if (hasPrefix(payload, Buffer.from('JFXX\0', 'binary'))) assertValidJfxx(payload);
-    else throw new Error('JPEG APP0 metadata is not an allowed JFIF or JFXX segment');
+    else throw new Error('JPEG APP0 metadata is not an allowed JFIF segment');
     return;
   }
 
