@@ -58,7 +58,7 @@ function persist(key, value) {
 function captureFocus() {
   const element = document.activeElement;
   if (!(element instanceof HTMLElement) || !element.dataset.focusKey) return null;
-  const selection = element instanceof HTMLInputElement
+  const selection = element.dataset.testid === 'search-input'
     ? [element.selectionStart, element.selectionEnd]
     : null;
   return { key: element.dataset.focusKey, selection };
@@ -69,7 +69,7 @@ function restoreFocus(identity) {
     ?? document.querySelector('#main-content');
   if (!(target instanceof HTMLElement)) return;
   target.focus({ preventScroll: true });
-  if (target instanceof HTMLInputElement && identity.selection) {
+  if (target.dataset.testid === 'search-input' && identity.selection) {
     target.setSelectionRange(...identity.selection);
   }
 }
