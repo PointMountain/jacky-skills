@@ -114,6 +114,7 @@ skills/image-effects/
 ├── gallery/
 │   ├── index.html
 │   ├── app.js
+│   ├── gallery-runtime.mjs      # URL、焦点、剪贴板等浏览器运行时边界
 │   ├── gallery-model.mjs
 │   ├── styles.css
 │   ├── translations.js

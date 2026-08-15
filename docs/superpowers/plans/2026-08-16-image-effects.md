@@ -23,6 +23,7 @@
 - `skills/image-effects/scripts/validate-effects.mjs`：离线验证与 `gh api` 在线来源哈希验证。
 - `skills/image-effects/scripts/export-public-repo.mjs`：从干净 `HEAD` 原子化导出公开仓库。
 - `skills/image-effects/gallery/gallery-model.mjs`：可独立测试的搜索、筛选、语言和选择状态。
+- `skills/image-effects/gallery/gallery-runtime.mjs`：URL 筛选、焦点恢复、剪贴板降级与稳定 DOM ID。
 - `skills/image-effects/gallery/{index.html,app.js,translations.js,styles.css}`：纯静态 Gallery UI。
 - `skills/image-effects/tests/*.test.mjs`：机器协议和可观察行为测试。
 
@@ -303,6 +304,7 @@ Expected: PASS。
 **Files:**
 - Create: `skills/image-effects/gallery/index.html`
 - Create: `skills/image-effects/gallery/app.js`
+- Create: `skills/image-effects/gallery/gallery-runtime.mjs`
 - Create: `skills/image-effects/gallery/translations.js`
 - Create: `skills/image-effects/gallery/styles.css`
 - Create: `skills/image-effects/tests/gallery-assets.test.mjs`
