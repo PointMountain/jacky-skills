@@ -1,14 +1,19 @@
 #!/usr/bin/env node
 
 import {
+  link,
   lstat,
   mkdir,
   mkdtemp,
+  open,
   readFile,
   rename,
   rm,
+  rmdir,
+  unlink,
   writeFile,
 } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -165,49 +170,118 @@ async function validateStagedArtifacts(stageRoot, artifacts, effects, library) {
   }
 }
 
-async function installArtifacts(outputRoot, stageRoot, artifactPaths, stalePaths) {
+async function syncFile(filePath) {
+  const handle = await open(filePath, 'r');
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
+async function installArtifacts(
+  outputRoot,
+  stageRoot,
+  artifactPaths,
+  stalePaths,
+  transactionHooks = {},
+) {
   const backupRoot = path.join(stageRoot, '.backup');
   const changes = [];
+  const staleChanges = [];
 
   try {
+    // POSIX does not provide an atomic transaction across multiple paths. Each visible file is
+    // replaced with one atomic rename, while ordinary in-process failures roll back prior swaps.
+    // A process crash may expose a mix of old and new files, but never a missing existing target.
     for (const relativePath of artifactPaths) {
       const target = localPath(outputRoot, relativePath);
       const staged = localPath(stageRoot, relativePath);
       const backup = localPath(backupRoot, relativePath);
       await mkdir(path.dirname(target), { recursive: true });
-      const hadPrevious = await pathExists(target);
-      if (hadPrevious) {
+      const temporary = path.join(
+        path.dirname(target),
+        `.${path.basename(target)}.image-effects-${randomUUID()}.tmp`,
+      );
+      await link(staged, temporary);
+      const change = {
+        relativePath,
+        target,
+        temporary,
+        backup,
+        hadPrevious: false,
+        installed: false,
+      };
+      changes.push(change);
+      await syncFile(temporary);
+      change.hadPrevious = await pathExists(target);
+      if (change.hadPrevious) {
         await mkdir(path.dirname(backup), { recursive: true });
-        await rename(target, backup);
+        await link(target, backup);
       }
-      try {
-        await rename(staged, target);
-      } catch (error) {
-        if (hadPrevious) await rename(backup, target);
-        throw error;
-      }
-      changes.push({ target, backup, hadPrevious, installed: true });
+    }
+
+    for (const change of changes) {
+      await transactionHooks.beforeExchange?.({
+        relativePath: change.relativePath,
+        targetPath: change.target,
+      });
+      await rename(change.temporary, change.target);
+      change.installed = true;
     }
 
     for (const relativePath of stalePaths) {
       const target = localPath(outputRoot, relativePath);
       if (!(await pathExists(target))) continue;
-      const backup = localPath(backupRoot, relativePath);
+      const backup = localPath(path.join(stageRoot, '.stale-backup'), relativePath);
       await mkdir(path.dirname(backup), { recursive: true });
-      await rename(target, backup);
-      changes.push({ target, backup, hadPrevious: true, installed: false });
+      await link(target, backup);
+      await unlink(target);
+      staleChanges.push({ target, backup });
+    }
+
+    const staleDirectories = [...new Set(stalePaths.map((relativePath) => path.dirname(relativePath)))]
+      .sort((left, right) => right.length - left.length || compareAscii(left, right));
+    for (const relativePath of staleDirectories) {
+      try {
+        await rmdir(localPath(outputRoot, relativePath));
+      } catch (error) {
+        if (error.code !== 'ENOENT' && error.code !== 'ENOTEMPTY') throw error;
+      }
     }
   } catch (error) {
-    for (const change of changes.reverse()) {
-      if (change.installed && (await pathExists(change.target))) {
-        await rm(change.target, { recursive: true, force: true });
-      }
-      if (change.hadPrevious && (await pathExists(change.backup))) {
+    let rollbackError;
+    for (const change of staleChanges.reverse()) {
+      try {
         await mkdir(path.dirname(change.target), { recursive: true });
         await rename(change.backup, change.target);
+      } catch (cause) {
+        rollbackError ??= cause;
       }
     }
+    for (const change of changes.reverse()) {
+      if (!change.installed) continue;
+      try {
+        if (change.hadPrevious) {
+          await rename(change.backup, change.target);
+        } else {
+          await unlink(change.target);
+        }
+      } catch (cause) {
+        rollbackError ??= cause;
+      }
+    }
+    if (rollbackError) {
+      throw new AggregateError(
+        [error, rollbackError],
+        `Artifact installation failed and rollback was incomplete: ${error.message}`,
+      );
+    }
     throw error;
+  } finally {
+    for (const change of changes) {
+      await rm(change.temporary, { force: true });
+    }
   }
 }
 
@@ -215,6 +289,7 @@ export async function buildGallery({
   sourceRoot = DEFAULT_SKILL_ROOT,
   outputRoot = DEFAULT_SKILL_ROOT,
   generatedAt,
+  transactionHooks,
 } = {}) {
   const effects = await validateEffects({ sourceRoot });
   const timestamp = generatedTimestamp(generatedAt);
@@ -253,7 +328,13 @@ export async function buildGallery({
   try {
     await writeStagedArtifacts(stageRoot, artifacts);
     await validateStagedArtifacts(stageRoot, artifacts, effects, library);
-    await installArtifacts(outputRoot, stageRoot, artifactPaths, stalePaths);
+    await installArtifacts(
+      outputRoot,
+      stageRoot,
+      artifactPaths,
+      stalePaths,
+      transactionHooks,
+    );
   } finally {
     await rm(stageRoot, { recursive: true, force: true });
   }

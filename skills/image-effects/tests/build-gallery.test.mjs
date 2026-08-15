@@ -200,6 +200,93 @@ test('重建删除旧清单拥有的陈旧产物并保留非受管文件', async
   }
 });
 
+test('每个可见产物交换前旧目标始终可读，成功后不残留事务文件', async () => {
+  const sourceRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-source-'));
+  const outputRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-output-'));
+
+  try {
+    await makeFixtureSource(sourceRoot);
+    await buildGallery({
+      sourceRoot,
+      outputRoot,
+      generatedAt: '2026-08-15T00:00:00.000Z',
+    });
+    const oldTree = new Map(await fileTree(outputRoot));
+    const exchanges = [];
+
+    await buildGallery({
+      sourceRoot,
+      outputRoot,
+      generatedAt: '2026-08-16T00:00:00.000Z',
+      transactionHooks: {
+        beforeExchange: async ({ relativePath, targetPath }) => {
+          const bytes = await readFile(targetPath);
+          assert.equal(createHash('sha256').update(bytes).digest('hex'), oldTree.get(relativePath));
+          exchanges.push(relativePath);
+        },
+      },
+    });
+
+    assert.deepEqual(exchanges, MANAGED_PATHS);
+    const finalPaths = (await fileTree(outputRoot)).map(([relativePath]) => relativePath);
+    assert.deepEqual(finalPaths, MANAGED_PATHS);
+    assert.equal(
+      finalPaths.some((relativePath) =>
+        /(?:^|\/)(?:\.image-effects-build-|\.image-effects-.*\.(?:tmp|backup)$)/.test(
+          relativePath,
+        ),
+      ),
+      false,
+    );
+  } finally {
+    await Promise.all([
+      rm(sourceRoot, { recursive: true, force: true }),
+      rm(outputRoot, { recursive: true, force: true }),
+    ]);
+  }
+});
+
+test('中途交换失败后旧输出树的路径与逐文件 SHA 完全不变', async () => {
+  const sourceRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-source-'));
+  const outputRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-output-'));
+
+  try {
+    await makeFixtureSource(sourceRoot);
+    await buildGallery({
+      sourceRoot,
+      outputRoot,
+      generatedAt: '2026-08-15T00:00:00.000Z',
+    });
+    const oldTree = await fileTree(outputRoot);
+    let exchanges = 0;
+
+    await assert.rejects(
+      () =>
+        buildGallery({
+          sourceRoot,
+          outputRoot,
+          generatedAt: '2026-08-16T00:00:00.000Z',
+          transactionHooks: {
+            beforeExchange: async ({ targetPath }) => {
+              await readFile(targetPath);
+              exchanges += 1;
+              if (exchanges === 3) throw new Error('injected exchange failure');
+            },
+          },
+        }),
+      /injected exchange failure/,
+    );
+
+    assert.equal(exchanges, 3);
+    assert.deepEqual(await fileTree(outputRoot), oldTree);
+  } finally {
+    await Promise.all([
+      rm(sourceRoot, { recursive: true, force: true }),
+      rm(outputRoot, { recursive: true, force: true }),
+    ]);
+  }
+});
+
 test('写入阶段失败会回滚，不替换已有产物', async () => {
   const sourceRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-source-'));
   const outputRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-output-'));
