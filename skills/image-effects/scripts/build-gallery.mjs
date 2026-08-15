@@ -364,6 +364,9 @@ async function installArtifacts(
   const backupRoot = path.join(stageRoot, '.backup');
   const changes = [];
   const staleChanges = [];
+  const artifactPathByCaseFold = new Map(
+    artifactPaths.map((relativePath) => [relativePath.toLowerCase(), relativePath]),
+  );
 
   try {
     // POSIX does not provide an atomic transaction across multiple paths. Each visible file is
@@ -414,6 +417,19 @@ async function installArtifacts(
       const target = localPath(context.outputRoot, relativePath);
       const inspection = await inspectManagedPath(context, relativePath, 'file');
       if (!inspection.exists) continue;
+      const caseMatchedArtifact = artifactPathByCaseFold.get(relativePath.toLowerCase());
+      if (caseMatchedArtifact !== undefined) {
+        const artifactInspection = await inspectManagedPath(context, caseMatchedArtifact, 'file');
+        if (artifactInspection.exists) {
+          const [staleStats, artifactStats] = await Promise.all([
+            lstat(target),
+            lstat(localPath(context.outputRoot, caseMatchedArtifact)),
+          ]);
+          if (staleStats.dev === artifactStats.dev && staleStats.ino === artifactStats.ino) {
+            continue;
+          }
+        }
+      }
       const backup = localPath(path.join(stageRoot, '.stale-backup'), relativePath);
       await mkdir(path.dirname(backup), { recursive: true });
       await materializeFile(target, backup);

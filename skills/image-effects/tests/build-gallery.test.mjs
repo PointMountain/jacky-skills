@@ -607,6 +607,64 @@ test('INDEX 对 Markdown table 中的反斜杠和 pipe 做稳定转义', async (
   }
 });
 
+test('同一 ref 仅扩展名大小写变化时保留新预览且 Library URL 可读', async () => {
+  const sourceRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-source-'));
+  const outputRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-output-'));
+  try {
+    await makeFixtureSource(sourceRoot);
+    const expectedPreview = await readFile(
+      path.join(sourceRoot, 'assets/previews/healing-anime-scribble-v3.jpg'),
+    );
+    await Promise.all([
+      mkdir(path.join(outputRoot, 'gallery/api'), { recursive: true }),
+      mkdir(path.join(outputRoot, 'gallery/media'), { recursive: true }),
+      mkdir(path.join(outputRoot, 'gallery/source'), { recursive: true }),
+    ]);
+    await Promise.all([
+      writeFile(
+        path.join(outputRoot, 'gallery/api/library.json'),
+        JSON.stringify({
+          schemaVersion: 1,
+          effects: [
+            {
+              previewUrl: `./media/${EFFECT_REF}.JPG`,
+              sourceUrl: `./source/${EFFECT_REF}.md`,
+            },
+          ],
+        }),
+      ),
+      writeFile(path.join(outputRoot, `gallery/media/${EFFECT_REF}.JPG`), 'old preview'),
+      writeFile(path.join(outputRoot, `gallery/source/${EFFECT_REF}.md`), 'old source'),
+    ]);
+
+    await buildGallery({
+      sourceRoot,
+      outputRoot,
+      generatedAt: '2026-08-16T00:00:00.000Z',
+    });
+
+    const library = JSON.parse(
+      await readFile(path.join(outputRoot, 'gallery/api/library.json'), 'utf8'),
+    );
+    const previewPath = path.join(
+      outputRoot,
+      'gallery',
+      library.effects[0].previewUrl.replace(/^\.\//, ''),
+    );
+    assert.deepEqual(await readFile(previewPath), expectedPreview);
+    const mediaNames = await readdir(path.join(outputRoot, 'gallery/media'));
+    assert.equal(
+      mediaNames.filter((name) => name.toLowerCase() === `${EFFECT_REF}.jpg`).length,
+      1,
+    );
+  } finally {
+    await Promise.all([
+      rm(sourceRoot, { recursive: true, force: true }),
+      rm(outputRoot, { recursive: true, force: true }),
+    ]);
+  }
+});
+
 test('预览公开扩展统一小写并删除旧清单中的大写扩展 stale 文件', async () => {
   const sourceRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-source-'));
   const outputRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-output-'));
