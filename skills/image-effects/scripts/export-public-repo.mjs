@@ -266,8 +266,11 @@ function scanPublicContent(relativePath, bytes) {
     throw wrapped;
   }
   const withoutHttpUrls = text.replace(
-    /https?:\/\/[^\s"'`<>?#]+/gi,
+    /(?<![A-Za-z0-9+.-])https?:\/\/[^\s"'`<>?#]+/gi,
     (candidate) => {
+      if (!/^https?:\/\/[^/\\?#]+(?:\/[^\\?#]*)?$/i.test(candidate)) {
+        return candidate;
+      }
       try {
         const parsed = new URL(candidate);
         if (
@@ -284,7 +287,7 @@ function scanPublicContent(relativePath, bytes) {
   );
   const rules = [
     {
-      pattern: /\/(?:Users|home)\/[^/\s"'`<>]+(?:\/|$)/i,
+      pattern: /[\\/](?:Users|home)[\\/][^\\/\s"'`<>]+(?:[\\/]|$)/i,
       message: "absolute user path",
       content: withoutHttpUrls,
     },
