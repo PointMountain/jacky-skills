@@ -1,0 +1,10 @@
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+.cache/
+dist/
+.image-effects-*.lock
+.image-effects-build-*/
