@@ -559,6 +559,10 @@ test("旧 manifest 拒绝所有危险路径语法与重复项，且拒绝越界 
     "scripts/less<name.mjs",
     "scripts/greater>name.mjs",
     "scripts/pipe|name.mjs",
+    'scripts/quote"name.mjs',
+    "scripts/new\nline.mjs",
+    "scripts/tab\tname.mjs",
+    "scripts/unit\u001fseparator.mjs",
     "scripts/CON",
     "scripts/prn.txt",
     "scripts/AuX.json",
@@ -1206,10 +1210,49 @@ test("源 Git tree 中选中的 symlink 或非 regular entry 会被拒绝", asyn
   }
 });
 
+test("源 Git tree 的导出路径拒绝双引号和 ASCII 控制字符", async (t) => {
+  const invalidNames = [
+    'quote"name.mjs',
+    "new\nline.mjs",
+    "tab\tname.mjs",
+    "unit\u001fseparator.mjs",
+  ];
+  for (const invalidName of invalidNames) {
+    await t.test(JSON.stringify(invalidName), async () => {
+      const sourceRoot = await makeSourceFixture();
+      const parent = await mkdtemp(
+        path.join(tmpdir(), "image-effects-export-targets-")
+      );
+      const target = path.join(parent, "public");
+      try {
+        await writeRelative(
+          sourceRoot,
+          `skills/image-effects/scripts/${invalidName}`,
+          "export const unsafe = true;\n"
+        );
+        await commitAll(sourceRoot, "add unsafe Git path");
+        await assert.rejects(
+          () => exportPublicRepository({ target, cwd: sourceRoot }),
+          /unsafe export path/i
+        );
+        await assert.rejects(() => lstat(target), /ENOENT/);
+      } finally {
+        await Promise.all([
+          rm(sourceRoot, { recursive: true, force: true }),
+          rm(parent, { recursive: true, force: true }),
+        ]);
+      }
+    });
+  }
+});
+
 test("内容扫描拒绝用户绝对路径、附件路径、secret 与禁止属性内容", async (t) => {
   const forbiddenContents = [
     `/${"Users"}/private-user/project/file.md\n`,
     `Private:/${"Users"}/private-user/project/file.md\n`,
+    `Location:/${"Users"}/private-user/project/file.md\n`,
+    `Source:/${"home"}/private-user/project/file.md\n`,
+    `https://example.com/docs?local=/${"Users"}/private-user/project/file.md\n`,
     `\`/${"Users"}/private-user/project/file.md\`\n`,
     `file:///${"Users"}/private-user/project/file.md\n`,
     `${"C:"}\\${"Users"}\\private-user\\project\\file.md\n`,
@@ -1262,6 +1305,9 @@ test("内容扫描不误报合法 URL 与未包含个人目录的普通文本", 
       [
         "https://example.com/Users/guide/reference",
         "https://example.com/docs/C:/Users/guide/reference",
+        "[macOS guide](https://example.com/Users/guide/reference)",
+        "`https://example.com/home/guide/reference`",
+        "HTTPS://example.com/home/guide/reference",
         "The /Users directory contains account folders.",
         "Windows uses a Users directory and drive letters such as C:.",
         "A project may document home/example without an absolute path.",

@@ -219,7 +219,7 @@ function assertSafeManagedPath(
     relativePath.includes("%") ||
     /[:*<>|?]/.test(relativePath) ||
     relativePath.includes("#") ||
-    relativePath.includes("\0")
+    /["\u0000-\u001f]/.test(relativePath)
   ) {
     throw new Error(`Unsafe ${label}: ${JSON.stringify(relativePath)}`);
   }
@@ -265,25 +265,34 @@ function scanPublicContent(relativePath, bytes) {
     wrapped.cause = error;
     throw wrapped;
   }
+  const withoutHttpUrls = text.replace(
+    /https?:\/\/[^\s"'`<>?#]+/gi,
+    (candidate) => {
+      try {
+        const parsed = new URL(candidate);
+        if (
+          (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+          parsed.host !== ""
+        ) {
+          return " ".repeat(candidate.length);
+        }
+      } catch {
+        // 仅排除 URL 解析确认含 authority 的 HTTP(S) 片段。
+      }
+      return candidate;
+    }
+  );
   const rules = [
     {
-      pattern:
-        /(?:^|[^A-Za-z0-9_/?#%&=.:-])\/(?:Users|home)\/[^/\s"'`<>]+(?:\/|$)/im,
+      pattern: /\/(?:Users|home)\/[^/\s"'`<>]+(?:\/|$)/i,
       message: "absolute user path",
-    },
-    {
-      pattern: /\b(?:private|path):\/(?:Users|home)\/[^/\s"'`<>]+(?:\/|$)/im,
-      message: "absolute user path",
+      content: withoutHttpUrls,
     },
     {
       pattern:
         /(?:^|[^A-Za-z0-9_/])[A-Za-z]:[\\/]Users[\\/][^\\/\s"'`<>]+(?:[\\/]|$)/im,
       message: "absolute user path",
-    },
-    {
-      pattern:
-        /\bfile:\/\/\/(?:[A-Za-z]:[\\/])?(?:Users|home)[\\/][^\\/\s"'`<>]+(?:[\\/]|$)/i,
-      message: "absolute user path",
+      content: withoutHttpUrls,
     },
     {
       pattern: /(?:sandbox:)?\/mnt\/data\/|attachment:\/\//i,
@@ -305,7 +314,7 @@ function scanPublicContent(relativePath, bytes) {
     },
   ];
   for (const rule of rules) {
-    if (rule.pattern.test(text)) {
+    if (rule.pattern.test(rule.content ?? text)) {
       throw new Error(
         `Unsafe public content in ${relativePath}: ${rule.message}`
       );
