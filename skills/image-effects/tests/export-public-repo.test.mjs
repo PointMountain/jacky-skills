@@ -797,6 +797,107 @@ test("--check 从同一 HEAD 重建，允许纯受管 dirty，并拒绝各种漂
     }
   );
 
+  await t.test("拒绝 staged blob 正确但 index mode 变为 100755", async () => {
+    const fixture = await preparedTarget();
+    try {
+      await initTargetRepository(fixture.target);
+      await git(fixture.target, "update-index", "--chmod=+x", "README.md");
+      assert.match(
+        (await git(fixture.target, "ls-files", "--stage", "README.md")).stdout,
+        /^100755 /m
+      );
+
+      await assert.rejects(
+        () =>
+          exportPublicRepository({
+            target: fixture.target,
+            cwd: fixture.sourceRoot,
+            check: true,
+          }),
+        /index|mode|type|100755/i
+      );
+    } finally {
+      await Promise.all([
+        rm(fixture.sourceRoot, { recursive: true, force: true }),
+        rm(fixture.parent, { recursive: true, force: true }),
+      ]);
+    }
+  });
+
+  await t.test(
+    "拒绝 staged blob 正确但 index type 变为 120000 symlink",
+    async () => {
+      const fixture = await preparedTarget();
+      try {
+        await initTargetRepository(fixture.target);
+        const scriptPath = path.join(fixture.target, "scripts/run.mjs");
+        const expectedScript = await readFile(scriptPath, "utf8");
+        await rm(scriptPath);
+        await symlink(expectedScript, scriptPath);
+        await git(fixture.target, "add", "scripts/run.mjs");
+        await rm(scriptPath);
+        await writeFile(scriptPath, expectedScript);
+        assert.match(
+          (await git(fixture.target, "ls-files", "--stage", "scripts/run.mjs"))
+            .stdout,
+          /^120000 /m
+        );
+
+        await assert.rejects(
+          () =>
+            exportPublicRepository({
+              target: fixture.target,
+              cwd: fixture.sourceRoot,
+              check: true,
+            }),
+          /index|mode|type|120000|symlink/i
+        );
+      } finally {
+        await Promise.all([
+          rm(fixture.sourceRoot, { recursive: true, force: true }),
+          rm(fixture.parent, { recursive: true, force: true }),
+        ]);
+      }
+    }
+  );
+
+  await t.test("拒绝 staged managed path 变为 160000 gitlink", async () => {
+    const fixture = await preparedTarget();
+    try {
+      await initTargetRepository(fixture.target);
+      const targetHead = (
+        await git(fixture.target, "rev-parse", "HEAD")
+      ).stdout.trim();
+      await git(
+        fixture.target,
+        "update-index",
+        "--add",
+        "--cacheinfo",
+        `160000,${targetHead},scripts/run.mjs`
+      );
+      assert.match(
+        (await git(fixture.target, "ls-files", "--stage", "scripts/run.mjs"))
+          .stdout,
+        /^160000 /m
+      );
+
+      await assert.rejects(
+        () =>
+          exportPublicRepository({
+            target: fixture.target,
+            cwd: fixture.sourceRoot,
+            check: true,
+          }),
+        /index|mode|type|160000|gitlink/i
+      );
+    } finally {
+      await Promise.all([
+        rm(fixture.sourceRoot, { recursive: true, force: true }),
+        rm(fixture.parent, { recursive: true, force: true }),
+      ]);
+    }
+  });
+
   await t.test(
     "拒绝 staged managed delete，即使工作树文件仍是正确导出内容",
     async () => {

@@ -765,6 +765,80 @@ function parseNullTerminatedGitPaths(bytes, label) {
   return paths;
 }
 
+function parseSingleStagedIndexEntry(bytes, expectedPath) {
+  if (
+    !Buffer.isBuffer(bytes) ||
+    bytes.length === 0 ||
+    bytes[bytes.length - 1] !== 0
+  ) {
+    throw new Error(
+      `Public export check found a missing or malformed staged index entry: ${expectedPath}`
+    );
+  }
+  const record = bytes.subarray(0, bytes.length - 1);
+  if (record.includes(0)) {
+    throw new Error(
+      `Public export check found multiple staged index entries: ${expectedPath}`
+    );
+  }
+  const separator = record.indexOf(0x09);
+  if (separator < 0) {
+    throw new Error(
+      `Public export check found a malformed staged index entry: ${expectedPath}`
+    );
+  }
+
+  let header;
+  let relativePath;
+  try {
+    const decoder = new TextDecoder("utf-8", { fatal: true });
+    header = decoder.decode(record.subarray(0, separator));
+    relativePath = decoder.decode(record.subarray(separator + 1));
+  } catch (error) {
+    const wrapped = new Error(
+      `Public export check found invalid UTF-8 in a staged index entry: ${expectedPath}`
+    );
+    wrapped.cause = error;
+    throw wrapped;
+  }
+
+  const match = /^([0-7]{6}) ([0-9a-f]{40,64}) ([0-3])$/.exec(header);
+  if (!match || match[3] !== "0" || relativePath !== expectedPath) {
+    throw new Error(
+      `Public export check found a malformed staged index entry: ${expectedPath}`
+    );
+  }
+  return { mode: match[1] };
+}
+
+function expectedGitMode(file) {
+  if (file.mode === 0o644) return "100644";
+  if (file.mode === 0o755) return "100755";
+  throw new Error(`Unsupported expected export mode: ${file.path}`);
+}
+
+async function assertStagedIndexEntryMatches(target, expectedFile) {
+  const indexOutput = (
+    await runGit(
+      target,
+      ["ls-files", "--stage", "-z", "--", `:(literal)${expectedFile.path}`],
+      { binary: true }
+    )
+  ).stdout;
+  const entry = parseSingleStagedIndexEntry(indexOutput, expectedFile.path);
+  const expectedMode = expectedGitMode(expectedFile);
+  if (entry.mode !== expectedMode) {
+    throw new Error(
+      `Public export check found staged index mode/type mismatch: ${expectedFile.path} (expected ${expectedMode}, found ${entry.mode})`
+    );
+  }
+  await assertStagedIndexBlobMatches(
+    target,
+    expectedFile.path,
+    expectedFile.bytes
+  );
+}
+
 async function assertStagedIndexBlobMatches(
   target,
   relativePath,
@@ -793,7 +867,7 @@ async function assertCheckGitPathsAreManaged(target, expectedFiles) {
   if (!(await pathExists(path.join(target, ".git")))) return;
   await assertTargetGitRepository(target);
   const expectedByPath = new Map(
-    expectedFiles.map(({ path: relativePath, bytes }) => [relativePath, bytes])
+    expectedFiles.map((file) => [file.path, file])
   );
   const stagedOutput = (
     await runGit(
@@ -806,11 +880,11 @@ async function assertCheckGitPathsAreManaged(target, expectedFiles) {
     stagedOutput,
     "staged index"
   )) {
-    const expectedBytes = expectedByPath.get(changedPath);
-    if (expectedBytes === undefined) {
+    const expectedFile = expectedByPath.get(changedPath);
+    if (expectedFile === undefined) {
       throw new Error("Public export check found unmanaged staged index path");
     }
-    await assertStagedIndexBlobMatches(target, changedPath, expectedBytes);
+    await assertStagedIndexEntryMatches(target, expectedFile);
   }
 
   const worktreeCommands = [
@@ -855,7 +929,7 @@ async function checkTarget(targetContext, source, desiredFiles, manifestBytes) {
   ].sort(compareAscii);
   const expectedFiles = [
     ...desiredFiles,
-    { path: MANIFEST_NAME, bytes: manifestBytes },
+    { path: MANIFEST_NAME, bytes: manifestBytes, mode: 0o644 },
   ];
   await assertCheckGitPathsAreManaged(targetContext.target, expectedFiles);
   if (
