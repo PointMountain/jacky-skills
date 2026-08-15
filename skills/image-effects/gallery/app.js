@@ -12,11 +12,9 @@ import {
   toggleSelection,
 } from './gallery-model.mjs';
 import { translations } from './translations.js';
-
 const INSTALL_COMMAND = 'npx skills add wangjs-jacky/image-effects';
 const THEME_ORDER = Object.freeze(['system', 'dark', 'light']);
 const app = document.querySelector('#app');
-
 function readPreference(key, allowed, fallback) {
   try {
     const value = localStorage.getItem(key);
@@ -25,7 +23,6 @@ function readPreference(key, allowed, fallback) {
     return fallback;
   }
 }
-
 let state = Object.freeze(
   createGalleryState({ language: readPreference('image-effects-language', ['en', 'zh'], 'en') }),
 );
@@ -33,14 +30,12 @@ let view = Object.freeze({
   theme: readPreference('image-effects-theme', THEME_ORDER, 'dark'),
   notice: '',
 });
-
 function withTokens(template, values = {}) {
   return Object.entries(values).reduce(
     (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
     template,
   );
 }
-
 function copy(text) {
   if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
   const field = document.createElement('textarea');
@@ -53,7 +48,6 @@ function copy(text) {
   field.remove();
   return copied ? Promise.resolve() : Promise.reject(new Error('Copy failed'));
 }
-
 function persist(key, value) {
   try {
     localStorage.setItem(key, value);
@@ -61,7 +55,24 @@ function persist(key, value) {
     // 存储不可用时，当前页面中的偏好仍然有效。
   }
 }
-
+function captureFocus() {
+  const element = document.activeElement;
+  if (!(element instanceof HTMLElement) || !element.dataset.focusKey) return null;
+  const selection = element instanceof HTMLInputElement
+    ? [element.selectionStart, element.selectionEnd]
+    : null;
+  return { key: element.dataset.focusKey, selection };
+}
+function restoreFocus(identity) {
+  if (!identity) return;
+  const target = document.querySelector(`[data-focus-key="${identity.key}"]`)
+    ?? document.querySelector('#main-content');
+  if (!(target instanceof HTMLElement)) return;
+  target.focus({ preventScroll: true });
+  if (target instanceof HTMLInputElement && identity.selection) {
+    target.setSelectionRange(...identity.selection);
+  }
+}
 function node(tag, options = {}, children = []) {
   const element = document.createElement(tag);
   if (options.className) element.className = options.className;
@@ -75,7 +86,6 @@ function node(tag, options = {}, children = []) {
   element.append(...children.filter(Boolean));
   return element;
 }
-
 function button(text, options = {}) {
   const element = node('button', {
     className: options.className,
@@ -86,7 +96,6 @@ function button(text, options = {}) {
   if (options.onClick) element.addEventListener('click', options.onClick);
   return element;
 }
-
 function externalLink(text, href, options = {}) {
   return node('a', {
     className: options.className,
@@ -100,12 +109,10 @@ function externalLink(text, href, options = {}) {
     dataset: options.dataset,
   });
 }
-
 function announce(message) {
   view = Object.freeze({ ...view, notice: message });
   render();
 }
-
 async function copyWithFeedback(value, successMessage) {
   const t = translations[state.language];
   try {
@@ -115,29 +122,26 @@ async function copyWithFeedback(value, successMessage) {
     announce(t.copyFailed);
   }
 }
-
 function setState(nextState, renderOptions) {
   state = Object.freeze(nextState);
   render(renderOptions);
 }
-
 function makeHeader(t) {
   const languageToggle = button(t.languageAction, {
     className: 'utility-button language-button',
     attrs: { 'aria-label': t.languageLabel },
-    dataset: { testid: 'language-toggle' },
+    dataset: { testid: 'language-toggle', focusKey: 'language-toggle' },
     onClick: () => {
       const language = state.language === 'en' ? 'zh' : 'en';
       persist('image-effects-language', language);
       setState({ ...state, language });
     },
   });
-
   const currentTheme = t[`theme${view.theme[0].toUpperCase()}${view.theme.slice(1)}`];
   const themeToggle = button(withTokens(t.themeValue, { theme: currentTheme }), {
     className: 'utility-button theme-button',
     attrs: { 'aria-label': t.themeLabel },
-    dataset: { testid: 'theme-toggle' },
+    dataset: { testid: 'theme-toggle', focusKey: 'theme-toggle' },
     onClick: () => {
       const nextIndex = (THEME_ORDER.indexOf(view.theme) + 1) % THEME_ORDER.length;
       view = Object.freeze({ ...view, theme: THEME_ORDER[nextIndex], notice: '' });
@@ -145,7 +149,6 @@ function makeHeader(t) {
       render();
     },
   });
-
   return node('header', { className: 'site-header' }, [
     node('div', { className: 'brand-lockup' }, [
       node('span', { className: 'brand-mark', attrs: { 'aria-hidden': 'true' } }),
@@ -158,7 +161,6 @@ function makeHeader(t) {
     ]),
   ]);
 }
-
 function makeIntro(t) {
   const effects = state.library?.effects ?? [];
   const countKey = effects.length === 1 ? 'effectCount' : 'effectCountPlural';
@@ -173,7 +175,6 @@ function makeIntro(t) {
         }),
       ]
     : [];
-
   return node('section', { className: 'intro', attrs: { 'aria-labelledby': 'page-title' } }, [
     node('div', { className: 'intro-copy' }, [
       node('p', { className: 'eyebrow', text: t.heroEyebrow }),
@@ -188,7 +189,6 @@ function makeIntro(t) {
     ]),
   ]);
 }
-
 function makeInstall(t) {
   return node('section', { className: 'install-strip', attrs: { 'aria-label': t.installLabel } }, [
     node('div', { className: 'install-copy' }, [
@@ -197,15 +197,14 @@ function makeInstall(t) {
     ]),
     button(t.copyInstall, {
       className: 'copy-button',
+      dataset: { action: 'copy-install', focusKey: 'copy-install' },
       onClick: () => copyWithFeedback(INSTALL_COMMAND, t.copiedInstall),
     }),
   ]);
 }
-
-function updateFilter(field, value, focusId) {
-  setState({ ...state, [field]: value }, focusId ? { focusId } : undefined);
+function updateFilter(field, value) {
+  setState({ ...state, [field]: value });
 }
-
 function makeFilters(t, visibleCount, totalCount) {
   const search = node('input', {
     className: 'search-input',
@@ -216,19 +215,19 @@ function makeFilters(t, visibleCount, totalCount) {
       placeholder: t.searchPlaceholder,
       autocomplete: 'off',
     },
-    dataset: { testid: 'search-input' },
+    dataset: { testid: 'search-input', focusKey: 'search-input' },
   });
   search.addEventListener('input', (event) =>
-    updateFilter('query', event.currentTarget.value, 'search-input'),
+    updateFilter('query', event.currentTarget.value),
   );
 
   const category = node('select', {
     className: 'category-filter',
     attrs: { id: 'category-filter' },
-    dataset: { testid: 'category-filter' },
+    dataset: { testid: 'category-filter', focusKey: 'category-filter' },
   }, [
     node('option', { text: t.categoryAll, attrs: { value: 'all' } }),
-    node('option', { text: t.categoryPortrait, attrs: { value: 'portrait' } }),
+    node('option', { text: t.categories.portrait, attrs: { value: 'portrait' } }),
   ]);
   category.value = state.category;
   category.addEventListener('change', (event) => updateFilter('category', event.currentTarget.value));
@@ -257,6 +256,10 @@ function makeFact(label, value) {
   ]);
 }
 
+function categoryLabel(category, t) {
+  return t.categories[category] ?? category;
+}
+
 function makeEffectCard(effect, t) {
   const selected = state.selectedRefs.includes(effect.ref);
   const checkbox = node('input', {
@@ -266,7 +269,7 @@ function makeEffectCard(effect, t) {
       checked: selected ? '' : undefined,
       'aria-label': withTokens(t.selectEffect, { title: effect.title }),
     },
-    dataset: { testid: 'effect-select' },
+    dataset: { testid: 'effect-select', focusKey: `effect-select:${effect.ref}` },
   });
   checkbox.checked = selected;
   checkbox.addEventListener('change', () => setState(toggleSelection(state, effect.ref)));
@@ -307,7 +310,7 @@ function makeEffectCard(effect, t) {
     ]),
     node('div', { className: 'effect-content' }, [
       node('div', { className: 'effect-topline' }, [
-        node('span', { className: 'category-chip', text: effect.category }),
+        node('span', { className: 'category-chip', text: categoryLabel(effect.category, t) }),
         node('label', { className: 'selection-control' }, [
           checkbox,
           node('span', { text: selected ? t.selected : t.notSelected }),
@@ -320,7 +323,7 @@ function makeEffectCard(effect, t) {
       ]),
       node('dl', { className: 'facts' }, [
         makeFact(t.version, effect.version),
-        makeFact(t.category, effect.category),
+        makeFact(t.category, categoryLabel(effect.category, t)),
         makeFact(t.input, inputValue),
         makeFact(t.output, withTokens(t[outputKey], { count: effect.outputCount })),
       ]),
@@ -379,14 +382,16 @@ function makeSelectionBar(t) {
     node('div', { className: 'selection-actions' }, [
       button(t.clearSelection, {
         className: 'secondary-button',
-        attrs: { disabled: invocations.length ? undefined : '' },
-        onClick: () => setState(clearSelection(state)),
+        attrs: { 'aria-disabled': invocations.length ? 'false' : 'true' },
+        dataset: { action: 'clear-selection', focusKey: 'clear-selection' },
+        onClick: () => invocations.length && setState(clearSelection(state)),
       }),
       button(t.copySelected, {
         className: 'primary-button',
-        attrs: { disabled: invocations.length ? undefined : '' },
-        dataset: { testid: 'copy-selected' },
-        onClick: () => copyWithFeedback(invocations.join('\n'), t.copiedSelected),
+        attrs: { 'aria-disabled': invocations.length ? 'false' : 'true' },
+        dataset: { testid: 'copy-selected', focusKey: 'copy-selected' },
+        onClick: () => invocations.length
+          && copyWithFeedback(invocations.join('\n'), t.copiedSelected),
       }),
     ]),
   ]);
@@ -404,12 +409,16 @@ function makeLoadState(t) {
       node('p', { text: state.loadError }),
       button(t.retry, {
         className: 'primary-button',
-        dataset: { testid: 'retry-load' },
+        dataset: { testid: 'retry-load', focusKey: 'retry-load' },
         onClick: () => loadLibrary(true),
       }),
     ]);
   }
-  return node('section', { className: 'state-panel loading-panel', attrs: { 'aria-live': 'polite' } }, [
+  return node('section', {
+    className: 'state-panel loading-panel',
+    attrs: { 'aria-live': 'polite', tabindex: '-1' },
+    dataset: { action: 'retry-load', focusKey: 'retry-load' },
+  }, [
     node('span', { className: 'loading-line', attrs: { 'aria-hidden': 'true' } }),
     node('p', { text: t.loading }),
   ]);
@@ -422,12 +431,17 @@ function makeEmptyState(t) {
     node('p', { text: t.emptyBody }),
     button(t.resetFilters, {
       className: 'primary-button',
-      onClick: () => setState({ ...state, query: '', category: 'all' }),
+      dataset: { action: 'reset-filters', focusKey: 'reset-filters' },
+      onClick: () => setState(
+        { ...state, query: '', category: 'all' },
+        { focus: { key: 'search-input', selection: [0, 0] } },
+      ),
     }),
   ]);
 }
 
 function render(renderOptions = {}) {
+  const focus = renderOptions.focus ?? captureFocus();
   const t = translations[state.language];
   const visibleEffects = state.loadStatus === 'ready' ? getVisibleEffects(state) : [];
   const totalEffects = state.library?.effects.length ?? 0;
@@ -453,7 +467,7 @@ function render(renderOptions = {}) {
     node('a', { className: 'skip-link', text: t.skipToContent, attrs: { href: '#main-content' } }),
     node('div', { className: 'site-shell' }, [
       makeHeader(t),
-      node('main', { attrs: { id: 'main-content' } }, mainChildren),
+      node('main', { attrs: { id: 'main-content', tabindex: '-1' } }, mainChildren),
       node('footer', { className: 'site-footer' }, [
         node('span', { className: 'footer-rule', attrs: { 'aria-hidden': 'true' } }),
         node('p', { text: t.footer }),
@@ -462,14 +476,7 @@ function render(renderOptions = {}) {
     node('p', { className: 'sr-only', text: view.notice, attrs: { 'aria-live': 'polite' } }),
   );
 
-  if (renderOptions.focusId) {
-    const focused = document.querySelector(`[data-testid="${renderOptions.focusId}"]`);
-    focused?.focus();
-    if (focused instanceof HTMLInputElement) {
-      const end = focused.value.length;
-      focused.setSelectionRange(end, end);
-    }
-  }
+  restoreFocus(focus);
 }
 
 async function loadLibrary(isRetry = false) {

@@ -5,6 +5,8 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { translations } from '../gallery/translations.js';
+
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const GALLERY_ROOT = path.join(SKILL_ROOT, 'gallery');
 const EXPECTED_REVISION = 'aaf9a82f5efd73e87cc0998edc398e75bfc35901';
@@ -103,5 +105,18 @@ test('Library 固定公开来源、源码许可和预览署名契约', async (t)
         licenseSpdx: 'CC-BY-4.0',
       },
     });
+  }
+});
+
+test('Library 的每个分类都有中英文展示标签', async () => {
+  const library = JSON.parse(
+    await readFile(path.join(GALLERY_ROOT, 'api/library.json'), 'utf8'),
+  );
+  const categories = new Set(library.effects.map((effect) => effect.category));
+
+  for (const category of categories) {
+    assert.equal(typeof translations.en.categories[category], 'string');
+    assert.equal(typeof translations.zh.categories[category], 'string');
+    assert.notEqual(translations.en.categories[category], translations.zh.categories[category]);
   }
 });
