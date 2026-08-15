@@ -1,20 +1,14 @@
-import {
-  assertLibrary,
-  clearSelection,
-  createGalleryState,
-  getSelectedInvocations,
-  getVisibleEffects,
-  loadFailed,
-  loadSucceeded,
-  localizeEffect,
-  retryLoad,
-  startLoading,
-  toggleSelection,
-} from './gallery-model.mjs';
+import { assertLibrary, clearSelection, createGalleryState, getSelectedInvocations, getVisibleEffects, loadFailed, loadSucceeded, localizeEffect, retryLoad, startLoading, toggleSelection } from './gallery-model.mjs';
 import { translations } from './translations.js';
+import { captureFocus, copyText, effectTitleId, readLocationFilters, restoreFocus, syncLocationFilters } from './gallery-runtime.mjs';
 const INSTALL_COMMAND = 'npx skills add wangjs-jacky/image-effects';
 const THEME_ORDER = Object.freeze(['system', 'dark', 'light']);
 const app = document.querySelector('#app');
+const liveRegion = document.querySelector('#app-status');
+const themeColor = document.querySelector('meta[name="theme-color"]');
+let searchFrame = 0;
+let pendingQuery = '';
+let composing = false;
 function readPreference(key, allowed, fallback) {
   try {
     const value = localStorage.getItem(key);
@@ -24,53 +18,23 @@ function readPreference(key, allowed, fallback) {
   }
 }
 let state = Object.freeze(
-  createGalleryState({ language: readPreference('image-effects-language', ['en', 'zh'], 'en') }),
+  createGalleryState({
+    language: readPreference('image-effects-language', ['en', 'zh'], 'en'),
+    ...readLocationFilters(),
+  }),
 );
-let view = Object.freeze({
-  theme: readPreference('image-effects-theme', THEME_ORDER, 'dark'),
-  notice: '',
-});
+let view = Object.freeze({ theme: readPreference('image-effects-theme', THEME_ORDER, 'dark') });
 function withTokens(template, values = {}) {
   return Object.entries(values).reduce(
     (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
     template,
   );
 }
-function copy(text) {
-  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
-  const field = document.createElement('textarea');
-  field.value = text;
-  field.setAttribute('readonly', '');
-  field.className = 'clipboard-fallback';
-  document.body.append(field);
-  field.select();
-  const copied = document.execCommand('copy');
-  field.remove();
-  return copied ? Promise.resolve() : Promise.reject(new Error('Copy failed'));
-}
 function persist(key, value) {
   try {
     localStorage.setItem(key, value);
   } catch {
     // 存储不可用时，当前页面中的偏好仍然有效。
-  }
-}
-function captureFocus() {
-  const element = document.activeElement;
-  if (!(element instanceof HTMLElement) || !element.dataset.focusKey) return null;
-  const selection = element.dataset.testid === 'search-input'
-    ? [element.selectionStart, element.selectionEnd]
-    : null;
-  return { key: element.dataset.focusKey, selection };
-}
-function restoreFocus(identity) {
-  if (!identity) return;
-  const target = document.querySelector(`[data-focus-key="${identity.key}"]`)
-    ?? document.querySelector('#main-content');
-  if (!(target instanceof HTMLElement)) return;
-  target.focus({ preventScroll: true });
-  if (target.dataset.testid === 'search-input' && identity.selection) {
-    target.setSelectionRange(...identity.selection);
   }
 }
 function node(tag, options = {}, children = []) {
@@ -110,13 +74,13 @@ function externalLink(text, href, options = {}) {
   });
 }
 function announce(message) {
-  view = Object.freeze({ ...view, notice: message });
-  render();
+  liveRegion.textContent = '';
+  requestAnimationFrame(() => { liveRegion.textContent = message; });
 }
 async function copyWithFeedback(value, successMessage) {
   const t = translations[state.language];
   try {
-    await copy(value);
+    await copyText(value);
     announce(successMessage);
   } catch {
     announce(t.copyFailed);
@@ -125,6 +89,13 @@ async function copyWithFeedback(value, successMessage) {
 function setState(nextState, renderOptions) {
   state = Object.freeze(nextState);
   render(renderOptions);
+}
+function validCategory(nextState) {
+  const effects = nextState.library?.effects;
+  if (!effects || nextState.category === 'all') return nextState;
+  return effects.some((effect) => effect.category === nextState.category)
+    ? nextState
+    : { ...nextState, category: 'all' };
 }
 function makeHeader(t) {
   const languageToggle = button(t.languageAction, {
@@ -144,7 +115,7 @@ function makeHeader(t) {
     dataset: { testid: 'theme-toggle', focusKey: 'theme-toggle' },
     onClick: () => {
       const nextIndex = (THEME_ORDER.indexOf(view.theme) + 1) % THEME_ORDER.length;
-      view = Object.freeze({ ...view, theme: THEME_ORDER[nextIndex], notice: '' });
+      view = Object.freeze({ ...view, theme: THEME_ORDER[nextIndex] });
       persist('image-effects-theme', view.theme);
       render();
     },
@@ -203,9 +174,21 @@ function makeInstall(t) {
   ]);
 }
 function updateFilter(field, value) {
-  setState({ ...state, [field]: value });
+  const nextState = { ...state, [field]: value };
+  syncLocationFilters(nextState);
+  setState(nextState);
+}
+function scheduleQuery(value) {
+  pendingQuery = value;
+  if (searchFrame) return;
+  searchFrame = requestAnimationFrame(() => {
+    searchFrame = 0;
+    updateFilter('query', pendingQuery);
+  });
 }
 function makeFilters(t, visibleCount, totalCount) {
+  const categories = [...new Set(state.library.effects.map((effect) => effect.category))]
+    .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
   const search = node('input', {
     className: 'search-input',
     attrs: {
@@ -217,17 +200,27 @@ function makeFilters(t, visibleCount, totalCount) {
     },
     dataset: { testid: 'search-input', focusKey: 'search-input' },
   });
-  search.addEventListener('input', (event) =>
-    updateFilter('query', event.currentTarget.value),
-  );
-
+  search.addEventListener('compositionstart', () => {
+    composing = true;
+    if (searchFrame) cancelAnimationFrame(searchFrame);
+    searchFrame = 0;
+  });
+  search.addEventListener('compositionend', (event) => {
+    composing = false;
+    scheduleQuery(event.currentTarget.value);
+  });
+  search.addEventListener('input', (event) => {
+    if (!composing && !event.isComposing) scheduleQuery(event.currentTarget.value);
+  });
   const category = node('select', {
     className: 'category-filter',
     attrs: { id: 'category-filter' },
     dataset: { testid: 'category-filter', focusKey: 'category-filter' },
   }, [
     node('option', { text: t.categoryAll, attrs: { value: 'all' } }),
-    node('option', { text: t.categories.portrait, attrs: { value: 'portrait' } }),
+    ...categories.map((value) =>
+      node('option', { text: categoryLabel(value, t), attrs: { value } }),
+    ),
   ]);
   category.value = state.category;
   category.addEventListener('change', (event) => updateFilter('category', event.currentTarget.value));
@@ -248,20 +241,18 @@ function makeFilters(t, visibleCount, totalCount) {
     }),
   ]);
 }
-
 function makeFact(label, value) {
   return node('div', { className: 'fact' }, [
     node('dt', { text: label }),
     node('dd', { text: value }),
   ]);
 }
-
 function categoryLabel(category, t) {
   return t.categories[category] ?? category;
 }
-
 function makeEffectCard(effect, t) {
   const selected = state.selectedRefs.includes(effect.ref);
+  const titleId = effectTitleId(effect.ref);
   const checkbox = node('input', {
     className: 'effect-checkbox',
     attrs: {
@@ -280,6 +271,8 @@ function makeEffectCard(effect, t) {
       alt: withTokens(t.imageAlt, { title: effect.title }),
       loading: 'lazy',
       decoding: 'async',
+      width: '1448',
+      height: '1086',
     },
   });
 
@@ -293,7 +286,7 @@ function makeEffectCard(effect, t) {
 
   return node('article', {
     className: `effect-card${selected ? ' is-selected' : ''}`,
-    attrs: { 'aria-labelledby': `title-${effect.id}` },
+    attrs: { 'aria-labelledby': titleId },
     dataset: { testid: 'effect-card' },
   }, [
     node('figure', { className: 'preview-frame' }, [
@@ -318,7 +311,7 @@ function makeEffectCard(effect, t) {
       ]),
       node('div', { className: 'effect-heading' }, [
         node('p', { className: 'version-ref', text: effect.ref }),
-        node('h2', { text: effect.title, attrs: { id: `title-${effect.id}` } }),
+        node('h2', { text: effect.title, attrs: { id: titleId } }),
         node('p', { className: 'effect-summary', text: effect.summary }),
       ]),
       node('dl', { className: 'facts' }, [
@@ -358,7 +351,6 @@ function makeEffectCard(effect, t) {
     ]),
   ]);
 }
-
 function makeSelectionBar(t) {
   const invocations = getSelectedInvocations(state);
   const selectedEffects = (state.library?.effects ?? [])
@@ -372,7 +364,7 @@ function makeSelectionBar(t) {
     : '';
 
   return node('section', {
-    className: `selection-bar${invocations.length ? ' has-selection' : ''}`,
+    className: 'selection-bar',
     attrs: { 'aria-label': summary },
   }, [
     node('div', { className: 'selection-summary' }, [
@@ -396,7 +388,6 @@ function makeSelectionBar(t) {
     ]),
   ]);
 }
-
 function makeLoadState(t) {
   if (state.loadStatus === 'error') {
     return node('section', {
@@ -432,10 +423,11 @@ function makeEmptyState(t) {
     button(t.resetFilters, {
       className: 'primary-button',
       dataset: { action: 'reset-filters', focusKey: 'reset-filters' },
-      onClick: () => setState(
-        { ...state, query: '', category: 'all' },
-        { focus: { key: 'search-input', selection: [0, 0] } },
-      ),
+      onClick: () => {
+        const nextState = { ...state, query: '', category: 'all' };
+        syncLocationFilters(nextState);
+        setState(nextState, { focus: { key: 'search-input', selection: [0, 0] } });
+      },
     }),
   ]);
 }
@@ -447,6 +439,9 @@ function render(renderOptions = {}) {
   const totalEffects = state.library?.effects.length ?? 0;
   document.documentElement.lang = state.language;
   document.documentElement.dataset.theme = view.theme;
+  const isLight = view.theme === 'light'
+    || (view.theme === 'system' && matchMedia('(prefers-color-scheme: light)').matches);
+  themeColor.setAttribute('content', isLight ? '#eeeee9' : '#0a0a0b');
   document.title = t.pageTitle;
 
   const mainChildren = [makeIntro(t), makeInstall(t)];
@@ -473,7 +468,6 @@ function render(renderOptions = {}) {
         node('p', { text: t.footer }),
       ]),
     ]),
-    node('p', { className: 'sr-only', text: view.notice, attrs: { 'aria-live': 'polite' } }),
   );
 
   restoreFocus(focus);
@@ -487,11 +481,20 @@ async function loadLibrary(isRetry = false) {
     if (!response.ok) throw new Error(`Library request failed with ${response.status}`);
     const rawLibrary = await response.json();
     assertLibrary(rawLibrary);
-    if (state.loadAttempt === attempt) setState(loadSucceeded(state, rawLibrary));
+    if (state.loadAttempt === attempt) {
+      const nextState = validCategory(loadSucceeded(state, rawLibrary));
+      syncLocationFilters(nextState);
+      setState(nextState);
+    }
   } catch (error) {
     if (state.loadAttempt === attempt) setState(loadFailed(state, error));
   }
 }
 
+addEventListener('popstate', () => {
+  if (searchFrame) cancelAnimationFrame(searchFrame);
+  searchFrame = 0;
+  setState(validCategory({ ...state, ...readLocationFilters() }));
+});
 render();
 loadLibrary();
