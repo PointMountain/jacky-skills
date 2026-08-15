@@ -36,9 +36,23 @@ const SEMVER_PATTERN =
 const GIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/i;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
-const YAML_EMPTY_SCALAR_PATTERN = /^(?:null|~|"\s*"|'\s*')$/i;
-const YAML_COMPLEX_SCALAR_PATTERN = /^["'\[\]{|}>!&*]/;
-const YAML_COMMENT_PATTERN = /(?:^|[ \t])#/;
+const YAML_NULL_PATTERN = /^(?:null|~)$/i;
+const YAML_INDICATOR_START_PATTERN = /^[-?:,\[\]{}#&*!|>'"%@`]/;
+const YAML_PLAIN_SEPARATOR_PATTERN = /:[ \t]|[ \t]#/;
+
+/**
+ * 只判定本解析器支持的 YAML plain scalar 词法子集：值必须是单行非空文本，
+ * 不以 YAML indicator 开头，且不包含映射或注释分隔语法。数字、布尔值和 null 语义由字段校验器决定。
+ */
+function isSupportedPlainScalar(value) {
+  return (
+    value.length > 0 &&
+    !value.includes('\n') &&
+    !value.includes('\r') &&
+    !YAML_INDICATOR_START_PATTERN.test(value) &&
+    !YAML_PLAIN_SEPARATOR_PATTERN.test(value)
+  );
+}
 
 function fail(message, filePath) {
   const location = filePath ? ` in ${filePath}` : '';
@@ -77,11 +91,7 @@ function parseFrontmatter(markdown, filePath) {
     if (!value) {
       fail(`Empty frontmatter value for ${key}`, filePath);
     }
-    if (
-      YAML_EMPTY_SCALAR_PATTERN.test(value) ||
-      YAML_COMPLEX_SCALAR_PATTERN.test(value) ||
-      YAML_COMMENT_PATTERN.test(value)
-    ) {
+    if (!isSupportedPlainScalar(value)) {
       fail(`Field ${key} must be a simple single-line scalar`, filePath);
     }
     fields[key] = value;
@@ -195,6 +205,12 @@ function sortEffects(effects) {
 
 export function parseEffect(markdown, filePath) {
   const { fields, body } = parseFrontmatter(markdown, filePath);
+
+  for (const field of REQUIRED_FIELDS) {
+    if (YAML_NULL_PATTERN.test(fields[field])) {
+      fail(`Field ${field} cannot be null or empty`, filePath);
+    }
+  }
 
   if (!ID_PATTERN.test(fields.id)) fail('Invalid id; expected kebab-case', filePath);
   if (!parseSemVer(fields.version)) fail('Invalid SemVer version', filePath);

@@ -115,6 +115,12 @@ test('parseEffect rejects YAML values outside strict simple scalars', async (t) 
     ['anchor', '&shared value'],
     ['alias', '*shared'],
     ['quoted scalar', '"Portrait"'],
+    ['sequence entry', '- item'],
+    ['explicit key', '? key'],
+    ['mapping value', ': value'],
+    ['reserved at sign', '@reserved'],
+    ['reserved backtick', '`reserved`'],
+    ['mapping pair', 'foo: bar'],
   ];
 
   for (const [name, value] of invalidValues) {
@@ -146,6 +152,14 @@ test('parseEffect does not treat null-like plain text as YAML null', () => {
   assert.equal(parseEffect(card({ title_en: '~decorative title' })).title.en, '~decorative title');
   assert.equal(parseEffect(card({ title_en: 'C# portrait' })).title.en, 'C# portrait');
   assert.equal(parseEffect(card({ title_en: 'hash#tag portrait' })).title.en, 'hash#tag portrait');
+});
+
+test('parseEffect preserves supported plain scalar punctuation and Unicode', () => {
+  const values = ['https://example.com/effect', 'C# portrait', 'hash#tag', '治愈，v3。'];
+
+  for (const value of values) {
+    assert.equal(parseEffect(card({ title_en: value })).title.en, value);
+  }
 });
 
 test('parseEffect rejects absolute paths and traversal segments', async (t) => {
