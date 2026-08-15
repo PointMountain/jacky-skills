@@ -101,6 +101,36 @@ test('parseEffect rejects unknown, missing, and empty fields', async (t) => {
   });
 });
 
+test('parseEffect rejects YAML values outside strict simple scalars', async (t) => {
+  const invalidValues = [
+    ['double-quoted empty string', '""'],
+    ['single-quoted empty string', "''"],
+    ['null keyword', 'null'],
+    ['null shorthand', '~'],
+    ['flow sequence', '[]'],
+    ['flow mapping', '{}'],
+    ['literal block', '|'],
+    ['folded block', '>'],
+    ['explicit tag', '!!map {foo: bar}'],
+    ['anchor', '&shared value'],
+    ['alias', '*shared'],
+  ];
+
+  for (const [name, value] of invalidValues) {
+    await t.test(name, () => {
+      assert.throws(
+        () => parseEffect(card({ title_en: value })),
+        /simple single-line scalar|empty/i,
+      );
+    });
+  }
+});
+
+test('parseEffect does not treat null-like plain text as YAML null', () => {
+  assert.equal(parseEffect(card({ title_en: 'Nullable portrait' })).title.en, 'Nullable portrait');
+  assert.equal(parseEffect(card({ title_en: '~decorative title' })).title.en, '~decorative title');
+});
+
 test('parseEffect rejects absolute paths and traversal segments', async (t) => {
   await t.test('absolute preview path', () => {
     assert.throws(() => parseEffect(card({ preview: '/tmp/preview.jpg' })), /relative path/i);
@@ -205,6 +235,18 @@ test('loadEffects reads Markdown cards and returns stable ID and SemVer order', 
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('SemVer sorting preserves numeric precedence beyond Number safe integers', () => {
+  const larger = parseEffect(card({ version: '9007199254740993.0.0' }));
+  const smaller = parseEffect(card({ version: '9007199254740992.0.0' }));
+
+  const library = buildLibrary([larger, smaller], '2026-08-16T00:00:00.000Z');
+
+  assert.deepEqual(
+    library.effects.map((effect) => effect.version),
+    ['9007199254740992.0.0', '9007199254740993.0.0'],
+  );
 });
 
 test('buildLibrary projects the public schema with versioned invocations', () => {

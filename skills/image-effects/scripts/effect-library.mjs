@@ -36,6 +36,8 @@ const SEMVER_PATTERN =
 const GIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/i;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const YAML_EMPTY_SCALAR_PATTERN = /^(?:null|~|"\s*"|'\s*')$/i;
+const YAML_COMPLEX_SCALAR_PATTERN = /^[\[\]{|}>!&*]/;
 
 function fail(message, filePath) {
   const location = filePath ? ` in ${filePath}` : '';
@@ -74,7 +76,7 @@ function parseFrontmatter(markdown, filePath) {
     if (!value) {
       fail(`Empty frontmatter value for ${key}`, filePath);
     }
-    if (value === '|' || value === '>' || value.startsWith('[') || value.startsWith('{')) {
+    if (YAML_EMPTY_SCALAR_PATTERN.test(value) || YAML_COMPLEX_SCALAR_PATTERN.test(value)) {
       fail(`Field ${key} must be a simple single-line scalar`, filePath);
     }
     fields[key] = value;
@@ -131,11 +133,17 @@ function parseSemVer(version) {
   const match = version.match(SEMVER_PATTERN);
   if (!match) return null;
   return {
-    major: Number(match[1]),
-    minor: Number(match[2]),
-    patch: Number(match[3]),
+    major: match[1],
+    minor: match[2],
+    patch: match[3],
     prerelease: match[4]?.split('.') ?? [],
   };
+}
+
+function compareNumericIdentifier(left, right) {
+  if (left.length !== right.length) return left.length - right.length;
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
 }
 
 function comparePrerelease(left, right) {
@@ -151,7 +159,7 @@ function comparePrerelease(left, right) {
 
     const leftNumber = /^\d+$/.test(left[index]);
     const rightNumber = /^\d+$/.test(right[index]);
-    if (leftNumber && rightNumber) return Number(left[index]) - Number(right[index]);
+    if (leftNumber && rightNumber) return compareNumericIdentifier(left[index], right[index]);
     if (leftNumber !== rightNumber) return leftNumber ? -1 : 1;
     return left[index].localeCompare(right[index]);
   }
@@ -162,7 +170,8 @@ function compareSemVer(left, right) {
   const a = parseSemVer(left);
   const b = parseSemVer(right);
   for (const field of ['major', 'minor', 'patch']) {
-    if (a[field] !== b[field]) return a[field] - b[field];
+    const precedence = compareNumericIdentifier(a[field], b[field]);
+    if (precedence !== 0) return precedence;
   }
   return comparePrerelease(a.prerelease, b.prerelease);
 }
