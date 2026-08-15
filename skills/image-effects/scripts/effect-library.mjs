@@ -35,10 +35,13 @@ const SEMVER_PATTERN =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 const GIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/i;
-const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const GITHUB_OWNER_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
+const GITHUB_REPOSITORY_PATTERN = /^[A-Za-z0-9._-]{1,100}$/;
 const YAML_NULL_PATTERN = /^(?:null|~)$/i;
 const YAML_INDICATOR_START_PATTERN = /^[-?:,\[\]{}#&*!|>'"%@`]/;
 const YAML_PLAIN_SEPARATOR_PATTERN = /:[ \t]|[ \t]#/;
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+const MARKDOWN_TEXT_PATTERN = /[\\`*_\[\]()<>!|]/g;
 
 /**
  * 只判定本解析器支持的 YAML plain scalar 词法子集：值必须是单行非空文本，
@@ -78,7 +81,8 @@ function parseFrontmatter(markdown, filePath) {
     }
 
     const key = line.slice(0, separator).trim();
-    const value = line.slice(separator + 1).trim();
+    const rawValue = line.slice(separator + 1);
+    const value = rawValue.trim();
     if (!key) {
       fail('Frontmatter contains an empty key', filePath);
     }
@@ -90,6 +94,9 @@ function parseFrontmatter(markdown, filePath) {
     }
     if (!value) {
       fail(`Empty frontmatter value for ${key}`, filePath);
+    }
+    if (CONTROL_CHARACTER_PATTERN.test(rawValue)) {
+      fail(`Field ${key} contains a control character`, filePath);
     }
     if (!isSupportedPlainScalar(value)) {
       fail(`Field ${key} must be a simple single-line scalar`, filePath);
@@ -115,14 +122,60 @@ function parseCsv(value, field, filePath) {
   return items;
 }
 
-function assertRelativePath(value, field, filePath) {
+function containsUnsafeEncodedPath(value) {
+  let decoded = value;
+  for (let depth = 0; depth < value.length; depth += 1) {
+    let next;
+    try {
+      next = decodeURIComponent(decoded);
+    } catch {
+      return false;
+    }
+    if (next === decoded) return false;
+
+    const segments = next.split('/');
+    if (
+      path.posix.isAbsolute(next) ||
+      path.win32.isAbsolute(next) ||
+      next.includes('\\') ||
+      next.includes('`') ||
+      CONTROL_CHARACTER_PATTERN.test(next) ||
+      segments.some((segment) => segment === '' || segment === '.' || segment === '..')
+    ) {
+      return true;
+    }
+    decoded = next;
+  }
+  return false;
+}
+
+function assertCanonicalRelativePath(value, field, filePath) {
+  const segments = value.split('/');
   if (
     path.posix.isAbsolute(value) ||
     path.win32.isAbsolute(value) ||
     value.includes('\\') ||
-    value.split('/').includes('..')
+    value.includes('`') ||
+    CONTROL_CHARACTER_PATTERN.test(value) ||
+    segments.some((segment) => segment === '' || segment === '.' || segment === '..') ||
+    containsUnsafeEncodedPath(value)
   ) {
-    fail(`${field} must be a relative path without .. segments`, filePath);
+    fail(`${field} must be a canonical POSIX relative path without . or .. segments`, filePath);
+  }
+}
+
+function assertGithubRepository(value, field, filePath) {
+  const parts = value.split('/');
+  const [owner, repository] = parts;
+  if (
+    parts.length !== 2 ||
+    !GITHUB_OWNER_PATTERN.test(owner) ||
+    owner.includes('--') ||
+    !GITHUB_REPOSITORY_PATTERN.test(repository) ||
+    repository === '.' ||
+    repository === '..'
+  ) {
+    fail(`${field} must use canonical GitHub owner/repo format`, filePath);
   }
 }
 
@@ -132,6 +185,22 @@ function assertEqual(value, expected, field, filePath) {
   }
 }
 
+function containsEncodedControl(value) {
+  let decoded = value;
+  for (let depth = 0; depth < value.length; depth += 1) {
+    let next;
+    try {
+      next = decodeURIComponent(decoded);
+    } catch {
+      return true;
+    }
+    if (CONTROL_CHARACTER_PATTERN.test(next)) return true;
+    if (next === decoded) return false;
+    decoded = next;
+  }
+  return false;
+}
+
 function assertHttpsUrl(value, field, filePath) {
   let url;
   try {
@@ -139,9 +208,19 @@ function assertHttpsUrl(value, field, filePath) {
   } catch {
     fail(`${field} must be a valid HTTPS URL`, filePath);
   }
-  if (url.protocol !== 'https:') {
+  if (
+    url.protocol !== 'https:' ||
+    !url.hostname ||
+    url.username ||
+    url.password ||
+    /^https:\/\/[^/?#]*@/i.test(value) ||
+    value.includes('#') ||
+    CONTROL_CHARACTER_PATTERN.test(value) ||
+    containsEncodedControl(value)
+  ) {
     fail(`${field} must be a valid HTTPS URL`, filePath);
   }
+  return url.href;
 }
 
 function parseSemVer(version) {
@@ -161,6 +240,11 @@ function compareNumericIdentifier(left, right) {
   return left < right ? -1 : 1;
 }
 
+function compareAscii(left, right) {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
 function comparePrerelease(left, right) {
   if (left.length === 0 || right.length === 0) {
     return left.length === right.length ? 0 : left.length === 0 ? 1 : -1;
@@ -176,7 +260,7 @@ function comparePrerelease(left, right) {
     const rightNumber = /^\d+$/.test(right[index]);
     if (leftNumber && rightNumber) return compareNumericIdentifier(left[index], right[index]);
     if (leftNumber !== rightNumber) return leftNumber ? -1 : 1;
-    return left[index] < right[index] ? -1 : 1;
+    return compareAscii(left[index], right[index]);
   }
   return 0;
 }
@@ -192,15 +276,28 @@ function compareSemVer(left, right) {
 }
 
 function sortEffects(effects) {
+  validateEffectCollection(effects);
   return effects
     .map((effect, index) => ({ effect, index }))
     .sort(
       (left, right) =>
-        left.effect.id.localeCompare(right.effect.id) ||
+        compareAscii(left.effect.id, right.effect.id) ||
         compareSemVer(left.effect.version, right.effect.version) ||
         left.index - right.index,
     )
     .map(({ effect }) => effect);
+}
+
+export function validateEffectCollection(effects) {
+  if (!Array.isArray(effects)) throw new TypeError('Effects must be an array');
+
+  const refs = new Set();
+  for (const effect of effects) {
+    const ref = `${effect.id}@${effect.version}`;
+    if (refs.has(ref)) throw new Error(`Duplicate effect ref: ${ref}`);
+    refs.add(ref);
+  }
+  return effects;
 }
 
 export function parseEffect(markdown, filePath) {
@@ -214,9 +311,7 @@ export function parseEffect(markdown, filePath) {
 
   if (!ID_PATTERN.test(fields.id)) fail('Invalid id; expected kebab-case', filePath);
   if (!parseSemVer(fields.version)) fail('Invalid SemVer version', filePath);
-  if (!REPOSITORY_PATTERN.test(fields.source_repository)) {
-    fail('source_repository must use owner/repo format', filePath);
-  }
+  assertGithubRepository(fields.source_repository, 'source_repository', filePath);
   if (!GIT_SHA_PATTERN.test(fields.source_revision)) {
     fail('source_revision must be a 40-character Git SHA', filePath);
   }
@@ -232,14 +327,18 @@ export function parseEffect(markdown, filePath) {
   assertEqual(fields.output_count, '1', 'output_count', filePath);
   assertEqual(fields.source_license_spdx, 'MIT', 'source_license_spdx', filePath);
   assertEqual(fields.preview_license_spdx, 'CC-BY-4.0', 'preview_license_spdx', filePath);
-  assertHttpsUrl(fields.source_license_url, 'source_license_url', filePath);
+  const sourceLicenseUrl = assertHttpsUrl(
+    fields.source_license_url,
+    'source_license_url',
+    filePath,
+  );
 
   const formats = parseCsv(fields.input_formats, 'input_formats', filePath);
   if (formats.length !== 2 || formats[0] !== 'jpeg' || formats[1] !== 'png') {
     fail('input_formats must be jpeg,png', filePath);
   }
 
-  assertRelativePath(fields.preview, 'preview', filePath);
+  assertCanonicalRelativePath(fields.preview, 'preview', filePath);
   const sourcePaths = parseCsv(fields.source_paths, 'source_paths', filePath);
   const sourceHashes = parseCsv(fields.source_sha256s, 'source_sha256s', filePath);
   if (sourcePaths.length !== sourceHashes.length) {
@@ -248,7 +347,7 @@ export function parseEffect(markdown, filePath) {
 
   const seenPaths = new Set();
   const sources = sourcePaths.map((sourcePath, index) => {
-    assertRelativePath(sourcePath, 'source_paths', filePath);
+    assertCanonicalRelativePath(sourcePath, 'source_paths', filePath);
     if (seenPaths.has(sourcePath)) fail(`Duplicate source path: ${sourcePath}`, filePath);
     seenPaths.add(sourcePath);
 
@@ -275,7 +374,7 @@ export function parseEffect(markdown, filePath) {
     sources,
     sourceLicense: {
       spdx: fields.source_license_spdx,
-      url: fields.source_license_url,
+      url: sourceLicenseUrl,
     },
     adaptationNotice: fields.adaptation_notice,
     previewProvenance: {
@@ -296,12 +395,11 @@ export async function loadEffects(root) {
     .map((entry) => entry.name)
     .sort();
 
-  const effects = await Promise.all(
-    markdownFiles.map(async (name) => {
-      const filePath = path.join(root, name);
-      return parseEffect(await readFile(filePath, 'utf8'), filePath);
-    }),
-  );
+  const effects = [];
+  for (const name of markdownFiles) {
+    const filePath = path.join(root, name);
+    effects.push(parseEffect(await readFile(filePath, 'utf8'), filePath));
+  }
   return sortEffects(effects);
 }
 
@@ -309,30 +407,41 @@ export function buildLibrary(effects, generatedAt) {
   return {
     schemaVersion: 1,
     generatedAt,
-    effects: sortEffects(effects).map((effect) => ({
-      ref: effect.ref,
-      id: effect.id,
-      version: effect.version,
-      title: { ...effect.title },
-      summary: { ...effect.summary },
-      category: effect.category,
-      input: { ...effect.input, formats: [...effect.input.formats] },
-      outputCount: effect.outputCount,
-      previewUrl: `./media/${path.posix.basename(effect.preview)}`,
-      sourceUrl: `./source/${effect.id}.md`,
-      provenance: {
-        repository: effect.sourceRepository,
-        revision: effect.sourceRevision,
-        license: { ...effect.sourceLicense },
-        preview: {
-          origin: effect.previewProvenance.origin,
-          author: effect.previewProvenance.author,
-          licenseSpdx: effect.previewProvenance.licenseSpdx,
+    effects: sortEffects(effects).map((effect) => {
+      const previewExtension = path.posix.extname(effect.preview);
+      return {
+        ref: effect.ref,
+        id: effect.id,
+        version: effect.version,
+        title: { ...effect.title },
+        summary: { ...effect.summary },
+        category: effect.category,
+        input: { ...effect.input, formats: [...effect.input.formats] },
+        outputCount: effect.outputCount,
+        previewUrl: `./media/${effect.ref}${previewExtension}`,
+        sourceUrl: `./source/${effect.ref}.md`,
+        provenance: {
+          repository: effect.sourceRepository,
+          revision: effect.sourceRevision,
+          license: { ...effect.sourceLicense },
+          preview: {
+            origin: effect.previewProvenance.origin,
+            author: effect.previewProvenance.author,
+            licenseSpdx: effect.previewProvenance.licenseSpdx,
+          },
         },
-      },
-      invocation: `Use $image-effects effect ${effect.ref} on my uploaded image.`,
-    })),
+        invocation: `Use $image-effects effect ${effect.ref} on my uploaded image.`,
+      };
+    }),
   };
+}
+
+function escapeMarkdownText(value) {
+  return value.replace(MARKDOWN_TEXT_PATTERN, '\\$&');
+}
+
+function markdownDestination(url) {
+  return `<${url.replaceAll('<', '%3C').replaceAll('>', '%3E')}>`;
 }
 
 export function renderThirdPartyNotices(effects, header) {
@@ -340,16 +449,17 @@ export function renderThirdPartyNotices(effects, header) {
 
   const sections = sortEffects(effects).map((effect) => {
     const sourceLines = effect.sources.map(
-      (source) => `- Source: \`${source.path}\` (SHA-256: \`${source.sha256}\`)`,
+      (source) =>
+        `- Source: \`${escapeMarkdownText(source.path)}\` (SHA-256: \`${source.sha256}\`)`,
     );
     return [
       `## ${effect.ref}`,
       '',
-      `- Repository: \`${effect.sourceRepository}\``,
+      `- Repository: \`${escapeMarkdownText(effect.sourceRepository)}\``,
       `- Revision: \`${effect.sourceRevision}\``,
       ...sourceLines,
-      `- License: [${effect.sourceLicense.spdx}](${effect.sourceLicense.url})`,
-      `- Adaptation: ${effect.adaptationNotice}`,
+      `- License: [${effect.sourceLicense.spdx}](${markdownDestination(effect.sourceLicense.url)})`,
+      `- Adaptation: ${escapeMarkdownText(effect.adaptationNotice)}`,
     ].join('\n');
   });
 

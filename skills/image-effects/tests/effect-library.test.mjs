@@ -176,6 +176,69 @@ test('parseEffect rejects absolute paths and traversal segments', async (t) => {
   });
 });
 
+test('parseEffect rejects non-canonical or unsafe provenance fields', async (t) => {
+  const invalidRepositories = [
+    'https://github.com/owner/repo',
+    'owner/repo/extra',
+    '-owner/repo',
+    'owner_/repo',
+    'owner/repo](https://evil.example)',
+  ];
+  for (const source_repository of invalidRepositories) {
+    await t.test(`repository ${source_repository}`, () => {
+      assert.throws(() => parseEffect(card({ source_repository })), /source_repository/i);
+    });
+  }
+
+  const invalidPaths = [
+    'assets//preview.jpg',
+    'assets/./preview.jpg',
+    'assets/%2e%2e/preview.jpg',
+    'assets\\preview.jpg',
+    'assets/pre`view.jpg',
+  ];
+  for (const preview of invalidPaths) {
+    await t.test(`path ${preview}`, () => {
+      assert.throws(() => parseEffect(card({ preview })), /relative path|canonical path/i);
+    });
+  }
+
+  await t.test('encoded source path traversal', () => {
+    assert.throws(
+      () => parseEffect(card({ source_paths: 'upstream/%2e%2e/secret.md' })),
+      /relative path|canonical path/i,
+    );
+  });
+
+  await t.test('NUL in scalar', () => {
+    assert.throws(
+      () => parseEffect(card({ adaptation_notice: 'safe\0unsafe' })),
+      /control character/i,
+    );
+  });
+
+  await t.test('trailing Tab in scalar', () => {
+    assert.throws(
+      () => parseEffect(card({ adaptation_notice: 'unsafe\t' })),
+      /control character/i,
+    );
+  });
+
+  const invalidUrls = [
+    'https://user:password@example.com/license',
+    'https://@example.com/license',
+    'https://example.com/license#fragment',
+    'https://example.com/license#',
+    'https://example.com/%0Alicense',
+    'https://example.com/%250Alicense',
+  ];
+  for (const source_license_url of invalidUrls) {
+    await t.test(`URL ${source_license_url}`, () => {
+      assert.throws(() => parseEffect(card({ source_license_url })), /HTTPS URL/i);
+    });
+  }
+});
+
 test('parseEffect rejects invalid identifiers, versions, and hashes', async (t) => {
   await t.test('id', () => {
     assert.throws(() => parseEffect(card({ id: 'Healing_Effect' })), /invalid id/i);
@@ -268,6 +331,41 @@ test('loadEffects reads Markdown cards and returns stable ID and SemVer order', 
   }
 });
 
+test('loadEffects, buildLibrary, and notices reject duplicate versioned references', async () => {
+  const effect = parseEffect(card());
+  assert.throws(() => buildLibrary([effect, effect], '2026-08-16T00:00:00.000Z'), /duplicate.*ref/i);
+  assert.throws(() => renderThirdPartyNotices([effect, effect], '# Header\n'), /duplicate.*ref/i);
+
+  const root = await mkdtemp(path.join(tmpdir(), 'image-effects-duplicates-'));
+  try {
+    await writeFile(path.join(root, 'one.md'), card());
+    await writeFile(path.join(root, 'two.md'), card());
+    await assert.rejects(() => loadEffects(root), /duplicate.*ref/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('effect IDs use ASCII code-unit order without locale comparison', () => {
+  const later = parseEffect(card({ id: 'z-effect' }));
+  const earlier = parseEffect(card({ id: 'a-effect' }));
+  const originalLocaleCompare = String.prototype.localeCompare;
+  let ids;
+
+  String.prototype.localeCompare = () => {
+    throw new Error('localeCompare must not be used');
+  };
+  try {
+    ids = buildLibrary([later, earlier], '2026-08-16T00:00:00.000Z').effects.map(
+      (effect) => effect.id,
+    );
+  } finally {
+    String.prototype.localeCompare = originalLocaleCompare;
+  }
+
+  assert.deepEqual(ids, ['a-effect', 'z-effect']);
+});
+
 test('SemVer sorting preserves numeric precedence beyond Number safe integers', () => {
   const larger = parseEffect(card({ version: '9007199254740993.0.0' }));
   const smaller = parseEffect(card({ version: '9007199254740992.0.0' }));
@@ -312,8 +410,8 @@ test('buildLibrary projects the public schema with versioned invocations', () =>
         category: 'portrait',
         input: { mode: 'image', min: 1, max: 1, formats: ['jpeg', 'png'] },
         outputCount: 1,
-        previewUrl: './media/healing-anime-scribble-v3.jpg',
-        sourceUrl: './source/healing-anime-scribble-v3.md',
+        previewUrl: './media/healing-anime-scribble-v3@1.0.0.jpg',
+        sourceUrl: './source/healing-anime-scribble-v3@1.0.0.md',
         provenance: {
           repository: 'ConardLi/garden-skills',
           revision: REVISION,
@@ -334,27 +432,47 @@ test('buildLibrary projects the public schema with versioned invocations', () =>
   });
 });
 
-test('renderThirdPartyNotices deterministically appends source facts to the supplied header', () => {
-  const first = parseEffect(card(), 'references/effects/healing-anime-scribble-v3.md');
-  const second = parseEffect(
+test('buildLibrary gives every effect version distinct versioned artifact URLs', () => {
+  const first = parseEffect(card({ version: '1.0.0' }));
+  const second = parseEffect(card({ version: '2.0.0' }));
+
+  const library = buildLibrary([second, first], '2026-08-16T00:00:00.000Z');
+
+  assert.deepEqual(
+    library.effects.map(({ previewUrl, sourceUrl }) => ({ previewUrl, sourceUrl })),
+    [
+      {
+        previewUrl: './media/healing-anime-scribble-v3@1.0.0.jpg',
+        sourceUrl: './source/healing-anime-scribble-v3@1.0.0.md',
+      },
+      {
+        previewUrl: './media/healing-anime-scribble-v3@2.0.0.jpg',
+        sourceUrl: './source/healing-anime-scribble-v3@2.0.0.md',
+      },
+    ],
+  );
+});
+
+test('renderThirdPartyNotices emits the exact escaped machine protocol', () => {
+  const effect = parseEffect(
     card({
-      id: 'another-effect',
-      title_en: 'Another effect',
-      source_paths: 'upstream/one.md,upstream/two.md',
-      source_sha256s: `${'1'.repeat(64)},${'2'.repeat(64)}`,
+      source_paths: 'upstream/[guide](copy).md',
+      adaptation_notice: 'Adapted [guide](https://evil.example).',
     }),
-    'references/effects/another-effect.md',
+    'references/effects/healing-anime-scribble-v3.md',
   );
 
-  const notice = renderThirdPartyNotices([first, second], '# Third-party notices\n');
+  assert.equal(
+    renderThirdPartyNotices([effect], '# Third-party notices\n'),
+    `# Third-party notices
 
-  assert.ok(notice.startsWith('# Third-party notices\n'));
-  assert.ok(notice.indexOf('another-effect@1.0.0') < notice.indexOf('healing-anime-scribble-v3@1.0.0'));
-  assert.match(notice, /ConardLi\/garden-skills/);
-  assert.match(notice, new RegExp(REVISION));
-  assert.match(notice, /upstream\/one\.md/);
-  assert.match(notice, new RegExp('1'.repeat(64)));
-  assert.match(notice, /MIT/);
-  assert.match(notice, /https:\/\/github\.com\/ConardLi\/garden-skills/);
-  assert.match(notice, /Adapted into a versioned image-effect card\./);
+## healing-anime-scribble-v3@1.0.0
+
+- Repository: \`ConardLi/garden-skills\`
+- Revision: \`${REVISION}\`
+- Source: \`upstream/\\[guide\\]\\(copy\\).md\` (SHA-256: \`${SOURCE_SHA}\`)
+- License: [MIT](<https://github.com/ConardLi/garden-skills/blob/${REVISION}/LICENSE>)
+- Adaptation: Adapted \\[guide\\]\\(https://evil.example\\).
+`,
+  );
 });
