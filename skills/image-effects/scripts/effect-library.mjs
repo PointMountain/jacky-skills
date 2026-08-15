@@ -381,7 +381,7 @@ export function buildLibrary(effects, generatedAt) {
     schemaVersion: 1,
     generatedAt,
     effects: sortEffects(effects).map((effect) => {
-      const previewExtension = path.posix.extname(effect.preview);
+      const previewExtension = path.posix.extname(effect.preview).toLowerCase();
       return {
         ref: effect.ref,
         id: effect.id,

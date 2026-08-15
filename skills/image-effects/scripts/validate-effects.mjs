@@ -29,6 +29,27 @@ function remoteLabel({ repository, revision, path: sourcePath }) {
   return `${repository}@${revision}:${sourcePath}`;
 }
 
+function pinnedSourceFetchError(message, request, cause) {
+  const error = new Error(`${message} for ${remoteLabel(request)}`, { cause });
+  error.code = 'ERR_PINNED_SOURCE_FETCH';
+  return error;
+}
+
+function fetchFailureMessage(cause) {
+  const diagnostic = [cause?.stderr, cause?.message]
+    .filter((value) => typeof value === 'string')
+    .join('\n');
+  if (cause?.code === 'ENOENT') return 'GitHub CLI is unavailable';
+  if (/authentication|authenticate|HTTP\s+(?:401|403)|not logged/i.test(diagnostic)) {
+    return 'GitHub authentication failed';
+  }
+  if (/HTTP\s+404|not found/i.test(diagnostic)) {
+    return 'Pinned GitHub source was not found';
+  }
+  if (cause?.killed || cause?.code === 'ETIMEDOUT') return 'GitHub request timed out';
+  return 'GitHub request failed';
+}
+
 function decodeBase64Content(payload, request) {
   if (
     payload === null ||
@@ -80,8 +101,12 @@ export async function validateOnlineSources(effects, { fetcher = fetchGitHubCont
       let payload;
       try {
         payload = await fetcher(request);
-      } catch {
-        throw new Error(`Failed to fetch pinned GitHub source ${remoteLabel(request)}`);
+      } catch (cause) {
+        const message =
+          cause?.code === 'ERR_PINNED_SOURCE_FETCH'
+            ? cause.message
+            : `Failed to validate pinned GitHub source ${remoteLabel(request)}`;
+        throw new Error(message, { cause });
       }
       const actualSha = sha256(decodeBase64Content(payload, request));
       if (actualSha !== source.sha256) {
@@ -105,15 +130,21 @@ export async function fetchGitHubContent(
     ({ stdout } = await run('gh', ['api', endpoint], {
       encoding: 'utf8',
       maxBuffer: 16 * 1024 * 1024,
+      timeout: 30_000,
     }));
-  } catch {
-    throw new Error(`Failed to fetch pinned GitHub source ${remoteLabel({ repository, revision, path: sourcePath })}`);
+  } catch (cause) {
+    const request = { repository, revision, path: sourcePath };
+    throw pinnedSourceFetchError(fetchFailureMessage(cause), request, cause);
   }
 
   try {
     return JSON.parse(stdout);
-  } catch {
-    throw new Error(`Invalid GitHub JSON response for ${remoteLabel({ repository, revision, path: sourcePath })}`);
+  } catch (cause) {
+    throw pinnedSourceFetchError(
+      'Invalid GitHub JSON response',
+      { repository, revision, path: sourcePath },
+      cause,
+    );
   }
 }
 

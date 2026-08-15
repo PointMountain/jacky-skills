@@ -5,9 +5,12 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  readlink,
   readdir,
+  rename,
   rm,
   stat,
+  symlink,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -81,6 +84,41 @@ async function fileTree(root) {
   }
   await visit(root);
   return entries.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+}
+
+async function topologyTree(root) {
+  const entries = [];
+  async function visit(directory, prefix = '') {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const relativePath = path.posix.join(prefix, entry.name);
+      const absolutePath = path.join(directory, entry.name);
+      if (entry.isSymbolicLink()) {
+        entries.push({ path: relativePath, type: 'symlink', target: await readlink(absolutePath) });
+      } else if (entry.isDirectory()) {
+        entries.push({ path: relativePath, type: 'directory' });
+        await visit(absolutePath, relativePath);
+      } else if (entry.isFile()) {
+        const bytes = await readFile(absolutePath);
+        entries.push({
+          path: relativePath,
+          type: 'file',
+          sha256: createHash('sha256').update(bytes).digest('hex'),
+        });
+      } else {
+        entries.push({ path: relativePath, type: 'other' });
+      }
+    }
+  }
+  await visit(root);
+  return entries.sort((left, right) =>
+    left.path < right.path ? -1 : left.path > right.path ? 1 : 0,
+  );
+}
+
+async function addUnmanagedTopology(outputRoot, externalRoot) {
+  await mkdir(path.join(outputRoot, 'keep-dir/nested'), { recursive: true });
+  await writeFile(path.join(outputRoot, 'keep-dir/nested/value.txt'), 'keep\n');
+  await symlink(externalRoot, path.join(outputRoot, 'keep-link'), 'dir');
 }
 
 test('固定 epoch 在两个独立输出目录生成逐字节相同的完整受管树', async () => {
@@ -197,6 +235,209 @@ test('重建删除旧清单拥有的陈旧产物并保留非受管文件', async
       rm(sourceRoot, { recursive: true, force: true }),
       rm(outputRoot, { recursive: true, force: true }),
     ]);
+  }
+});
+
+test('拒绝 outputRoot 本身或任一受管父目录 symlink，外部树保持不变', async (t) => {
+  const sourceRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-source-'));
+  await makeFixtureSource(sourceRoot);
+
+  try {
+    for (const symlinkPath of [
+      '.',
+      'gallery',
+      'gallery/media',
+      'gallery/source',
+      'assets/public-repo',
+      'gallery/api/library.json',
+    ]) {
+      await t.test(symlinkPath === '.' ? 'outputRoot' : symlinkPath, async () => {
+        const caseRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-symlink-case-'));
+        const externalRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-external-'));
+        const outputRoot = path.join(caseRoot, 'output');
+        await mkdir(path.join(externalRoot, 'nested'), { recursive: true });
+        await writeFile(path.join(externalRoot, 'nested/sentinel.txt'), 'outside\n');
+        await symlink(
+          path.join(externalRoot, 'nested/sentinel.txt'),
+          path.join(externalRoot, 'sentinel-link'),
+        );
+
+        if (symlinkPath === '.') {
+          await symlink(externalRoot, outputRoot, 'dir');
+        } else {
+          await mkdir(path.dirname(path.join(outputRoot, symlinkPath)), { recursive: true });
+          await symlink(externalRoot, path.join(outputRoot, symlinkPath), 'dir');
+        }
+        const oldExternal = await topologyTree(externalRoot);
+        const oldOutput = await topologyTree(caseRoot);
+
+        try {
+          await assert.rejects(
+            () =>
+              buildGallery({
+                sourceRoot,
+                outputRoot,
+                generatedAt: '2026-08-16T00:00:00.000Z',
+              }),
+            /symbolic link|symlink/i,
+          );
+          assert.deepEqual(await topologyTree(externalRoot), oldExternal);
+          assert.deepEqual(await topologyTree(caseRoot), oldOutput);
+        } finally {
+          await Promise.all([
+            rm(caseRoot, { recursive: true, force: true }),
+            rm(externalRoot, { recursive: true, force: true }),
+          ]);
+        }
+      });
+    }
+  } finally {
+    await rm(sourceRoot, { recursive: true, force: true });
+  }
+});
+
+test('同一 outputRoot 的第二个构建立即失败且不会生成混合版本', async () => {
+  const sourceRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-source-'));
+  const outputRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-output-'));
+  let enterFirstExchange;
+  let releaseFirstBuild;
+  const firstExchange = new Promise((resolve) => {
+    enterFirstExchange = resolve;
+  });
+  const release = new Promise((resolve) => {
+    releaseFirstBuild = resolve;
+  });
+
+  try {
+    await makeFixtureSource(sourceRoot);
+    const firstBuild = buildGallery({
+      sourceRoot,
+      outputRoot,
+      generatedAt: '2026-08-15T00:00:00.000Z',
+      transactionHooks: {
+        beforeExchange: async () => {
+          enterFirstExchange();
+          await release;
+        },
+      },
+    });
+    await firstExchange;
+
+    await assert.rejects(
+      () =>
+        buildGallery({
+          sourceRoot,
+          outputRoot,
+          generatedAt: '2026-08-16T00:00:00.000Z',
+        }),
+      /build.*(?:lock|progress)|(?:lock|progress).*build/i,
+    );
+    releaseFirstBuild();
+    await firstBuild;
+
+    const library = JSON.parse(
+      await readFile(path.join(outputRoot, 'gallery/api/library.json'), 'utf8'),
+    );
+    assert.equal(library.generatedAt, '2026-08-15T00:00:00.000Z');
+    assert.deepEqual(
+      (await fileTree(outputRoot)).map(([relativePath]) => relativePath),
+      MANAGED_PATHS,
+    );
+    await assert.rejects(
+      () => stat(path.join(outputRoot, '.image-effects-build.lock')),
+      /ENOENT/,
+    );
+  } finally {
+    releaseFirstBuild?.();
+    await Promise.all([
+      rm(sourceRoot, { recursive: true, force: true }),
+      rm(outputRoot, { recursive: true, force: true }),
+    ]);
+  }
+});
+
+test('预检、首次交换、中途交换和 stale 清理异常均完整恢复旧拓扑', async (t) => {
+  const scenarios = [
+    {
+      name: '预检后',
+      hooks: { afterPreflight: async () => { throw new Error('injected after preflight'); } },
+      expected: /injected after preflight/,
+    },
+    {
+      name: '首次交换前',
+      hooks: { beforeExchange: async () => { throw new Error('injected first exchange'); } },
+      expected: /injected first exchange/,
+    },
+    {
+      name: '中途交换前',
+      hooks: {
+        beforeExchange: async ({ index }) => {
+          if (index === 2) throw new Error('injected middle exchange');
+        },
+      },
+      expected: /injected middle exchange/,
+    },
+    {
+      name: 'stale 删除后',
+      withStale: true,
+      hooks: { afterStaleDelete: async () => { throw new Error('injected stale cleanup'); } },
+      expected: /injected stale cleanup/,
+    },
+  ];
+
+  for (const scenario of scenarios) {
+    await t.test(scenario.name, async () => {
+      const sourceRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-source-'));
+      const outputRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-output-'));
+      const externalRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-external-'));
+      try {
+        await makeFixtureSource(sourceRoot);
+        await addUnmanagedTopology(outputRoot, externalRoot);
+        if (scenario.withStale) {
+          const staleRef = 'retired-effect@9.9.9';
+          await Promise.all([
+            mkdir(path.join(outputRoot, 'gallery/api'), { recursive: true }),
+            mkdir(path.join(outputRoot, 'gallery/media'), { recursive: true }),
+            mkdir(path.join(outputRoot, 'gallery/source'), { recursive: true }),
+          ]);
+          await Promise.all([
+            writeFile(
+              path.join(outputRoot, 'gallery/api/library.json'),
+              JSON.stringify({
+                schemaVersion: 1,
+                effects: [
+                  {
+                    previewUrl: `./media/${staleRef}.jpg`,
+                    sourceUrl: `./source/${staleRef}.md`,
+                  },
+                ],
+              }),
+            ),
+            writeFile(path.join(outputRoot, `gallery/media/${staleRef}.jpg`), 'stale image'),
+            writeFile(path.join(outputRoot, `gallery/source/${staleRef}.md`), 'stale source'),
+          ]);
+        }
+        const oldTree = await topologyTree(outputRoot);
+
+        await assert.rejects(
+          () =>
+            buildGallery({
+              sourceRoot,
+              outputRoot,
+              generatedAt: '2026-08-16T00:00:00.000Z',
+              transactionHooks: scenario.hooks,
+            }),
+          scenario.expected,
+        );
+        assert.deepEqual(await topologyTree(outputRoot), oldTree);
+      } finally {
+        await Promise.all([
+          rm(sourceRoot, { recursive: true, force: true }),
+          rm(outputRoot, { recursive: true, force: true }),
+          rm(externalRoot, { recursive: true, force: true }),
+        ]);
+      }
+    });
   }
 });
 
@@ -335,6 +576,126 @@ test('写入阶段失败会回滚，不替换已有产物', async () => {
   }
 });
 
+test('INDEX 对 Markdown table 中的反斜杠和 pipe 做稳定转义', async () => {
+  const sourceRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-source-'));
+  const outputRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-output-'));
+  try {
+    await makeFixtureSource(sourceRoot);
+    const cardPath = path.join(
+      sourceRoot,
+      'references/effects/healing-anime-scribble-v3.md',
+    );
+    const card = (await readFile(cardPath, 'utf8')).replace(
+      /^summary_en: .*$/m,
+      'summary_en: Left | middle \\ right',
+    );
+    await writeFile(cardPath, card);
+
+    await buildGallery({
+      sourceRoot,
+      outputRoot,
+      generatedAt: '2026-08-16T00:00:00.000Z',
+    });
+    const index = await readFile(path.join(outputRoot, 'references/INDEX.md'), 'utf8');
+    assert.equal(index.includes('Left \\| middle \\\\ right'), true);
+    assert.equal(index.includes('Left | middle \\ right'), false);
+  } finally {
+    await Promise.all([
+      rm(sourceRoot, { recursive: true, force: true }),
+      rm(outputRoot, { recursive: true, force: true }),
+    ]);
+  }
+});
+
+test('预览公开扩展统一小写并删除旧清单中的大写扩展 stale 文件', async () => {
+  const sourceRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-source-'));
+  const outputRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-output-'));
+  const staleRef = 'retired-effect@9.9.9';
+  try {
+    await makeFixtureSource(sourceRoot);
+    const lowerPreview = path.join(
+      sourceRoot,
+      'assets/previews/healing-anime-scribble-v3.jpg',
+    );
+    const upperPreview = path.join(sourceRoot, 'assets/previews/preview-upper.JPG');
+    await rename(lowerPreview, upperPreview);
+    const cardPath = path.join(
+      sourceRoot,
+      'references/effects/healing-anime-scribble-v3.md',
+    );
+    const card = (await readFile(cardPath, 'utf8')).replace(
+      /^preview: .*$/m,
+      'preview: assets/previews/preview-upper.JPG',
+    );
+    await writeFile(cardPath, card);
+
+    await Promise.all([
+      mkdir(path.join(outputRoot, 'gallery/api'), { recursive: true }),
+      mkdir(path.join(outputRoot, 'gallery/media'), { recursive: true }),
+      mkdir(path.join(outputRoot, 'gallery/source'), { recursive: true }),
+    ]);
+    await Promise.all([
+      writeFile(
+        path.join(outputRoot, 'gallery/api/library.json'),
+        JSON.stringify({
+          schemaVersion: 1,
+          effects: [
+            {
+              previewUrl: `./media/${staleRef}.JPG`,
+              sourceUrl: `./source/${staleRef}.md`,
+            },
+          ],
+        }),
+      ),
+      writeFile(path.join(outputRoot, `gallery/media/${staleRef}.JPG`), 'stale'),
+      writeFile(path.join(outputRoot, `gallery/source/${staleRef}.md`), 'stale'),
+    ]);
+
+    await buildGallery({
+      sourceRoot,
+      outputRoot,
+      generatedAt: '2026-08-16T00:00:00.000Z',
+    });
+    const library = JSON.parse(
+      await readFile(path.join(outputRoot, 'gallery/api/library.json'), 'utf8'),
+    );
+    assert.equal(library.effects[0].previewUrl, `./media/${EFFECT_REF}.jpg`);
+    await stat(path.join(outputRoot, `gallery/media/${EFFECT_REF}.jpg`));
+    const mediaNames = await readdir(path.join(outputRoot, 'gallery/media'));
+    assert.equal(mediaNames.includes(`${EFFECT_REF}.jpg`), true);
+    assert.equal(mediaNames.includes(`${EFFECT_REF}.JPG`), false);
+    await assert.rejects(
+      () => stat(path.join(outputRoot, `gallery/media/${staleRef}.JPG`)),
+      /ENOENT/,
+    );
+  } finally {
+    await Promise.all([
+      rm(sourceRoot, { recursive: true, force: true }),
+      rm(outputRoot, { recursive: true, force: true }),
+    ]);
+  }
+});
+
+test('hardlink 不受支持时使用同盘排他 copy fallback', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'image-effects-copy-fallback-'));
+  try {
+    const source = path.join(root, 'source.txt');
+    const destination = path.join(root, 'destination.txt');
+    await writeFile(source, 'fallback bytes\n');
+    const { materializeFile } = await import('../scripts/build-gallery.mjs');
+    const unsupported = Object.assign(new Error('hardlinks unavailable'), { code: 'ENOTSUP' });
+
+    await materializeFile(source, destination, {
+      linkFile: async () => {
+        throw unsupported;
+      },
+    });
+    assert.equal(await readFile(destination, 'utf8'), 'fallback bytes\n');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('离线验证加载卡片并校验预览，完全不调用在线 fetcher', async () => {
   const sourceRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-source-'));
   let calls = 0;
@@ -430,7 +791,69 @@ test('GitHub fetcher 逐段编码路径并通过无 shell 的 gh api 获取 JSON
         'api',
         'repos/owner/repo/contents/folder%20name/file%2B.md?ref=abc%2Fdef',
       ],
-      { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
+      { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, timeout: 30_000 },
     ],
   ]);
+});
+
+test('GitHub fetcher 对缺少 gh、认证失败和 404 返回安全诊断并保留 cause', async (t) => {
+  const cases = [
+    {
+      name: 'missing gh',
+      cause: Object.assign(new Error('spawn SECRET_LOCAL_MARKER ENOENT'), { code: 'ENOENT' }),
+      expected: /GitHub CLI is unavailable/i,
+    },
+    {
+      name: 'authentication',
+      cause: Object.assign(new Error('private command failed'), {
+        stderr: 'authentication required HTTP 401 SECRET_LOCAL_MARKER',
+      }),
+      expected: /GitHub authentication failed/i,
+    },
+    {
+      name: 'not found',
+      cause: Object.assign(new Error('private command failed'), {
+        stderr: 'HTTP 404 Not Found SECRET_LOCAL_MARKER',
+      }),
+      expected: /pinned GitHub source was not found/i,
+    },
+  ];
+
+  for (const fixture of cases) {
+    await t.test(fixture.name, async () => {
+      await assert.rejects(
+        () =>
+          fetchGitHubContent(
+            { repository: 'owner/repo', revision: REVISION, path: SOURCE_PATH },
+            { run: async () => { throw fixture.cause; } },
+          ),
+        (error) => {
+          assert.match(error.message, fixture.expected);
+          assert.doesNotMatch(error.message, /SECRET_LOCAL_MARKER|spawn/);
+          assert.equal(error.cause, fixture.cause);
+          return true;
+        },
+      );
+    });
+  }
+});
+
+test('在线验证包装未知 fetcher 错误时保留 cause 且不泄露原始诊断', async () => {
+  const sourceRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-source-'));
+  try {
+    await makeFixtureSource(sourceRoot);
+    const effects = await validateEffects({ sourceRoot });
+    const cause = new Error('gh api SECRET_LOCAL_MARKER');
+    await assert.rejects(
+      () => validateOnlineSources(effects, { fetcher: async () => { throw cause; } }),
+      (error) => {
+        assert.match(error.message, /Failed to validate pinned GitHub source/i);
+        assert.doesNotMatch(error.message, /SECRET_LOCAL_MARKER|gh api/);
+        assert.equal(error.cause, cause);
+        return true;
+      },
+    );
+  } finally {
+    await rm(sourceRoot, { recursive: true, force: true });
+  }
 });
