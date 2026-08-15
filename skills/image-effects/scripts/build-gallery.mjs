@@ -490,6 +490,13 @@ export async function buildGallery({
     'utf8',
   );
   const library = buildLibrary(effects, timestamp);
+  const previewExtensionByRef = new Map(
+    effects.map((effect) => [effect.ref, publicPreviewExtension(effect.preview)]),
+  );
+  library.effects = library.effects.map((effect) => ({
+    ...effect,
+    previewUrl: `./media/${effect.ref}${previewExtensionByRef.get(effect.ref)}`,
+  }));
   const artifacts = new Map([
     ['references/INDEX.md', renderIndex(effects)],
     ['assets/public-repo/THIRD_PARTY_NOTICES.md', renderThirdPartyNotices(effects, header)],
