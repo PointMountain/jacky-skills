@@ -736,16 +736,22 @@ test("--check 从同一 HEAD 重建，允许纯受管 dirty，并拒绝各种漂
   });
 
   await t.test(
-    "staged 与 unstaged 都只涉及 expected managed paths 时通过",
+    "正确导出内容 git add 后 staged managed paths 通过",
     async () => {
       const fixture = await preparedTarget();
       try {
         await initTargetRepository(fixture.target);
-        const readmePath = path.join(fixture.target, "README.md");
-        const expectedReadme = await readFile(readmePath);
-        await writeFile(readmePath, "staged managed bytes\n");
-        await git(fixture.target, "add", "README.md");
-        await writeFile(readmePath, expectedReadme);
+        await writeRelative(
+          fixture.sourceRoot,
+          "skills/image-effects/scripts/run.mjs",
+          "export const ok = 4;\n"
+        );
+        await commitAll(fixture.sourceRoot, "update export before staging");
+        await exportPublicRepository({
+          target: fixture.target,
+          cwd: fixture.sourceRoot,
+        });
+        await git(fixture.target, "add", "--all");
 
         await exportPublicRepository({
           target: fixture.target,
@@ -760,6 +766,94 @@ test("--check 从同一 HEAD 重建，允许纯受管 dirty，并拒绝各种漂
       }
     }
   );
+
+  await t.test(
+    "拒绝 staged managed blob 内容漂移，即使工作树已恢复正确",
+    async () => {
+      const fixture = await preparedTarget();
+      try {
+        await initTargetRepository(fixture.target);
+        const readmePath = path.join(fixture.target, "README.md");
+        const expectedReadme = await readFile(readmePath);
+        await writeFile(readmePath, "staged managed bytes\n");
+        await git(fixture.target, "add", "README.md");
+        await writeFile(readmePath, expectedReadme);
+
+        await assert.rejects(
+          () =>
+            exportPublicRepository({
+              target: fixture.target,
+              cwd: fixture.sourceRoot,
+              check: true,
+            }),
+          /staged|index|blob|content|mismatch/i
+        );
+      } finally {
+        await Promise.all([
+          rm(fixture.sourceRoot, { recursive: true, force: true }),
+          rm(fixture.parent, { recursive: true, force: true }),
+        ]);
+      }
+    }
+  );
+
+  await t.test(
+    "拒绝 staged managed delete，即使工作树文件仍是正确导出内容",
+    async () => {
+      const fixture = await preparedTarget();
+      try {
+        await initTargetRepository(fixture.target);
+        const readmePath = path.join(fixture.target, "README.md");
+        const expectedReadme = await readFile(readmePath);
+        await git(fixture.target, "rm", "README.md");
+        await writeFile(readmePath, expectedReadme);
+
+        await assert.rejects(
+          () =>
+            exportPublicRepository({
+              target: fixture.target,
+              cwd: fixture.sourceRoot,
+              check: true,
+            }),
+          /staged|index|delete|missing|mismatch/i
+        );
+      } finally {
+        await Promise.all([
+          rm(fixture.sourceRoot, { recursive: true, force: true }),
+          rm(fixture.parent, { recursive: true, force: true }),
+        ]);
+      }
+    }
+  );
+
+  await t.test("拒绝两个 managed paths 之间的 staged rename", async () => {
+    const fixture = await preparedTarget();
+    try {
+      await initTargetRepository(fixture.target);
+      const readmePath = path.join(fixture.target, "README.md");
+      const readmeCnPath = path.join(fixture.target, "README_CN.md");
+      const expectedReadme = await readFile(readmePath);
+      const expectedReadmeCn = await readFile(readmeCnPath);
+      await git(fixture.target, "mv", "-f", "README.md", "README_CN.md");
+      await writeFile(readmePath, expectedReadme);
+      await writeFile(readmeCnPath, expectedReadmeCn);
+
+      await assert.rejects(
+        () =>
+          exportPublicRepository({
+            target: fixture.target,
+            cwd: fixture.sourceRoot,
+            check: true,
+          }),
+        /staged|index|rename|missing|mismatch/i
+      );
+    } finally {
+      await Promise.all([
+        rm(fixture.sourceRoot, { recursive: true, force: true }),
+        rm(fixture.parent, { recursive: true, force: true }),
+      ]);
+    }
+  });
 
   await t.test("拒绝 git add 后工作树删除形成的 unmanaged AD", async () => {
     const fixture = await preparedTarget();

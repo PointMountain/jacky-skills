@@ -765,14 +765,55 @@ function parseNullTerminatedGitPaths(bytes, label) {
   return paths;
 }
 
-async function assertCheckGitPathsAreManaged(target, expectedPaths) {
+async function assertStagedIndexBlobMatches(
+  target,
+  relativePath,
+  expectedBytes
+) {
+  let indexBytes;
+  try {
+    indexBytes = (
+      await runGit(target, ["show", `:${relativePath}`], { binary: true })
+    ).stdout;
+  } catch (error) {
+    const wrapped = new Error(
+      `Public export check found a missing or deleted staged index blob: ${relativePath}`
+    );
+    wrapped.cause = error;
+    throw wrapped;
+  }
+  if (!indexBytes.equals(expectedBytes)) {
+    throw new Error(
+      `Public export check found staged index content mismatch: ${relativePath}`
+    );
+  }
+}
+
+async function assertCheckGitPathsAreManaged(target, expectedFiles) {
   if (!(await pathExists(path.join(target, ".git")))) return;
   await assertTargetGitRepository(target);
-  const commands = [
-    {
-      label: "staged index",
-      args: ["diff", "--cached", "--name-only", "--no-renames", "-z", "--"],
-    },
+  const expectedByPath = new Map(
+    expectedFiles.map(({ path: relativePath, bytes }) => [relativePath, bytes])
+  );
+  const stagedOutput = (
+    await runGit(
+      target,
+      ["diff", "--cached", "--name-only", "--no-renames", "-z", "--"],
+      { binary: true }
+    )
+  ).stdout;
+  for (const changedPath of parseNullTerminatedGitPaths(
+    stagedOutput,
+    "staged index"
+  )) {
+    const expectedBytes = expectedByPath.get(changedPath);
+    if (expectedBytes === undefined) {
+      throw new Error("Public export check found unmanaged staged index path");
+    }
+    await assertStagedIndexBlobMatches(target, changedPath, expectedBytes);
+  }
+
+  const worktreeCommands = [
     {
       label: "unstaged worktree",
       args: ["diff", "--name-only", "--no-renames", "-z", "--"],
@@ -782,7 +823,7 @@ async function assertCheckGitPathsAreManaged(target, expectedPaths) {
       args: ["ls-files", "--others", "--exclude-standard", "-z", "--"],
     },
   ];
-  for (const command of commands) {
+  for (const command of worktreeCommands) {
     const output = (
       await runGit(target, command.args, {
         binary: true,
@@ -792,7 +833,7 @@ async function assertCheckGitPathsAreManaged(target, expectedPaths) {
       output,
       command.label
     )) {
-      if (!expectedPaths.has(changedPath)) {
+      if (!expectedByPath.has(changedPath)) {
         throw new Error(
           `Public export check found unmanaged ${command.label} path`
         );
@@ -812,10 +853,11 @@ async function checkTarget(targetContext, source, desiredFiles, manifestBytes) {
     ...desiredFiles.map(({ path: filePath }) => filePath),
     MANIFEST_NAME,
   ].sort(compareAscii);
-  await assertCheckGitPathsAreManaged(
-    targetContext.target,
-    new Set(expectedPaths)
-  );
+  const expectedFiles = [
+    ...desiredFiles,
+    { path: MANIFEST_NAME, bytes: manifestBytes },
+  ];
+  await assertCheckGitPathsAreManaged(targetContext.target, expectedFiles);
   if (
     actualPaths.some(({ type }) => type !== "file") ||
     actualPaths.map(({ path: filePath }) => filePath).join("\0") !==
