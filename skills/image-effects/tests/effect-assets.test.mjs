@@ -91,17 +91,6 @@ function injectJpegSegment(buffer, marker, payload) {
   return Buffer.concat([buffer.subarray(0, 2), jpegSegment(marker, payload), buffer.subarray(2)]);
 }
 
-function replaceFirstJpegSegment(buffer, marker, payload) {
-  assert.equal(buffer.readUInt16BE(0), 0xffd8);
-  assert.equal(buffer[2], 0xff);
-  const length = buffer.readUInt16BE(4);
-  return Buffer.concat([
-    buffer.subarray(0, 2),
-    jpegSegment(marker, payload),
-    buffer.subarray(4 + length),
-  ]);
-}
-
 function insertAfterFirstJpegSegment(buffer, marker, payload) {
   assert.equal(buffer.readUInt16BE(0), 0xffd8);
   assert.equal(buffer[2], 0xff);
@@ -386,6 +375,30 @@ test('JPEG 拒绝普通 JFXX 和嵌入 EXIF 或 COM 的 JFXX JPEG 缩略图', as
   }
 });
 
+test('JPEG 拒绝 JFIF APP0 内嵌的 1x1 RGB 缩略图', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'image-effects-jpeg-jfif-thumbnail-'));
+  try {
+    const { assertMetadataFreeImage } = await loadImageTools();
+    const { jpeg } = await createFixtures(directory);
+    const jfif = Buffer.alloc(17);
+    jfif.write('JFIF\0', 0, 'binary');
+    jfif[5] = 1;
+    jfif[6] = 2;
+    jfif.writeUInt16BE(1, 8);
+    jfif.writeUInt16BE(1, 10);
+    jfif[12] = 1;
+    jfif[13] = 1;
+    jfif.set([12, 34, 56], 14);
+
+    await assert.rejects(
+      () => assertMetadataFreeImage(injectJpegSegment(jpeg, 0xe0, jfif), 'jpeg'),
+      { message: 'JPEG APP0 contains an invalid JFIF structure' },
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test('JPEG 拒绝版本字段非法的 JFIF 和 Adobe 白名单段', async (t) => {
   const directory = await mkdtemp(path.join(tmpdir(), 'image-effects-jpeg-app-structure-'));
   try {
@@ -403,18 +416,18 @@ test('JPEG 拒绝版本字段非法的 JFIF 和 Adobe 白名单段', async (t) =
     adobe.writeUInt16BE(99, 5);
     adobe[11] = 1;
 
-    const samples = [
-      ['JFIF version', replaceFirstJpegSegment(jpeg, 0xe0, jfif)],
-      ['Adobe version', injectJpegSegment(jpeg, 0xee, adobe)],
-    ];
-    for (const [name, sample] of samples) {
-      await t.test(name, async () => {
-        await assert.rejects(
-          () => assertMetadataFreeImage(sample, 'jpeg'),
-          /JPEG APP|JFIF|Adobe|structure/i,
-        );
-      });
-    }
+    await t.test('JFIF version', async () => {
+      await assert.rejects(
+        () => assertMetadataFreeImage(injectJpegSegment(jpeg, 0xe0, jfif), 'jpeg'),
+        { message: 'JPEG APP0 contains an invalid JFIF structure' },
+      );
+    });
+    await t.test('Adobe version', async () => {
+      await assert.rejects(
+        () => assertMetadataFreeImage(injectJpegSegment(jpeg, 0xee, adobe), 'jpeg'),
+        /JPEG APP|Adobe|structure/i,
+      );
+    });
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

@@ -105,14 +105,15 @@ function assertValidJfif(payload) {
   const units = payload[7];
   const width = payload[12];
   const height = payload[13];
-  const expectedLength = 14 + 3 * width * height;
   if (
     payload[5] !== 1 ||
     payload[6] > 2 ||
     units > 2 ||
     payload.readUInt16BE(8) === 0 ||
     payload.readUInt16BE(10) === 0 ||
-    payload.length !== expectedLength
+    payload.length !== 14 ||
+    width !== 0 ||
+    height !== 0
   ) {
     throw new Error('JPEG APP0 contains an invalid JFIF structure');
   }
@@ -228,6 +229,11 @@ function assertMetadataFreePng(buffer) {
   }
 }
 
+function assertMetadataFreeContainer(buffer, format) {
+  if (format === 'jpeg') assertMetadataFreeJpeg(buffer);
+  else assertMetadataFreePng(buffer);
+}
+
 export async function inspectImage(buffer, format) {
   assertBuffer(buffer);
   const normalizedFormat = normalizeFormat(format);
@@ -256,8 +262,17 @@ export async function inspectImage(buffer, format) {
 }
 
 export async function assertMetadataFreeImage(buffer, format) {
-  const image = await inspectImage(buffer, format);
-  if (image.format === 'jpeg') assertMetadataFreeJpeg(buffer);
-  else assertMetadataFreePng(buffer);
+  let image;
+  try {
+    image = await inspectImage(buffer, format);
+  } catch (decodeError) {
+    assertBuffer(buffer);
+    const normalizedFormat = normalizeFormat(format);
+    assertMatchingSignature(buffer, normalizedFormat);
+    assertMetadataFreeContainer(buffer, normalizedFormat);
+    throw decodeError;
+  }
+
+  assertMetadataFreeContainer(buffer, image.format);
   return image;
 }
