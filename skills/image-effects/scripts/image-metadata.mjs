@@ -2,7 +2,7 @@ import sharp from 'sharp';
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const FORBIDDEN_PNG_CHUNKS = new Set(['eXIf', 'tEXt', 'zTXt', 'iTXt']);
-const JPEG_METADATA_TEXT = /(?:exif\0\0|xmp|xap\/1\.0|gps|(?:make|model|device|camera|software|artist|copyright)\s*[=:])/i;
+const MAX_INPUT_PIXELS = 20_000_000;
 const CRC32_TABLE = Uint32Array.from({ length: 256 }, (_, value) => {
   let crc = value;
   for (let bit = 0; bit < 8; bit += 1) {
@@ -39,6 +39,7 @@ function jpegSegments(buffer) {
   const segments = [];
   let offset = 2;
   let inScan = false;
+  let sawScan = false;
 
   while (offset < buffer.length) {
     if (buffer[offset] !== 0xff) {
@@ -59,15 +60,21 @@ function jpegSegments(buffer) {
       if (!inScan) throw new Error('Invalid JPEG structure: stuffed byte outside scan');
       continue;
     }
+    if (marker >= 0xd0 && marker <= 0xd7) {
+      if (!inScan) throw new Error('Invalid JPEG structure: restart marker outside scan');
+      continue;
+    }
     if (marker === 0xd9) {
+      if (!sawScan) throw new Error('Invalid JPEG structure: EOI before SOS');
       if (offset !== buffer.length) {
         throw new Error('Invalid JPEG structure: trailing bytes after EOI');
       }
       return segments;
     }
-    if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
-      continue;
-    }
+    if (marker === 0xd8) throw new Error('Invalid JPEG structure: duplicate SOI marker');
+    if (marker === 0x01) continue;
+
+    inScan = false;
     if (offset + 2 > buffer.length) throw new Error('Invalid JPEG structure: truncated length');
 
     const length = buffer.readUInt16BE(offset);
@@ -78,21 +85,94 @@ function jpegSegments(buffer) {
     const payload = buffer.subarray(offset + 2, offset + length);
     segments.push({ marker, payload });
     offset += length;
-    inScan = marker === 0xda;
+    if (marker === 0xda) {
+      sawScan = true;
+      inScan = true;
+    }
   }
 
   throw new Error('Invalid JPEG structure: missing end marker');
+}
+
+function hasPrefix(payload, prefix) {
+  return payload.length >= prefix.length && payload.subarray(0, prefix.length).equals(prefix);
+}
+
+function assertValidJfif(payload) {
+  if (!hasPrefix(payload, Buffer.from('JFIF\0', 'binary')) || payload.length < 14) {
+    throw new Error('JPEG APP0 must contain a structurally valid JFIF segment');
+  }
+  const units = payload[7];
+  const width = payload[12];
+  const height = payload[13];
+  const expectedLength = 14 + 3 * width * height;
+  if (
+    payload[5] !== 1 ||
+    payload[6] > 2 ||
+    units > 2 ||
+    payload.readUInt16BE(8) === 0 ||
+    payload.readUInt16BE(10) === 0 ||
+    payload.length !== expectedLength
+  ) {
+    throw new Error('JPEG APP0 contains an invalid JFIF structure');
+  }
+}
+
+function assertValidJfxx(payload) {
+  if (!hasPrefix(payload, Buffer.from('JFXX\0', 'binary')) || payload.length < 6) {
+    throw new Error('JPEG APP0 must contain a structurally valid JFXX segment');
+  }
+
+  const extensionCode = payload[5];
+  if (extensionCode === 0x10) {
+    if (
+      payload.length < 10 ||
+      payload.readUInt16BE(6) !== 0xffd8 ||
+      payload.readUInt16BE(payload.length - 2) !== 0xffd9
+    ) {
+      throw new Error('JPEG APP0 contains an invalid JFXX JPEG thumbnail');
+    }
+    return;
+  }
+
+  if ((extensionCode === 0x11 || extensionCode === 0x13) && payload.length >= 8) {
+    const width = payload[6];
+    const height = payload[7];
+    const expectedLength =
+      extensionCode === 0x11 ? 8 + 768 + width * height : 8 + 3 * width * height;
+    if (payload.length === expectedLength) return;
+  }
+  throw new Error('JPEG APP0 contains an invalid JFXX structure');
+}
+
+function assertAllowedAppSegment(marker, payload) {
+  if (marker === 0xe0) {
+    if (hasPrefix(payload, Buffer.from('JFIF\0', 'binary'))) assertValidJfif(payload);
+    else if (hasPrefix(payload, Buffer.from('JFXX\0', 'binary'))) assertValidJfxx(payload);
+    else throw new Error('JPEG APP0 metadata is not an allowed JFIF or JFXX segment');
+    return;
+  }
+
+  if (marker === 0xee) {
+    if (
+      payload.length !== 12 ||
+      !hasPrefix(payload, Buffer.from('Adobe', 'ascii')) ||
+      payload.readUInt16BE(5) !== 100 ||
+      payload[11] > 2
+    ) {
+      throw new Error('JPEG APP14 metadata is not a structurally valid Adobe segment');
+    }
+    return;
+  }
+
+  throw new Error(`JPEG APP${marker - 0xe0} metadata is not allowed`);
 }
 
 function assertMetadataFreeJpeg(buffer) {
   for (const { marker, payload } of jpegSegments(buffer)) {
     if (marker === 0xfe) throw new Error('JPEG comment metadata is not allowed');
     if (marker < 0xe0 || marker > 0xef) continue;
-
-    const text = payload.toString('latin1');
-    if (JPEG_METADATA_TEXT.test(text)) {
-      throw new Error('JPEG EXIF, XMP, GPS, or device metadata is not allowed');
-    }
+    assertAllowedAppSegment(marker, payload);
   }
 }
 
@@ -107,6 +187,10 @@ function pngChunkCrc(buffer, start, end) {
 function pngChunkTypes(buffer) {
   const types = [];
   let offset = PNG_SIGNATURE.length;
+  let chunkIndex = 0;
+  let sawIhdr = false;
+  let sawIdat = false;
+  let endedIdatRun = false;
   let sawIend = false;
 
   while (offset < buffer.length) {
@@ -117,22 +201,49 @@ function pngChunkTypes(buffer) {
 
     const type = buffer.toString('ascii', offset + 4, offset + 8);
     if (!/^[A-Za-z]{4}$/.test(type)) throw new Error('Invalid PNG structure: invalid chunk type');
+    if (!/[A-Z]/.test(type[2])) {
+      throw new Error(`Invalid PNG structure: reserved bit is set in ${type}`);
+    }
     const storedCrc = buffer.readUInt32BE(offset + 8 + length);
     const computedCrc = pngChunkCrc(buffer, offset + 4, offset + 8 + length);
     if (storedCrc !== computedCrc) {
       throw new Error(`Invalid PNG structure: CRC mismatch in ${type}`);
     }
-    types.push(type);
-    offset = end;
+
+    if (type === 'IHDR') {
+      if (chunkIndex !== 0 || sawIhdr || length !== 13) {
+        throw new Error('Invalid PNG structure: IHDR must be the unique first 13-byte chunk');
+      }
+      sawIhdr = true;
+    } else if (!sawIhdr) {
+      throw new Error('Invalid PNG structure: IHDR must be the first chunk');
+    }
+
+    if (type === 'IDAT') {
+      if (endedIdatRun) throw new Error('Invalid PNG structure: IDAT chunks must be consecutive');
+      sawIdat = true;
+    } else if (sawIdat && type !== 'IEND') {
+      endedIdatRun = true;
+    }
 
     if (type === 'IEND') {
+      if (sawIend || length !== 0 || !sawIdat) {
+        throw new Error('Invalid PNG structure: IEND must be unique and empty after IDAT');
+      }
       sawIend = true;
+    }
+
+    types.push(type);
+    offset = end;
+    chunkIndex += 1;
+
+    if (type === 'IEND') {
       break;
     }
   }
 
-  if (!sawIend || offset !== buffer.length) {
-    throw new Error('Invalid PNG structure: missing final IEND chunk');
+  if (!sawIhdr || !sawIdat || !sawIend || offset !== buffer.length) {
+    throw new Error('Invalid PNG structure: IHDR, IDAT, and final IEND are required');
   }
   return types;
 }
@@ -150,10 +261,18 @@ export async function inspectImage(buffer, format) {
   const normalizedFormat = normalizeFormat(format);
   assertMatchingSignature(buffer, normalizedFormat);
 
-  const { info } = await sharp(buffer, { failOn: 'error' })
+  const { info } = await sharp(buffer, {
+    failOn: 'warning',
+    limitInputPixels: MAX_INPUT_PIXELS,
+  })
     .raw()
     .toBuffer({ resolveWithObject: true });
-  if (!Number.isInteger(info.width) || info.width <= 0 || !Number.isInteger(info.height) || info.height <= 0) {
+  if (
+    !Number.isInteger(info.width) ||
+    info.width <= 0 ||
+    !Number.isInteger(info.height) ||
+    info.height <= 0
+  ) {
     throw new Error('Decoded image has invalid dimensions');
   }
 
