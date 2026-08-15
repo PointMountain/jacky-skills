@@ -3,6 +3,13 @@ import sharp from 'sharp';
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const FORBIDDEN_PNG_CHUNKS = new Set(['eXIf', 'tEXt', 'zTXt', 'iTXt']);
 const JPEG_METADATA_TEXT = /(?:exif\0\0|xmp|xap\/1\.0|gps|(?:make|model|device|camera|software|artist|copyright)\s*[=:])/i;
+const CRC32_TABLE = Uint32Array.from({ length: 256 }, (_, value) => {
+  let crc = value;
+  for (let bit = 0; bit < 8; bit += 1) {
+    crc = crc & 1 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1;
+  }
+  return crc >>> 0;
+});
 
 function normalizeFormat(format) {
   if (typeof format !== 'string') throw new TypeError('Image format must be jpeg or png');
@@ -52,7 +59,12 @@ function jpegSegments(buffer) {
       if (!inScan) throw new Error('Invalid JPEG structure: stuffed byte outside scan');
       continue;
     }
-    if (marker === 0xd9) return segments;
+    if (marker === 0xd9) {
+      if (offset !== buffer.length) {
+        throw new Error('Invalid JPEG structure: trailing bytes after EOI');
+      }
+      return segments;
+    }
     if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
       continue;
     }
@@ -84,6 +96,14 @@ function assertMetadataFreeJpeg(buffer) {
   }
 }
 
+function pngChunkCrc(buffer, start, end) {
+  let crc = 0xffffffff;
+  for (let offset = start; offset < end; offset += 1) {
+    crc = CRC32_TABLE[(crc ^ buffer[offset]) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
 function pngChunkTypes(buffer) {
   const types = [];
   let offset = PNG_SIGNATURE.length;
@@ -97,6 +117,11 @@ function pngChunkTypes(buffer) {
 
     const type = buffer.toString('ascii', offset + 4, offset + 8);
     if (!/^[A-Za-z]{4}$/.test(type)) throw new Error('Invalid PNG structure: invalid chunk type');
+    const storedCrc = buffer.readUInt32BE(offset + 8 + length);
+    const computedCrc = pngChunkCrc(buffer, offset + 4, offset + 8 + length);
+    if (storedCrc !== computedCrc) {
+      throw new Error(`Invalid PNG structure: CRC mismatch in ${type}`);
+    }
     types.push(type);
     offset = end;
 

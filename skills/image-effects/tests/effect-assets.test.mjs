@@ -131,6 +131,21 @@ function injectPngChunk(buffer, type, payload) {
   throw new Error('Fixture PNG is missing IEND');
 }
 
+function corruptPngChunkCrc(buffer, targetType) {
+  let offset = 8;
+  while (offset + 12 <= buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.toString('ascii', offset + 4, offset + 8);
+    if (type === targetType) {
+      const corrupted = Buffer.from(buffer);
+      corrupted[offset + 8 + length] ^= 0x01;
+      return corrupted;
+    }
+    offset += 12 + length;
+  }
+  throw new Error(`Fixture PNG is missing ${targetType}`);
+}
+
 async function createFixtures(directory) {
   const sharp = await loadSharp();
   const input = {
@@ -217,6 +232,29 @@ test('JPEG 拒绝 EXIF、XMP、COM、GPS 和设备文本元数据', async (t) =>
   }
 });
 
+test('JPEG 拒绝 EOI 后追加的 COM 段和任意尾随字节', async (t) => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'image-effects-jpeg-trailing-'));
+  try {
+    const { assertMetadataFreeImage } = await loadImageTools();
+    const { jpeg } = await createFixtures(directory);
+    const samples = [
+      ['COM 段', jpegSegment(0xfe, Buffer.from('private trailing comment'))],
+      ['任意字节', Buffer.from([0xde, 0xad, 0xbe, 0xef])],
+    ];
+
+    for (const [name, suffix] of samples) {
+      await t.test(name, async () => {
+        await assert.rejects(
+          () => assertMetadataFreeImage(Buffer.concat([jpeg, suffix]), 'jpeg'),
+          /JPEG structure|trailing|EOI/i,
+        );
+      });
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test('PNG 拒绝 eXIf、tEXt、zTXt 和 iTXt 元数据块', async (t) => {
   const directory = await mkdtemp(path.join(tmpdir(), 'image-effects-png-metadata-'));
   try {
@@ -234,6 +272,34 @@ test('PNG 拒绝 eXIf、tEXt、zTXt 和 iTXt 元数据块', async (t) => {
         await assert.rejects(
           () => assertMetadataFreeImage(injectPngChunk(png, type, payload), 'png'),
           new RegExp(`metadata|${type}`, 'i'),
+        );
+      });
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('PNG 拒绝 ancillary chunk 和 IEND 的损坏 CRC', async (t) => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'image-effects-png-crc-'));
+  try {
+    const { assertMetadataFreeImage } = await loadImageTools();
+    const { png } = await createFixtures(directory);
+    const withAncillary = injectPngChunk(
+      png,
+      'pHYs',
+      Buffer.from([0, 0, 0x0e, 0xc4, 0, 0, 0x0e, 0xc4, 1]),
+    );
+    const samples = [
+      ['ancillary pHYs', corruptPngChunkCrc(withAncillary, 'pHYs')],
+      ['IEND', corruptPngChunkCrc(png, 'IEND')],
+    ];
+
+    for (const [name, sample] of samples) {
+      await t.test(name, async () => {
+        await assert.rejects(
+          () => assertMetadataFreeImage(sample, 'png'),
+          /PNG structure|CRC/i,
         );
       });
     }
