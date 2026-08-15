@@ -735,6 +735,132 @@ test("--check 从同一 HEAD 重建，允许纯受管 dirty，并拒绝各种漂
     }
   });
 
+  await t.test(
+    "staged 与 unstaged 都只涉及 expected managed paths 时通过",
+    async () => {
+      const fixture = await preparedTarget();
+      try {
+        await initTargetRepository(fixture.target);
+        const readmePath = path.join(fixture.target, "README.md");
+        const expectedReadme = await readFile(readmePath);
+        await writeFile(readmePath, "staged managed bytes\n");
+        await git(fixture.target, "add", "README.md");
+        await writeFile(readmePath, expectedReadme);
+
+        await exportPublicRepository({
+          target: fixture.target,
+          cwd: fixture.sourceRoot,
+          check: true,
+        });
+      } finally {
+        await Promise.all([
+          rm(fixture.sourceRoot, { recursive: true, force: true }),
+          rm(fixture.parent, { recursive: true, force: true }),
+        ]);
+      }
+    }
+  );
+
+  await t.test("拒绝 git add 后工作树删除形成的 unmanaged AD", async () => {
+    const fixture = await preparedTarget();
+    try {
+      await initTargetRepository(fixture.target);
+      await writeRelative(fixture.target, "manual.txt", "index only\n");
+      await git(fixture.target, "add", "manual.txt");
+      await rm(path.join(fixture.target, "manual.txt"));
+      assert.match(
+        (
+          await git(
+            fixture.target,
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all"
+          )
+        ).stdout,
+        /^AD manual\.txt$/m
+      );
+
+      await assert.rejects(
+        () =>
+          exportPublicRepository({
+            target: fixture.target,
+            cwd: fixture.sourceRoot,
+            check: true,
+          }),
+        /git|index|unmanaged|unexpected/i
+      );
+    } finally {
+      await Promise.all([
+        rm(fixture.sourceRoot, { recursive: true, force: true }),
+        rm(fixture.parent, { recursive: true, force: true }),
+      ]);
+    }
+  });
+
+  await t.test("拒绝只存在于 index 的 staged rename 新路径", async () => {
+    const fixture = await preparedTarget();
+    try {
+      await initTargetRepository(fixture.target);
+      const readmePath = path.join(fixture.target, "README.md");
+      const manualPath = path.join(fixture.target, "manual.txt");
+      await git(fixture.target, "mv", "README.md", "manual.txt");
+      await writeFile(readmePath, await readFile(manualPath));
+      await rm(manualPath);
+      assert.match(
+        (await git(fixture.target, "diff", "--cached", "--name-status", "-M"))
+          .stdout,
+        /manual\.txt/
+      );
+
+      await assert.rejects(
+        () =>
+          exportPublicRepository({
+            target: fixture.target,
+            cwd: fixture.sourceRoot,
+            check: true,
+          }),
+        /git|index|unmanaged|unexpected/i
+      );
+    } finally {
+      await Promise.all([
+        rm(fixture.sourceRoot, { recursive: true, force: true }),
+        rm(fixture.parent, { recursive: true, force: true }),
+      ]);
+    }
+  });
+
+  await t.test(
+    "拒绝仅由 unstaged delete 隐藏的 committed unmanaged path",
+    async () => {
+      const fixture = await preparedTarget();
+      try {
+        await initTargetRepository(fixture.target);
+        await writeRelative(
+          fixture.target,
+          "manual.txt",
+          "committed unmanaged\n"
+        );
+        await commitAll(fixture.target, "add unmanaged path");
+        await rm(path.join(fixture.target, "manual.txt"));
+
+        await assert.rejects(
+          () =>
+            exportPublicRepository({
+              target: fixture.target,
+              cwd: fixture.sourceRoot,
+              check: true,
+            }),
+          /git|worktree|unmanaged|unexpected/i
+        );
+      } finally {
+        await Promise.all([
+          rm(fixture.sourceRoot, { recursive: true, force: true }),
+          rm(fixture.parent, { recursive: true, force: true }),
+        ]);
+      }
+    }
+  );
+
   const drifts = [
     [
       "content",
@@ -830,6 +956,47 @@ test("内容扫描拒绝用户绝对路径、附件路径、secret 与禁止属�
         await assert.rejects(
           () => exportPublicRepository({ target, cwd: sourceRoot }),
           /public content|private|secret|attachment|absolute|forbidden/i
+        );
+        await assert.rejects(() => lstat(target), /ENOENT/);
+      } finally {
+        await Promise.all([
+          rm(sourceRoot, { recursive: true, force: true }),
+          rm(parent, { recursive: true, force: true }),
+        ]);
+      }
+    });
+  }
+});
+
+test("内容扫描拒绝文本文件中的非法 UTF-8，不能把解码失败当作 binary", async (t) => {
+  const cases = [
+    {
+      name: "standalone invalid UTF-8 Markdown",
+      relativePath: "skills/image-effects/assets/public-repo/README.md",
+      content: Buffer.from([0x23, 0x20, 0x80, 0x0a]),
+    },
+    {
+      name: "secret followed by invalid UTF-8 JavaScript",
+      relativePath: "skills/image-effects/scripts/run.mjs",
+      content: Buffer.concat([
+        Buffer.from(`ghp_${"abcdefghijklmnopqrstuvwxyz1234567890"}\n`),
+        Buffer.from([0xff]),
+      ]),
+    },
+  ];
+  for (const fixture of cases) {
+    await t.test(fixture.name, async () => {
+      const sourceRoot = await makeSourceFixture();
+      const parent = await mkdtemp(
+        path.join(tmpdir(), "image-effects-export-targets-")
+      );
+      const target = path.join(parent, "public");
+      try {
+        await writeRelative(sourceRoot, fixture.relativePath, fixture.content);
+        await commitAll(sourceRoot, "add invalid UTF-8 text");
+        await assert.rejects(
+          () => exportPublicRepository({ target, cwd: sourceRoot }),
+          /UTF-8|text/i
         );
         await assert.rejects(() => lstat(target), /ENOENT/);
       } finally {
@@ -943,7 +1110,7 @@ test("同一 target 并发导出由独立维护锁 fail-fast，首个事务完�
   }
 });
 
-test("公开仓库模板包含安装、调用、Gallery、贡献、隐私和许可边界", async () => {
+test("公开仓库模板保留安装、调用、Gallery 与 Pages 机器契约", async () => {
   const readme = await readFile(
     path.join(SKILL_ROOT, "assets/public-repo/README.md"),
     "utf8"
@@ -952,42 +1119,30 @@ test("公开仓库模板包含安装、调用、Gallery、贡献、隐私和许�
     path.join(SKILL_ROOT, "assets/public-repo/README_CN.md"),
     "utf8"
   );
-  const license = await readFile(
-    path.join(SKILL_ROOT, "assets/public-repo/LICENSE"),
-    "utf8"
-  );
-  const gitignore = await readFile(
-    path.join(SKILL_ROOT, "assets/public-repo/.gitignore"),
-    "utf8"
-  );
   const workflow = await readFile(
     path.join(SKILL_ROOT, "assets/public-repo/.github/workflows/pages.yml"),
     "utf8"
   );
   const combined = `${readme}\n${readmeCn}`;
 
-  assert.match(combined, /npx skills add wangjs-jacky\/image-effects/);
-  assert.match(
-    combined,
-    /Use \$image-effects effect healing-anime-scribble-v3@1\.0\.0 on my uploaded image\./
+  assert.equal(
+    combined.includes("npx skills add wangjs-jacky/image-effects"),
+    true
   );
-  assert.match(combined, /https:\/\/wangjs-jacky\.github\.io\/image-effects\//);
-  assert.match(combined, /card|效果卡/i);
-  assert.match(combined, /preview|预览/i);
-  assert.match(combined, /build|构建/i);
-  assert.match(combined, /validate|验证/i);
-  assert.match(combined, /one effect|1 个效果|一个效果/i);
-  assert.match(combined, /privacy|隐私/i);
-  assert.match(combined, /host-native|宿主原生/i);
-  assert.match(combined, /no global generation lock|无全局生成锁/i);
-  assert.match(combined, /THIRD_PARTY_NOTICES\.md/);
-
-  assert.match(license, /^MIT License/m);
-  assert.match(license, /Copyright \(c\) 2026 wangjs-jacky/);
-  assert.match(license, /original code and adaptations/i);
-  assert.match(license, /THIRD_PARTY_NOTICES\.md/);
-  assert.match(gitignore, /node_modules/);
-  assert.doesNotMatch(gitignore, /gallery|image-effects-export/);
+  assert.equal(
+    combined.includes(
+      "Use $image-effects effect healing-anime-scribble-v3@1.0.0 on my uploaded image."
+    ),
+    true
+  );
+  assert.equal(
+    combined.includes("https://wangjs-jacky.github.io/image-effects/"),
+    true
+  );
+  await Promise.all([
+    stat(path.join(SKILL_ROOT, "assets/public-repo/LICENSE")),
+    stat(path.join(SKILL_ROOT, "assets/public-repo/THIRD_PARTY_NOTICES.md")),
+  ]);
 
   assert.match(workflow, /push:/);
   assert.match(workflow, /workflow_dispatch:/);

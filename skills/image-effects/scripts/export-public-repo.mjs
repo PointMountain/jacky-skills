@@ -82,6 +82,8 @@ const MANAGED_NESTED_PREFIXES = [
 // This lock serializes public-export maintenance only. Image generation has no global lock.
 const EXPORT_LOCK_SUFFIX = ".image-effects-export.lock";
 const ALLOWED_SYSTEM_ROOT_LINKS = new Set(["/etc", "/tmp", "/var"]);
+const BINARY_PUBLIC_IMAGE_PATTERN =
+  /^(?:assets\/previews|gallery\/media)\/.+\.(?:jpe?g|png)$/i;
 
 function compareAscii(left, right) {
   if (left === right) return 0;
@@ -246,11 +248,16 @@ function assertSafeManagedPath(
 }
 
 function scanPublicContent(relativePath, bytes) {
+  if (BINARY_PUBLIC_IMAGE_PATTERN.test(relativePath)) return;
   let text;
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    return;
+  } catch (error) {
+    const wrapped = new Error(
+      `Unsafe public text in ${relativePath}: content must be valid UTF-8`
+    );
+    wrapped.cause = error;
+    throw wrapped;
   }
   const rules = [
     {
@@ -730,6 +737,70 @@ async function listTargetFiles(target) {
   return files.sort((left, right) => compareAscii(left.path, right.path));
 }
 
+function parseNullTerminatedGitPaths(bytes, label) {
+  if (!Buffer.isBuffer(bytes)) {
+    throw new Error(`Unexpected ${label} Git path output`);
+  }
+  const paths = [];
+  let start = 0;
+  for (let index = 0; index < bytes.length; index += 1) {
+    if (bytes[index] !== 0) continue;
+    const rawPath = bytes.subarray(start, index);
+    if (rawPath.length > 0) {
+      try {
+        paths.push(new TextDecoder("utf-8", { fatal: true }).decode(rawPath));
+      } catch (error) {
+        const wrapped = new Error(
+          `Unsafe ${label} Git path: path must be valid UTF-8`
+        );
+        wrapped.cause = error;
+        throw wrapped;
+      }
+    }
+    start = index + 1;
+  }
+  if (start !== bytes.length) {
+    throw new Error(`Unexpected non-NUL-terminated ${label} Git path output`);
+  }
+  return paths;
+}
+
+async function assertCheckGitPathsAreManaged(target, expectedPaths) {
+  if (!(await pathExists(path.join(target, ".git")))) return;
+  await assertTargetGitRepository(target);
+  const commands = [
+    {
+      label: "staged index",
+      args: ["diff", "--cached", "--name-only", "--no-renames", "-z", "--"],
+    },
+    {
+      label: "unstaged worktree",
+      args: ["diff", "--name-only", "--no-renames", "-z", "--"],
+    },
+    {
+      label: "untracked worktree",
+      args: ["ls-files", "--others", "--exclude-standard", "-z", "--"],
+    },
+  ];
+  for (const command of commands) {
+    const output = (
+      await runGit(target, command.args, {
+        binary: true,
+      })
+    ).stdout;
+    for (const changedPath of parseNullTerminatedGitPaths(
+      output,
+      command.label
+    )) {
+      if (!expectedPaths.has(changedPath)) {
+        throw new Error(
+          `Public export check found unmanaged ${command.label} path`
+        );
+      }
+    }
+  }
+}
+
 async function checkTarget(targetContext, source, desiredFiles, manifestBytes) {
   const preflight = await preflightTarget(targetContext, desiredFiles, {
     check: true,
@@ -741,6 +812,10 @@ async function checkTarget(targetContext, source, desiredFiles, manifestBytes) {
     ...desiredFiles.map(({ path: filePath }) => filePath),
     MANIFEST_NAME,
   ].sort(compareAscii);
+  await assertCheckGitPathsAreManaged(
+    targetContext.target,
+    new Set(expectedPaths)
+  );
   if (
     actualPaths.some(({ type }) => type !== "file") ||
     actualPaths.map(({ path: filePath }) => filePath).join("\0") !==
