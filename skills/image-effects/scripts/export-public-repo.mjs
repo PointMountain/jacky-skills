@@ -207,7 +207,7 @@ function mapSourcePath(sourcePath) {
 function assertSafeManagedPath(
   relativePath,
   label = "managed path",
-  { allowDirectoryRoot = false } = {}
+  { allowDirectoryRoot = false, allowExportManifest = false } = {}
 ) {
   if (typeof relativePath !== "string" || relativePath.length === 0) {
     throw new Error(`Unsafe ${label}: path must be a non-empty string`);
@@ -217,7 +217,7 @@ function assertSafeManagedPath(
     path.win32.isAbsolute(relativePath) ||
     relativePath.includes("\\") ||
     relativePath.includes("%") ||
-    relativePath.includes("?") ||
+    /[:*<>|?]/.test(relativePath) ||
     relativePath.includes("#") ||
     relativePath.includes("\0")
   ) {
@@ -226,13 +226,19 @@ function assertSafeManagedPath(
   const segments = relativePath.split("/");
   if (
     segments.some(
-      (segment) => segment === "" || segment === "." || segment === ".."
+      (segment) =>
+        segment === "" ||
+        segment === "." ||
+        segment === ".." ||
+        /[. ]$/.test(segment) ||
+        /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(segment)
     )
   ) {
     throw new Error(`Unsafe ${label}: ${JSON.stringify(relativePath)}`);
   }
   const allowed =
     MANAGED_ROOT_FILES.has(relativePath) ||
+    (allowExportManifest && relativePath === MANIFEST_NAME) ||
     relativePath === ".github/workflows/pages.yml" ||
     MANAGED_NESTED_PREFIXES.some((prefix) => relativePath.startsWith(prefix)) ||
     (allowDirectoryRoot &&
@@ -261,11 +267,22 @@ function scanPublicContent(relativePath, bytes) {
   }
   const rules = [
     {
-      pattern: /(?:^|[\s"'(=])\/(?:Users|home)\/[^/\s]+\//m,
+      pattern:
+        /(?:^|[^A-Za-z0-9_/?#%&=.:-])\/(?:Users|home)\/[^/\s"'`<>]+(?:\/|$)/im,
       message: "absolute user path",
     },
     {
-      pattern: /(?:^|[\s"'(=])[A-Za-z]:\\Users\\[^\\\s]+\\/m,
+      pattern: /\b(?:private|path):\/(?:Users|home)\/[^/\s"'`<>]+(?:\/|$)/im,
+      message: "absolute user path",
+    },
+    {
+      pattern:
+        /(?:^|[^A-Za-z0-9_/])[A-Za-z]:[\\/]Users[\\/][^\\/\s"'`<>]+(?:[\\/]|$)/im,
+      message: "absolute user path",
+    },
+    {
+      pattern:
+        /\bfile:\/\/\/(?:[A-Za-z]:[\\/])?(?:Users|home)[\\/][^\\/\s"'`<>]+(?:[\\/]|$)/i,
       message: "absolute user path",
     },
     {
@@ -532,14 +549,52 @@ function parseManifest(bytes) {
   return manifest;
 }
 
+function fileIdentity(stats) {
+  return { device: stats.dev, inode: stats.ino };
+}
+
+function hasFileIdentity(stats, identity) {
+  return stats.dev === identity.device && stats.ino === identity.inode;
+}
+
+async function assertTargetRootIdentity(targetContext, expectedIdentity) {
+  await assertNoUserSymlinkComponents(targetContext.target);
+  let stats;
+  try {
+    stats = await lstat(targetContext.target);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      throw new Error("Target root disappeared during export");
+    }
+    throw error;
+  }
+  if (stats.isSymbolicLink() || !stats.isDirectory()) {
+    throw new Error(
+      "Target root identity is unsafe: expected a real directory"
+    );
+  }
+  if (
+    (await realpath(targetContext.target)) !== targetContext.canonicalTarget
+  ) {
+    throw new Error("Target canonical path changed during export");
+  }
+  if (expectedIdentity && !hasFileIdentity(stats, expectedIdentity)) {
+    throw new Error("Target root identity changed during export");
+  }
+  return fileIdentity(stats);
+}
+
 async function inspectWithinTarget(
   targetContext,
   relativePath,
-  expectedLeaf = "file"
+  expectedLeaf = "file",
+  rootIdentity
 ) {
   assertSafeManagedPath(relativePath, "managed path", {
     allowDirectoryRoot: expectedLeaf === "directory",
+    allowExportManifest: relativePath === MANIFEST_NAME,
   });
+  await assertTargetRootIdentity(targetContext, rootIdentity);
   let current = targetContext.target;
   const segments = relativePath.split("/");
   for (let index = 0; index < segments.length; index += 1) {
@@ -636,15 +691,7 @@ async function preflightTarget(targetContext, desiredFiles, { check }) {
     if (check) throw new Error("Check target does not exist");
     return { kind: "new", manifest: null };
   }
-  const rootStats = await lstat(targetContext.target);
-  if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
-    throw new Error("Target must be a real directory, not a symbolic link");
-  }
-  if (
-    (await realpath(targetContext.target)) !== targetContext.canonicalTarget
-  ) {
-    throw new Error("Target canonical path changed during export");
-  }
+  await assertTargetRootIdentity(targetContext);
 
   const names = await readdir(targetContext.target);
   if (names.length === 0) {
@@ -702,14 +749,19 @@ async function preflightTarget(targetContext, desiredFiles, { check }) {
   return { kind: "existing", manifest };
 }
 
-async function inspectDesiredParents(targetContext, relativePath) {
+async function inspectDesiredParents(
+  targetContext,
+  relativePath,
+  rootIdentity
+) {
   const segments = relativePath.split("/");
   for (let index = 1; index < segments.length; index += 1) {
     const parentPath = segments.slice(0, index).join("/");
     const inspected = await inspectWithinTarget(
       targetContext,
       parentPath,
-      "directory"
+      "directory",
+      rootIdentity
     );
     if (!inspected.exists) return;
   }
@@ -815,6 +867,10 @@ function expectedGitMode(file) {
   if (file.mode === 0o644) return "100644";
   if (file.mode === 0o755) return "100755";
   throw new Error(`Unsupported expected export mode: ${file.path}`);
+}
+
+function filesystemGitMode(stats) {
+  return (stats.mode & 0o111) === 0 ? "100644" : "100755";
 }
 
 async function assertStagedIndexEntryMatches(target, expectedFile) {
@@ -941,6 +997,18 @@ async function checkTarget(targetContext, source, desiredFiles, manifestBytes) {
       "Public export check found missing, unexpected, or unmanaged target paths"
     );
   }
+  for (const file of expectedFiles) {
+    const stats = await lstat(
+      path.join(targetContext.target, ...file.path.split("/"))
+    );
+    const actualMode = filesystemGitMode(stats);
+    const expectedMode = expectedGitMode(file);
+    if (actualMode !== expectedMode) {
+      throw new Error(
+        `Public export check found worktree executable mode mismatch: ${file.path} (expected ${expectedMode}, found ${actualMode})`
+      );
+    }
+  }
   for (const file of desiredFiles) {
     const actual = await readFile(
       path.join(targetContext.target, ...file.path.split("/"))
@@ -1043,7 +1111,8 @@ async function writeStage(targetContext, desiredFiles, manifestBytes) {
 async function ensureDestinationDirectories(
   targetContext,
   relativePath,
-  createdDirectories
+  createdDirectories,
+  rootIdentity
 ) {
   const segments = relativePath.split("/").slice(0, -1);
   let relative = "";
@@ -1052,12 +1121,23 @@ async function ensureDestinationDirectories(
     const inspected = await inspectWithinTarget(
       targetContext,
       relative,
-      "directory"
+      "directory",
+      rootIdentity
     );
     if (inspected.exists) continue;
+    await assertTargetRootIdentity(targetContext, rootIdentity);
     await mkdir(inspected.path);
-    createdDirectories.push(inspected.path);
-    await inspectWithinTarget(targetContext, relative, "directory");
+    const created = await inspectWithinTarget(
+      targetContext,
+      relative,
+      "directory",
+      rootIdentity
+    );
+    createdDirectories.push({
+      path: created.path,
+      relativePath: relative,
+      identity: fileIdentity(await lstat(created.path)),
+    });
   }
 }
 
@@ -1076,7 +1156,37 @@ async function backupFile(source, destination) {
   }
 }
 
+async function assertManagedLeafState(
+  targetContext,
+  rootIdentity,
+  relativePath,
+  { exists, identity, expectedLeaf = "file" }
+) {
+  const inspected = await inspectWithinTarget(
+    targetContext,
+    relativePath,
+    expectedLeaf,
+    rootIdentity
+  );
+  if (inspected.exists !== exists) {
+    throw new Error(
+      `Managed path state changed during export: ${relativePath}`
+    );
+  }
+  if (exists && identity) {
+    const stats = await lstat(inspected.path);
+    if (!hasFileIdentity(stats, identity)) {
+      throw new Error(
+        `Managed path identity changed during export: ${relativePath}`
+      );
+    }
+  }
+  return inspected;
+}
+
 async function rollbackTransaction({
+  targetContext,
+  rootIdentity,
   replacements,
   staleMoves,
   createdDirectories,
@@ -1085,6 +1195,12 @@ async function rollbackTransaction({
   const rollbackErrors = [];
   for (const stale of [...staleMoves].reverse()) {
     try {
+      await assertManagedLeafState(
+        targetContext,
+        rootIdentity,
+        stale.relativePath,
+        { exists: false }
+      );
       await rename(stale.backup, stale.target);
     } catch (error) {
       rollbackErrors.push(error);
@@ -1092,23 +1208,42 @@ async function rollbackTransaction({
   }
   for (const replacement of [...replacements].reverse()) {
     try {
-      if (replacement.backup)
+      await assertManagedLeafState(
+        targetContext,
+        rootIdentity,
+        replacement.relativePath,
+        { exists: true, identity: replacement.installedIdentity }
+      );
+      if (replacement.backup) {
         await rename(replacement.backup, replacement.target);
-      else await unlink(replacement.target);
+      } else {
+        await unlink(replacement.target);
+      }
     } catch (error) {
       rollbackErrors.push(error);
     }
   }
   for (const directory of [...createdDirectories].reverse()) {
     try {
-      await rmdir(directory);
+      await assertManagedLeafState(
+        targetContext,
+        rootIdentity,
+        directory.relativePath,
+        {
+          exists: true,
+          identity: directory.identity,
+          expectedLeaf: "directory",
+        }
+      );
+      await rmdir(directory.path);
     } catch (error) {
       if (error.code !== "ENOENT") rollbackErrors.push(error);
     }
   }
   if (createdTarget) {
     try {
-      await rmdir(createdTarget);
+      await assertTargetRootIdentity(targetContext, rootIdentity);
+      await rmdir(createdTarget.path);
     } catch (error) {
       if (error.code !== "ENOENT") rollbackErrors.push(error);
     }
@@ -1129,12 +1264,13 @@ async function exchangeStage({
   const replacements = [];
   const staleMoves = [];
   let createdTarget = null;
+  let rootIdentity;
   try {
     if (!(await pathExists(targetContext.target))) {
       await mkdir(targetContext.target);
-      createdTarget = targetContext.target;
+      createdTarget = { path: targetContext.target };
     }
-    targetContext.canonicalTarget = await realpath(targetContext.target);
+    rootIdentity = await assertTargetRootIdentity(targetContext);
 
     const exchangeFiles = [
       ...desiredFiles,
@@ -1150,7 +1286,8 @@ async function exchangeStage({
       await ensureDestinationDirectories(
         targetContext,
         file.path,
-        createdDirectories
+        createdDirectories,
+        rootIdentity
       );
       const targetPath = path.join(
         targetContext.target,
@@ -1158,13 +1295,16 @@ async function exchangeStage({
       );
       const stagePath = path.join(stageRoot, "files", ...file.path.split("/"));
       let backup = null;
-      if (await pathExists(targetPath)) {
-        const targetStats = await lstat(targetPath);
-        if (targetStats.isSymbolicLink() || !targetStats.isFile()) {
-          throw new Error(
-            `Refusing to replace non-regular managed path: ${file.path}`
-          );
-        }
+      const inspectedBefore = await inspectWithinTarget(
+        targetContext,
+        file.path,
+        "file",
+        rootIdentity
+      );
+      let originalIdentity = null;
+      if (inspectedBefore.exists) {
+        const targetStats = await lstat(inspectedBefore.path);
+        originalIdentity = fileIdentity(targetStats);
         if (!oldPaths.has(file.path)) {
           throw new Error(
             `Refusing to replace unmanaged target path: ${file.path}`
@@ -1183,8 +1323,25 @@ async function exchangeStage({
         relativePath: file.path,
         targetPath,
       });
+      await assertTargetRootIdentity(targetContext, rootIdentity);
+      await inspectDesiredParents(targetContext, file.path, rootIdentity);
+      await assertManagedLeafState(targetContext, rootIdentity, file.path, {
+        exists: inspectedBefore.exists,
+        identity: originalIdentity,
+      });
       await rename(stagePath, targetPath);
-      replacements.push({ target: targetPath, backup });
+      const installed = await inspectWithinTarget(
+        targetContext,
+        file.path,
+        "file",
+        rootIdentity
+      );
+      replacements.push({
+        target: targetPath,
+        backup,
+        relativePath: file.path,
+        installedIdentity: fileIdentity(await lstat(installed.path)),
+      });
       await transactionHooks.afterExchange?.({
         index,
         relativePath: file.path,
@@ -1203,7 +1360,8 @@ async function exchangeStage({
       const inspected = await inspectWithinTarget(
         targetContext,
         stalePath,
-        "file"
+        "file",
+        rootIdentity
       );
       if (!inspected.exists)
         throw new Error(`Stale managed path disappeared: ${stalePath}`);
@@ -1214,13 +1372,26 @@ async function exchangeStage({
         ...stalePath.split("/")
       );
       await mkdir(path.dirname(backup), { recursive: true });
-      await rename(inspected.path, backup);
-      staleMoves.push({ target: inspected.path, backup });
+      const staleIdentity = fileIdentity(await lstat(inspected.path));
+      const finalStale = await assertManagedLeafState(
+        targetContext,
+        rootIdentity,
+        stalePath,
+        { exists: true, identity: staleIdentity }
+      );
+      await rename(finalStale.path, backup);
+      staleMoves.push({
+        target: finalStale.path,
+        backup,
+        relativePath: stalePath,
+      });
     }
     await transactionHooks.afterStaleDelete?.({ stalePaths });
   } catch (error) {
     try {
       await rollbackTransaction({
+        targetContext,
+        rootIdentity,
         replacements,
         staleMoves,
         createdDirectories,

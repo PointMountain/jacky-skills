@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFile as execFileCallback } from "node:child_process";
 import {
+  chmod,
   lstat,
   mkdir,
   mkdtemp,
@@ -9,6 +10,7 @@ import {
   readdir,
   readlink,
   realpath,
+  rename,
   rm,
   stat,
   symlink,
@@ -552,6 +554,19 @@ test("旧 manifest 拒绝所有危险路径语法与重复项，且拒绝越界 
     "scripts/query?.txt",
     "scripts/hash#.txt",
     "scripts/nul\0.txt",
+    "scripts/colon:name.mjs",
+    "scripts/star*name.mjs",
+    "scripts/less<name.mjs",
+    "scripts/greater>name.mjs",
+    "scripts/pipe|name.mjs",
+    "scripts/CON",
+    "scripts/prn.txt",
+    "scripts/AuX.json",
+    "scripts/NUL.md",
+    "scripts/COM1.mjs",
+    "scripts/lpt9.test.mjs",
+    "scripts/trailing.",
+    "scripts/trailing ",
     ".github/CODEOWNERS",
     "assets/private.txt",
   ];
@@ -578,7 +593,7 @@ test("旧 manifest 拒绝所有危险路径语法与重复项，且拒绝越界 
         const before = await topology(target);
         await assert.rejects(
           () => exportPublicRepository({ target, cwd: sourceRoot }),
-          /manifest|unsafe|path/i
+          /unsafe manifest path/i
         );
         assert.deepEqual(await topology(target), before);
       } finally {
@@ -815,6 +830,72 @@ test("--check 从同一 HEAD 重建，允许纯受管 dirty，并拒绝各种漂
             check: true,
           }),
         /index|mode|type|100755/i
+      );
+    } finally {
+      await Promise.all([
+        rm(fixture.sourceRoot, { recursive: true, force: true }),
+        rm(fixture.parent, { recursive: true, force: true }),
+      ]);
+    }
+  });
+
+  await t.test(
+    "拒绝工作树 chmod +x 形成的 unstaged executable mode",
+    async () => {
+      const fixture = await preparedTarget();
+      try {
+        await initTargetRepository(fixture.target);
+        const readmePath = path.join(fixture.target, "README.md");
+        await chmod(readmePath, 0o755);
+        assert.notEqual(
+          (await git(fixture.target, "diff", "--name-only")).stdout,
+          ""
+        );
+
+        await assert.rejects(
+          () =>
+            exportPublicRepository({
+              target: fixture.target,
+              cwd: fixture.sourceRoot,
+              check: true,
+            }),
+          /worktree|mode|executable|100755/i
+        );
+      } finally {
+        await Promise.all([
+          rm(fixture.sourceRoot, { recursive: true, force: true }),
+          rm(fixture.parent, { recursive: true, force: true }),
+        ]);
+      }
+    }
+  );
+
+  await t.test("拒绝错误 executable mode 已提交后的 clean target", async () => {
+    const fixture = await preparedTarget();
+    try {
+      await initTargetRepository(fixture.target);
+      await chmod(path.join(fixture.target, "README.md"), 0o755);
+      await commitAll(fixture.target, "commit wrong executable mode");
+      assert.equal(
+        (
+          await git(
+            fixture.target,
+            "status",
+            "--porcelain",
+            "--untracked-files=all"
+          )
+        ).stdout,
+        ""
+      );
+
+      await assert.rejects(
+        () =>
+          exportPublicRepository({
+            target: fixture.target,
+            cwd: fixture.sourceRoot,
+            check: true,
+          }),
+        /worktree|mode|executable|100755/i
       );
     } finally {
       await Promise.all([
@@ -1128,7 +1209,12 @@ test("源 Git tree 中选中的 symlink 或非 regular entry 会被拒绝", asyn
 test("内容扫描拒绝用户绝对路径、附件路径、secret 与禁止属性内容", async (t) => {
   const forbiddenContents = [
     `/${"Users"}/private-user/project/file.md\n`,
+    `Private:/${"Users"}/private-user/project/file.md\n`,
+    `\`/${"Users"}/private-user/project/file.md\`\n`,
+    `file:///${"Users"}/private-user/project/file.md\n`,
     `${"C:"}\\${"Users"}\\private-user\\project\\file.md\n`,
+    `${"c:"}\\${"uSeRs"}\\private-user\\project\\file.md\n`,
+    `path=${"D:"}/${"users"}/private-user/project/file.md\n`,
     `/${"mnt"}/data/uploaded-image.png\n`,
     `ghp_${"abcdefghijklmnopqrstuvwxyz1234567890"}\n`,
     `-----BEGIN ${"PRIVATE"} KEY-----\n`,
@@ -1160,6 +1246,41 @@ test("内容扫描拒绝用户绝对路径、附件路径、secret 与禁止属�
         ]);
       }
     });
+  }
+});
+
+test("内容扫描不误报合法 URL 与未包含个人目录的普通文本", async () => {
+  const sourceRoot = await makeSourceFixture();
+  const parent = await mkdtemp(
+    path.join(tmpdir(), "image-effects-export-targets-")
+  );
+  const target = path.join(parent, "public");
+  try {
+    await writeRelative(
+      sourceRoot,
+      "skills/image-effects/assets/public-repo/README.md",
+      [
+        "https://example.com/Users/guide/reference",
+        "https://example.com/docs/C:/Users/guide/reference",
+        "The /Users directory contains account folders.",
+        "Windows uses a Users directory and drive letters such as C:.",
+        "A project may document home/example without an absolute path.",
+        "",
+      ].join("\n")
+    );
+    await commitAll(sourceRoot, "add safe path discussion");
+    await exportPublicRepository({ target, cwd: sourceRoot });
+    assert.equal(
+      (await readFile(path.join(target, "README.md"), "utf8")).includes(
+        "https://example.com/Users/guide/reference"
+      ),
+      true
+    );
+  } finally {
+    await Promise.all([
+      rm(sourceRoot, { recursive: true, force: true }),
+      rm(parent, { recursive: true, force: true }),
+    ]);
   }
 });
 
@@ -1241,6 +1362,156 @@ test("交换中普通异常完整回滚，目标逐文件/目录/symlink 拓扑�
       /injected exchange failure/
     );
     assert.deepEqual(await topology(target), before);
+    await assertNoMaintenanceArtifacts(parent, target);
+  } finally {
+    await Promise.all([
+      rm(sourceRoot, { recursive: true, force: true }),
+      rm(parent, { recursive: true, force: true }),
+      rm(external, { recursive: true, force: true }),
+    ]);
+  }
+});
+
+test("beforeExchange 后目标根被替换为 symlink 时拒绝写入外部目录", async () => {
+  const sourceRoot = await makeSourceFixture();
+  const parent = await mkdtemp(
+    path.join(tmpdir(), "image-effects-export-targets-")
+  );
+  const external = await mkdtemp(
+    path.join(tmpdir(), "image-effects-export-external-")
+  );
+  const target = path.join(parent, "public");
+  const displaced = path.join(parent, "displaced-target");
+  const externalReadme = path.join(external, "README.md");
+  try {
+    await exportPublicRepository({ target, cwd: sourceRoot });
+    await initTargetRepository(target);
+    await writeFile(externalReadme, "external sentinel\n");
+
+    await assert.rejects(
+      () =>
+        exportPublicRepository({
+          target,
+          cwd: sourceRoot,
+          transactionHooks: {
+            beforeExchange: async ({ relativePath }) => {
+              if (relativePath !== "README.md") return;
+              await rename(target, displaced);
+              await symlink(external, target, "dir");
+            },
+          },
+        }),
+      /target|identity|symbolic link|symlink|unsafe|rollback/i
+    );
+    assert.equal(await readFile(externalReadme, "utf8"), "external sentinel\n");
+    await assertNoMaintenanceArtifacts(parent, target);
+  } finally {
+    await Promise.all([
+      rm(sourceRoot, { recursive: true, force: true }),
+      rm(parent, { recursive: true, force: true }),
+      rm(external, { recursive: true, force: true }),
+    ]);
+  }
+});
+
+test("beforeExchange 后受管父目录或 leaf 被替换时拒绝外部覆盖", async (t) => {
+  for (const attack of ["parent", "leaf"]) {
+    await t.test(attack, async () => {
+      const sourceRoot = await makeSourceFixture();
+      const parent = await mkdtemp(
+        path.join(tmpdir(), "image-effects-export-targets-")
+      );
+      const external = await mkdtemp(
+        path.join(tmpdir(), "image-effects-export-external-")
+      );
+      const target = path.join(parent, "public");
+      const displaced = path.join(parent, `displaced-${attack}`);
+      const externalScript = path.join(external, "run.mjs");
+      try {
+        await exportPublicRepository({ target, cwd: sourceRoot });
+        await initTargetRepository(target);
+        await writeFile(externalScript, "external sentinel\n");
+
+        await assert.rejects(
+          () =>
+            exportPublicRepository({
+              target,
+              cwd: sourceRoot,
+              transactionHooks: {
+                beforeExchange: async ({ relativePath, targetPath }) => {
+                  if (relativePath !== "scripts/run.mjs") return;
+                  if (attack === "parent") {
+                    await rename(path.dirname(targetPath), displaced);
+                    await symlink(external, path.dirname(targetPath), "dir");
+                  } else {
+                    await rm(targetPath);
+                    await symlink(externalScript, targetPath);
+                  }
+                },
+              },
+            }),
+          /managed path|identity|symbolic link|symlink|unsafe|rollback/i
+        );
+        assert.equal(
+          await readFile(externalScript, "utf8"),
+          "external sentinel\n"
+        );
+        await assertNoMaintenanceArtifacts(parent, target);
+      } finally {
+        await Promise.all([
+          rm(sourceRoot, { recursive: true, force: true }),
+          rm(parent, { recursive: true, force: true }),
+          rm(external, { recursive: true, force: true }),
+        ]);
+      }
+    });
+  }
+});
+
+test("rollback 遇到受管父目录 symlink 时不向外部恢复 backup", async () => {
+  const sourceRoot = await makeSourceFixture();
+  const parent = await mkdtemp(
+    path.join(tmpdir(), "image-effects-export-targets-")
+  );
+  const external = await mkdtemp(
+    path.join(tmpdir(), "image-effects-export-external-")
+  );
+  const target = path.join(parent, "public");
+  const displaced = path.join(parent, "displaced-scripts");
+  const externalRun = path.join(external, "run.mjs");
+  try {
+    await writeRelative(
+      sourceRoot,
+      "skills/image-effects/scripts/stale.mjs",
+      "export const stale = true;\n"
+    );
+    await commitAll(sourceRoot, "add stale export");
+    await exportPublicRepository({ target, cwd: sourceRoot });
+    await initTargetRepository(target);
+    await rm(path.join(sourceRoot, "skills/image-effects/scripts/stale.mjs"));
+    await commitAll(sourceRoot, "remove stale export");
+    await writeFile(externalRun, "external sentinel\n");
+
+    await assert.rejects(
+      () =>
+        exportPublicRepository({
+          target,
+          cwd: sourceRoot,
+          transactionHooks: {
+            afterStaleDelete: async () => {
+              await rename(path.join(target, "scripts"), displaced);
+              await symlink(external, path.join(target, "scripts"), "dir");
+              throw new Error("injected unsafe rollback");
+            },
+          },
+        }),
+      /rollback|symbolic link|symlink|unsafe/i
+    );
+    assert.equal(await readFile(externalRun, "utf8"), "external sentinel\n");
+    await assert.rejects(
+      () => lstat(path.join(external, "stale.mjs")),
+      /ENOENT/
+    );
     await assertNoMaintenanceArtifacts(parent, target);
   } finally {
     await Promise.all([
