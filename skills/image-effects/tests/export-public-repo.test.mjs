@@ -1308,12 +1308,12 @@ test("内容扫描不误报合法 URL 与未包含个人目录的普通文本", 
       sourceRoot,
       "skills/image-effects/assets/public-repo/README.md",
       [
-        "https://example.com/Users/guide/reference",
-        "https://example.com/docs/C:/Users/guide/reference",
-        "[macOS guide](https://example.com/Users/guide/reference)",
-        "`https://example.com/home/guide/reference`",
-        "HTTPS://example.com/home/guide/reference",
-        "https://example.com:8443/Users/guide/reference",
+        `https://example.com/${"Users"}/guide/reference`,
+        `https://example.com/docs/C:/${"Users"}/guide/reference`,
+        `[macOS guide](https://example.com/${"Users"}/guide/reference)`,
+        `\`https://example.com/${"home"}/guide/reference\``,
+        `HTTPS://example.com/${"home"}/guide/reference`,
+        `https://example.com:8443/${"Users"}/guide/reference`,
         "The /Users directory contains account folders.",
         "Windows uses a Users directory and drive letters such as C:.",
         "A project may document home/example without an absolute path.",
@@ -1324,7 +1324,7 @@ test("内容扫描不误报合法 URL 与未包含个人目录的普通文本", 
     await exportPublicRepository({ target, cwd: sourceRoot });
     assert.equal(
       (await readFile(path.join(target, "README.md"), "utf8")).includes(
-        "https://example.com/Users/guide/reference"
+        `https://example.com/${"Users"}/guide/reference`
       ),
       true
     );

@@ -33,6 +33,12 @@
       "version": "1.1.0"
     },
     {
+      "name": "image-effects",
+      "source": "./plugins/image-effects",
+      "description": "可版本化的图像效果配方、参考图生成与静态画廊",
+      "version": "1.0.0"
+    },
+    {
       "name": "knowledge-base",
       "source": "./plugins/knowledge-base",
       "description": "开发教程、经验总结与参考方案",

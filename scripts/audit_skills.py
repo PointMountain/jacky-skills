@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -248,6 +249,18 @@ def parse_manifest(manifest: Path, result: AuditResult) -> dict[str, Any] | None
 def audit_plugin(plugin: Path, active_skill_files: list[Path], result: AuditResult) -> None:
     manifest = plugin / ".claude-plugin" / "plugin.json"
     actual_skills = plugin_skill_directories(plugin, active_skill_files)
+    shared_link_origins: dict[Path, Path] = {}
+    shared_link_root = plugin / "skills"
+    if shared_link_root.is_dir():
+        for candidate in shared_link_root.iterdir():
+            if (
+                candidate.is_symlink()
+                and candidate.is_dir()
+                and (candidate / "SKILL.md").is_file()
+            ):
+                target = candidate.resolve()
+                actual_skills.add(target)
+                shared_link_origins[target] = candidate
 
     if not manifest.is_file():
         result.error("plugin_manifest_missing", manifest, "Plugin 缺少 .claude-plugin/plugin.json")
@@ -264,14 +277,15 @@ def audit_plugin(plugin: Path, active_skill_files: list[Path], result: AuditResu
 
     declared_skills: set[Path] = set()
     plugin_root = plugin.resolve()
+    shared_skills_root = (result.repo / "skills").resolve()
     for entry in declared_entries:
         if not isinstance(entry, str) or not entry.strip():
             result.error("manifest_skill_path_invalid", manifest, "skills 中的每一项必须是非空路径")
             continue
 
-        target = (plugin / entry).resolve()
+        declared_path = Path(os.path.abspath(plugin / entry))
         try:
-            target.relative_to(plugin_root)
+            declared_path.relative_to(plugin_root)
         except ValueError:
             result.error(
                 "manifest_skill_path_invalid",
@@ -279,6 +293,31 @@ def audit_plugin(plugin: Path, active_skill_files: list[Path], result: AuditResu
                 f"Skill 路径不能超出 Plugin 目录：{entry}",
             )
             continue
+
+        target = declared_path.resolve()
+        try:
+            target.relative_to(plugin_root)
+        except ValueError:
+            shared_link_parent = plugin_root / "skills"
+            try:
+                target.relative_to(shared_skills_root)
+            except ValueError:
+                shared_target_allowed = False
+            else:
+                shared_target_allowed = target != shared_skills_root
+
+            if not (
+                declared_path.is_symlink()
+                and declared_path.parent == shared_link_parent
+                and shared_target_allowed
+            ):
+                result.error(
+                    "manifest_skill_path_invalid",
+                    manifest,
+                    "共享 Skill 必须是 plugins/<plugin>/skills/ 下的目录软链接，"
+                    f"且最终指向仓库根 skills/：{entry}",
+                )
+                continue
 
         skill_directory = target.parent if target.name == "SKILL.md" else target
         declared_skills.add(skill_directory)
@@ -296,9 +335,10 @@ def audit_plugin(plugin: Path, active_skill_files: list[Path], result: AuditResu
             )
 
     for skill_directory in sorted(actual_skills - declared_skills):
+        reported_directory = shared_link_origins.get(skill_directory, skill_directory)
         result.error(
             "plugin_skill_undeclared",
-            skill_directory / "SKILL.md",
+            reported_directory / "SKILL.md",
             "Plugin 中的实际 Skill 未在 plugin.json 的 skills 中声明",
         )
 

@@ -184,6 +184,73 @@ find_all_skill_files() {
         -type f -name SKILL.md -print | sort
 }
 
+find_declared_shared_plugin_skills() {
+    local plugin_dir="$1"
+
+    node - "$REPO_DIR" "$plugin_dir" <<'NODE'
+const fs = require("node:fs");
+const path = require("node:path");
+
+const repoRoot = fs.realpathSync(process.argv[2]);
+const pluginRoot = fs.realpathSync(process.argv[3]);
+const sharedSkillsRoot = fs.realpathSync(path.join(repoRoot, "skills"));
+const manifestPath = path.join(pluginRoot, ".claude-plugin", "plugin.json");
+
+if (!fs.existsSync(manifestPath)) process.exit(0);
+
+const isStrictChild = (candidate, parent) => {
+    const relative = path.relative(parent, candidate);
+    return relative !== "" && relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+};
+
+try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    if (!Array.isArray(manifest.skills)) {
+        throw new Error(`${manifestPath} 的 skills 必须是数组`);
+    }
+
+    const sharedFiles = [];
+    for (const entry of manifest.skills) {
+        if (typeof entry !== "string" || entry.trim() === "") {
+            throw new Error(`${manifestPath} 包含无效的 Skill 路径`);
+        }
+
+        const declaredPath = path.resolve(pluginRoot, entry);
+        if (!isStrictChild(declaredPath, pluginRoot)) {
+            throw new Error(`Plugin Skill 声明超出 Plugin 目录：${entry}`);
+        }
+
+        const metadata = fs.lstatSync(declaredPath);
+        if (!metadata.isSymbolicLink()) continue;
+
+        if (path.dirname(declaredPath) !== path.join(pluginRoot, "skills")) {
+            throw new Error(`共享 Skill 链接必须位于 Plugin 的 skills/：${entry}`);
+        }
+
+        const target = fs.realpathSync(declaredPath);
+        if (!isStrictChild(target, sharedSkillsRoot)) {
+            throw new Error(`共享 Skill 链接最终必须指向仓库根 skills/：${entry}`);
+        }
+        if (!fs.statSync(target).isDirectory()) {
+            throw new Error(`共享 Skill 链接目标必须是目录：${entry}`);
+        }
+
+        const skillFile = path.join(target, "SKILL.md");
+        if (!fs.statSync(skillFile).isFile()) {
+            throw new Error(`共享 Skill 链接目标缺少 SKILL.md：${entry}`);
+        }
+        sharedFiles.push(skillFile);
+    }
+
+    process.stdout.write([...new Set(sharedFiles)].sort().join("\n"));
+    if (sharedFiles.length > 0) process.stdout.write("\n");
+} catch (error) {
+    console.error(`错误: ${error.message}`);
+    process.exit(1);
+}
+NODE
+}
+
 discover_skill_files() {
     local skill_file
     case "$SELECTOR_TYPE" in
@@ -200,9 +267,12 @@ discover_skill_files() {
         plugin)
             local plugin_dir="$REPO_DIR/plugins/$SELECTOR_VALUE"
             [ -d "$plugin_dir" ] || fail "Plugin 不存在：$SELECTOR_VALUE"
+            local shared_skill_files
+            shared_skill_files="$(find_declared_shared_plugin_skills "$plugin_dir")" || return $?
             find "$plugin_dir" \
                 -type d -name archived -prune -o \
                 -type f -name SKILL.md -print | sort
+            [ -z "$shared_skill_files" ] || printf '%s\n' "$shared_skill_files"
             ;;
     esac
 }

@@ -42,8 +42,8 @@
 Run:
 
 ```bash
-sed -n '1,240p' /Users/jiashengwang/.codex/skills/.system/skill-creator/references/openai_yaml.md
-python3 /Users/jiashengwang/.codex/skills/.system/skill-creator/scripts/init_skill.py image-effects \
+sed -n '1,240p' "$HOME/.codex/skills/.system/skill-creator/references/openai_yaml.md"
+python3 "$HOME/.codex/skills/.system/skill-creator/scripts/init_skill.py" image-effects \
   --path skills \
   --resources scripts,references,assets \
   --interface 'display_name=Image Effects' \
@@ -95,7 +95,7 @@ Expected: PASS，且无网络访问。
 Run:
 
 ```bash
-python3 /Users/jiashengwang/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/image-effects
+python3 "$HOME/.codex/skills/.system/skill-creator/scripts/quick_validate.py" skills/image-effects
 node --test skills/image-effects/tests/effect-library.test.mjs
 git add skills/image-effects
 git commit -m "feat: scaffold image effects skill contract"
@@ -491,7 +491,7 @@ Expected: 仓库集成门通过；提交只包含 Task 7 集成文件。
 
 ```bash
 npm ci --prefix skills/image-effects
-python3 /Users/jiashengwang/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/image-effects
+python3 "$HOME/.codex/skills/.system/skill-creator/scripts/quick_validate.py" skills/image-effects
 node --test skills/image-effects/tests/*.test.mjs
 node skills/image-effects/scripts/validate-effects.mjs --online
 SOURCE_DATE_EPOCH=1786809600 node skills/image-effects/scripts/build-gallery.mjs

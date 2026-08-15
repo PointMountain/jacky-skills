@@ -191,6 +191,86 @@ class AuditSkillsCliTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_plugin_manifest_accepts_declared_link_to_root_skill(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            root_skill = self.write_skill(repo, "skills/demo-skill")
+            plugin_skill = repo / "plugins/demo-plugin/skills/demo-skill"
+            plugin_skill.parent.mkdir(parents=True)
+            plugin_skill.symlink_to(root_skill.parent, target_is_directory=True)
+            self.write_manifest(
+                repo,
+                "demo-plugin",
+                ["./skills/demo-skill/"],
+            )
+
+            result = self.run_audit(repo, "--format", "json")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_plugin_manifest_rejects_shared_link_outside_repo(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = root / "repo"
+            external_skill = self.write_skill(root, "external/demo-skill")
+            plugin_skill = repo / "plugins/demo-plugin/skills/demo-skill"
+            plugin_skill.parent.mkdir(parents=True)
+            plugin_skill.symlink_to(external_skill.parent, target_is_directory=True)
+            self.write_manifest(
+                repo,
+                "demo-plugin",
+                ["./skills/demo-skill/"],
+            )
+
+            result = self.run_audit(repo, "--format", "json")
+            payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(
+            "manifest_skill_path_invalid",
+            {item["code"] for item in payload["errors"]},
+        )
+
+    def test_plugin_manifest_rejects_shared_link_to_non_skills_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            harness_skill = self.write_skill(repo, "harness/demo-ops")
+            plugin_skill = repo / "plugins/demo-plugin/skills/demo-skill"
+            plugin_skill.parent.mkdir(parents=True)
+            plugin_skill.symlink_to(harness_skill.parent, target_is_directory=True)
+            self.write_manifest(
+                repo,
+                "demo-plugin",
+                ["./skills/demo-skill/"],
+            )
+
+            result = self.run_audit(repo, "--format", "json")
+            payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(
+            "manifest_skill_path_invalid",
+            {item["code"] for item in payload["errors"]},
+        )
+
+    def test_plugin_manifest_rejects_undeclared_shared_skill_link(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            root_skill = self.write_skill(repo, "skills/demo-skill")
+            plugin_skill = repo / "plugins/demo-plugin/skills/demo-skill"
+            plugin_skill.parent.mkdir(parents=True)
+            plugin_skill.symlink_to(root_skill.parent, target_is_directory=True)
+            self.write_manifest(repo, "demo-plugin", [])
+
+            result = self.run_audit(repo, "--format", "json")
+            payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(
+            "plugin_skill_undeclared",
+            {item["code"] for item in payload["errors"]},
+        )
+
     def test_skill_over_500_lines_is_warning_only(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
