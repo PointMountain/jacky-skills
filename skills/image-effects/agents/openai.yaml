@@ -1,0 +1,4 @@
+interface:
+  display_name: "Image Effects"
+  short_description: "Apply reusable visual effects to uploaded images"
+  default_prompt: "Use $image-effects to apply a selected versioned effect to my uploaded image."
