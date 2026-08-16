@@ -39,6 +39,7 @@ class AuditSkillsCliTest(unittest.TestCase):
         return skill_file
 
     def write_manifest(self, repo: Path, plugin: str, skills: list[str]) -> Path:
+        (repo / "skills").mkdir(parents=True, exist_ok=True)
         manifest = repo / "plugins" / plugin / ".claude-plugin" / "plugin.json"
         manifest.parent.mkdir(parents=True, exist_ok=True)
         manifest.write_text(
@@ -191,6 +192,22 @@ class AuditSkillsCliTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_plugin_manifest_requires_real_root_skills_for_ordinary_plugin(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            self.write_skill(repo, "plugins/demo-plugin/direct-skill")
+            self.write_manifest(repo, "demo-plugin", ["./direct-skill/"])
+            (repo / "skills").rmdir()
+
+            result = self.run_audit(repo, "--format", "json")
+            payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(
+            "shared_skills_root_invalid",
+            {item["code"] for item in payload["errors"]},
+        )
+
     def test_plugin_manifest_accepts_declared_link_to_root_skill(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
@@ -212,6 +229,7 @@ class AuditSkillsCliTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             repo = root / "repo"
+            (repo / "skills").mkdir(parents=True)
             external_skill = self.write_skill(root, "external/demo-skill")
             plugin_skill = repo / "plugins/demo-plugin/skills/demo-skill"
             plugin_skill.parent.mkdir(parents=True)
@@ -234,6 +252,7 @@ class AuditSkillsCliTest(unittest.TestCase):
     def test_plugin_manifest_rejects_shared_link_to_non_skills_directory(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
+            (repo / "skills").mkdir(parents=True)
             harness_skill = self.write_skill(repo, "harness/demo-ops")
             plugin_skill = repo / "plugins/demo-plugin/skills/demo-skill"
             plugin_skill.parent.mkdir(parents=True)
@@ -261,6 +280,136 @@ class AuditSkillsCliTest(unittest.TestCase):
             plugin_skill.parent.mkdir(parents=True)
             plugin_skill.symlink_to(root_skill.parent, target_is_directory=True)
             self.write_manifest(repo, "demo-plugin", [])
+
+            result = self.run_audit(repo, "--format", "json")
+            payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(
+            "plugin_skill_undeclared",
+            {item["code"] for item in payload["errors"]},
+        )
+
+    def test_plugin_manifest_rejects_undeclared_alias_to_declared_target(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            root_skill = self.write_skill(repo, "skills/demo-skill")
+            shared_parent = repo / "plugins/demo-plugin/skills"
+            shared_parent.mkdir(parents=True)
+            for name in ("demo-skill", "extra-alias"):
+                (shared_parent / name).symlink_to(
+                    root_skill.parent, target_is_directory=True
+                )
+            self.write_manifest(
+                repo,
+                "demo-plugin",
+                ["./skills/demo-skill/"],
+            )
+
+            result = self.run_audit(repo, "--format", "json")
+            payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(
+            "plugin_skill_undeclared",
+            {item["code"] for item in payload["errors"]},
+        )
+
+    def test_plugin_manifest_rejects_duplicate_shared_targets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            root_skill = self.write_skill(repo, "skills/demo-skill")
+            shared_parent = repo / "plugins/demo-plugin/skills"
+            shared_parent.mkdir(parents=True)
+            for name in ("demo-skill", "second-alias"):
+                (shared_parent / name).symlink_to(
+                    root_skill.parent, target_is_directory=True
+                )
+            self.write_manifest(
+                repo,
+                "demo-plugin",
+                ["./skills/demo-skill/", "./skills/second-alias/"],
+            )
+
+            result = self.run_audit(repo, "--format", "json")
+            payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(
+            "manifest_skill_target_duplicate",
+            {item["code"] for item in payload["errors"]},
+        )
+
+    def test_plugin_manifest_rejects_symlinked_root_skills_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            root_skill = self.write_skill(repo, "real-skills/demo-skill")
+            (repo / "skills").symlink_to(
+                root_skill.parent.parent, target_is_directory=True
+            )
+            plugin_skill = repo / "plugins/demo-plugin/skills/demo-skill"
+            plugin_skill.parent.mkdir(parents=True)
+            plugin_skill.symlink_to(
+                repo / "skills/demo-skill", target_is_directory=True
+            )
+            self.write_manifest(repo, "demo-plugin", ["./skills/demo-skill/"])
+
+            result = self.run_audit(repo, "--format", "json")
+            payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(
+            "shared_skills_root_invalid",
+            {item["code"] for item in payload["errors"]},
+        )
+
+    def test_plugin_manifest_rejects_symlinked_skill_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = root / "repo"
+            root_skill = self.write_skill(repo, "skills/demo-skill")
+            external = root / "external-SKILL.md"
+            external.write_text(root_skill.read_text(encoding="utf-8"), encoding="utf-8")
+            root_skill.unlink()
+            root_skill.symlink_to(external)
+            plugin_skill = repo / "plugins/demo-plugin/skills/demo-skill"
+            plugin_skill.parent.mkdir(parents=True)
+            plugin_skill.symlink_to(root_skill.parent, target_is_directory=True)
+            self.write_manifest(repo, "demo-plugin", ["./skills/demo-skill/"])
+
+            result = self.run_audit(repo, "--format", "json")
+            payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(
+            "manifest_skill_file_invalid",
+            {item["code"] for item in payload["errors"]},
+        )
+
+    def test_plugin_manifest_rejects_shared_link_to_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            root_skill = self.write_skill(repo, "skills/demo-skill")
+            plugin_skill = repo / "plugins/demo-plugin/skills/demo-skill"
+            plugin_skill.parent.mkdir(parents=True)
+            plugin_skill.symlink_to(root_skill)
+            self.write_manifest(repo, "demo-plugin", ["./skills/demo-skill/"])
+
+            result = self.run_audit(repo, "--format", "json")
+            payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(
+            "manifest_skill_path_invalid",
+            {item["code"] for item in payload["errors"]},
+        )
+
+    def test_plugin_manifest_rejects_extra_ordinary_skills_entry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            self.write_skill(repo, "plugins/demo-plugin/skills/declared")
+            self.write_skill(repo, "plugins/demo-plugin/skills/extra")
+            self.write_manifest(repo, "demo-plugin", ["./skills/declared/"])
 
             result = self.run_audit(repo, "--format", "json")
             payload = json.loads(result.stdout)
