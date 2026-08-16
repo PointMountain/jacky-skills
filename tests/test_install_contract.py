@@ -358,6 +358,105 @@ class InstallContractTests(unittest.TestCase):
             self.assertIn("真实直接子目录", completed.stderr)
             self.assertEqual(self.command_log(root), "")
 
+    def test_plugin_selector_rejects_a_symlinked_manifest_before_j_skills(self) -> None:
+        for symlink_parent in (False, True):
+            with self.subTest(symlink_parent=symlink_parent), tempfile.TemporaryDirectory() as tempdir:
+                root = Path(tempdir)
+                repo, env = self.make_install_fixture(root)
+                plugin = repo / "plugins/dev-tools"
+                manifest = plugin / ".claude-plugin/plugin.json"
+                external_parent = root / "external-manifest"
+                external_parent.mkdir()
+                external_manifest = external_parent / "plugin.json"
+                external_manifest.write_text(
+                    manifest.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+                if symlink_parent:
+                    shutil.rmtree(manifest.parent)
+                    manifest.parent.symlink_to(external_parent, target_is_directory=True)
+                else:
+                    manifest.unlink()
+                    manifest.symlink_to(external_manifest)
+
+                completed = self.run_fixture(repo, env, "--plugin", "dev-tools")
+
+                self.assertNotEqual(completed.returncode, 0)
+                self.assertIn("manifest", completed.stderr)
+                self.assertEqual(self.command_log(root), "")
+
+    def test_plugin_selector_rejects_archived_manifest_entry_before_j_skills(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            repo, env = self.make_install_fixture(root)
+            plugin = repo / "plugins/dev-tools"
+            archived = plugin / "archived/old-skill"
+            archived.mkdir(parents=True)
+            (archived / "SKILL.md").write_text(
+                "---\nname: old-skill\ndescription: test\n---\n",
+                encoding="utf-8",
+            )
+            self.write_manifest(plugin, ["./archived/old-skill/"])
+
+            completed = self.run_fixture(repo, env, "--plugin", "dev-tools")
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("不在 Plugin 活跃内容中", completed.stderr)
+            self.assertEqual(self.command_log(root), "")
+
+    def test_plugin_selector_rejects_newline_path_injection_before_j_skills(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            repo, env = self.make_install_fixture(root)
+            plugin = repo / "plugins/dev-tools"
+            external_skill = root / "external/escaped"
+            external_skill.mkdir(parents=True)
+            external_skill_file = external_skill / "SKILL.md"
+            external_skill_file.write_text(
+                "---\nname: escaped\ndescription: escaped\n---\n",
+                encoding="utf-8",
+            )
+            injected_entry = "./skills/line\n" + external_skill.as_posix() + "/"
+            injected_directory = plugin / injected_entry
+            injected_directory.mkdir(parents=True)
+            (injected_directory / "SKILL.md").write_text(
+                "---\nname: injected\ndescription: injected\n---\n",
+                encoding="utf-8",
+            )
+            self.write_manifest(plugin, [injected_entry])
+            temp_root = root / "tmp"
+            temp_root.mkdir()
+            env["TMPDIR"] = str(temp_root)
+
+            completed = self.run_fixture(repo, env, "--plugin", "dev-tools")
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("不安全字符或路径片段", completed.stderr)
+            command_log = self.command_log(root)
+            self.assertEqual(command_log, "")
+            self.assertNotIn(external_skill_file.as_posix(), command_log)
+            self.assertEqual(list(temp_root.iterdir()), [])
+
+    def test_plugin_selector_rejects_control_and_cross_platform_paths_before_j_skills(self) -> None:
+        dangerous_entries = (
+            "./skills/bad\rname/",
+            "./skills/bad\x00name/",
+            "./skills/bad\x1bname/",
+            ".\\skills\\standalone\\",
+            "C:/skills/standalone/",
+            "./skills/../standalone/",
+        )
+        for entry in dangerous_entries:
+            with self.subTest(entry=repr(entry)), tempfile.TemporaryDirectory() as tempdir:
+                root = Path(tempdir)
+                repo, env = self.make_install_fixture(root)
+                self.write_manifest(repo / "plugins/dev-tools", [entry])
+
+                completed = self.run_fixture(repo, env, "--plugin", "dev-tools")
+
+                self.assertNotEqual(completed.returncode, 0)
+                self.assertIn("不安全字符或路径片段", completed.stderr)
+                self.assertEqual(self.command_log(root), "")
+
     def test_plugin_selector_rejects_a_symlinked_root_skills_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)

@@ -159,6 +159,71 @@ class AuditSkillsCliTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("plugin_json_invalid", {item["code"] for item in payload["errors"]})
 
+    def test_audit_rejects_symlinked_plugins_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = root / "repo"
+            external_plugins = root / "external-plugins"
+            self.write_skill(external_plugins, "demo-plugin/demo-skill")
+            (repo / "skills").mkdir(parents=True)
+            repo.mkdir(exist_ok=True)
+            (repo / "plugins").symlink_to(external_plugins, target_is_directory=True)
+
+            result = self.run_audit(repo, "--format", "json")
+            payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("plugins_root_invalid", {item["code"] for item in payload["errors"]})
+
+    def test_audit_rejects_symlinked_plugin_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = root / "repo"
+            external_plugin = root / "external-plugin"
+            self.write_skill(external_plugin, "demo-skill")
+            (repo / "skills").mkdir(parents=True)
+            (repo / "plugins").mkdir(parents=True)
+            (repo / "plugins/demo-plugin").symlink_to(
+                external_plugin, target_is_directory=True
+            )
+
+            result = self.run_audit(repo, "--format", "json")
+            payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("plugin_directory_invalid", {item["code"] for item in payload["errors"]})
+
+    def test_audit_rejects_symlinked_manifest_and_manifest_parent(self):
+        for symlink_parent in (False, True):
+            with self.subTest(symlink_parent=symlink_parent), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                repo = root / "repo"
+                plugin = repo / "plugins/demo-plugin"
+                plugin.mkdir(parents=True)
+                (repo / "skills").mkdir()
+                external_parent = root / "external-manifest"
+                external_parent.mkdir()
+                external_manifest = external_parent / "plugin.json"
+                external_manifest.write_text(
+                    json.dumps({"name": "demo-plugin", "version": "1.0.0", "skills": []}),
+                    encoding="utf-8",
+                )
+                manifest_parent = plugin / ".claude-plugin"
+                if symlink_parent:
+                    manifest_parent.symlink_to(external_parent, target_is_directory=True)
+                else:
+                    manifest_parent.mkdir()
+                    (manifest_parent / "plugin.json").symlink_to(external_manifest)
+
+                result = self.run_audit(repo, "--format", "json")
+                payload = json.loads(result.stdout)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "plugin_manifest_invalid",
+                {item["code"] for item in payload["errors"]},
+            )
+
     def test_plugin_manifest_detects_missing_and_undeclared_skills(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
@@ -176,6 +241,45 @@ class AuditSkillsCliTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("manifest_skill_path_missing", codes)
         self.assertIn("plugin_skill_undeclared", codes)
+
+    def test_plugin_manifest_rejects_archived_declaration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            self.write_skill(repo, "plugins/demo-plugin/archived/old-skill")
+            self.write_manifest(repo, "demo-plugin", ["./archived/old-skill/"])
+
+            result = self.run_audit(repo, "--format", "json")
+            payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(
+            "manifest_skill_not_active",
+            {item["code"] for item in payload["errors"]},
+        )
+
+    def test_plugin_manifest_rejects_control_and_cross_platform_paths(self):
+        dangerous_entries = (
+            "./skills/line\nname/",
+            "./skills/line\rname/",
+            "./skills/bad\x00name/",
+            "./skills/bad\x1bname/",
+            ".\\skills\\demo-skill\\",
+            "C:/skills/demo-skill/",
+            "./skills/../demo-skill/",
+        )
+        for entry in dangerous_entries:
+            with self.subTest(entry=repr(entry)), tempfile.TemporaryDirectory() as directory:
+                repo = Path(directory)
+                self.write_manifest(repo, "demo-plugin", [entry])
+
+                result = self.run_audit(repo, "--format", "json")
+                payload = json.loads(result.stdout)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "manifest_skill_path_invalid",
+                {item["code"] for item in payload["errors"]},
+            )
 
     def test_plugin_manifest_accepts_both_supported_skill_layouts(self):
         with tempfile.TemporaryDirectory() as directory:

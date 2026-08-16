@@ -25,6 +25,7 @@ USE_CURRENT_CHECKOUT=false
 SELECTOR_TYPE="all"
 SELECTOR_VALUE=""
 SELECTOR_SET=false
+PLUGIN_SKILL_LIST_FILE=""
 
 if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -50,6 +51,12 @@ success() {
 fail() {
     echo -e "${RED}错误: $*${NC}" >&2
     exit 1
+}
+
+cleanup() {
+    if [ -n "$PLUGIN_SKILL_LIST_FILE" ] && [ -f "$PLUGIN_SKILL_LIST_FILE" ]; then
+        rm -f -- "$PLUGIN_SKILL_LIST_FILE"
+    fi
 }
 
 usage() {
@@ -224,16 +231,45 @@ const path = require("node:path");
 const repoRoot = fs.realpathSync(process.argv[2]);
 const pluginRoot = fs.realpathSync(process.argv[3]);
 const pluginsRoot = fs.realpathSync(path.join(repoRoot, "plugins"));
-const manifestPath = path.join(pluginRoot, ".claude-plugin", "plugin.json");
+const manifestDirectory = path.join(pluginRoot, ".claude-plugin");
+const manifestPath = path.join(manifestDirectory, "plugin.json");
 
 const isStrictChild = (candidate, parent) => {
     const relative = path.relative(parent, candidate);
     return relative !== "" && relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 };
 
+const isSafeManifestEntry = (entry) => {
+    if (typeof entry !== "string" || entry.trim() === "") return false;
+    if (/[\u0000-\u001f\u007f\\]/u.test(entry)) return false;
+    if (!entry.startsWith("./") || path.posix.isAbsolute(entry) || path.win32.isAbsolute(entry)) {
+        return false;
+    }
+    const segments = entry.slice(2).split("/");
+    if (segments.at(-1) === "") segments.pop();
+    if (segments.length === 0) return false;
+    const windowsDevice = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/iu;
+    return segments.every((segment) =>
+        segment !== "" &&
+        segment !== "." &&
+        segment !== ".." &&
+        !/[<>:"|?*]/u.test(segment) &&
+        !/[. ]$/u.test(segment) &&
+        !windowsDevice.test(segment)
+    );
+};
+
 try {
     if (path.dirname(pluginRoot) !== pluginsRoot) {
         throw new Error("Plugin 必须是 plugins/ 下的真实直接子目录");
+    }
+    const manifestDirectoryMetadata = fs.lstatSync(manifestDirectory);
+    if (
+        manifestDirectoryMetadata.isSymbolicLink() ||
+        !manifestDirectoryMetadata.isDirectory() ||
+        fs.realpathSync(manifestDirectory) !== manifestDirectory
+    ) {
+        throw new Error("Plugin manifest 的父目录必须是 Plugin 内的真实目录");
     }
     const manifestMetadata = fs.lstatSync(manifestPath);
     if (!manifestMetadata.isFile() || manifestMetadata.isSymbolicLink()) {
@@ -272,8 +308,8 @@ try {
     const skillFiles = [];
     requireSharedSkillsRoot();
     for (const entry of manifest.skills) {
-        if (typeof entry !== "string" || entry.trim() === "") {
-            throw new Error(`${manifestPath} 包含无效的 Skill 路径`);
+        if (!isSafeManifestEntry(entry)) {
+            throw new Error(`${manifestPath} 包含不安全字符或路径片段`);
         }
 
         const declaredPath = path.resolve(pluginRoot, entry);
@@ -344,19 +380,21 @@ try {
     };
     walk(pluginRoot);
 
+    for (const declaredPath of declaredPaths) {
+        if (!actualPaths.has(declaredPath)) {
+            throw new Error(`manifest.skills 声明的入口不在 Plugin 活跃内容中：${path.relative(pluginRoot, declaredPath)}`);
+        }
+    }
     for (const actualPath of actualPaths) {
         if (!declaredPaths.has(actualPath)) {
             throw new Error(`Plugin Skill 入口未在 manifest.skills 声明：${path.relative(pluginRoot, actualPath)}`);
         }
     }
-    for (const declaredPath of declaredPaths) {
-        if (!actualPaths.has(declaredPath)) {
-            throw new Error(`manifest.skills 声明的入口不在 Plugin 内容中：${path.relative(pluginRoot, declaredPath)}`);
-        }
-    }
 
-    process.stdout.write(skillFiles.join("\n"));
-    if (skillFiles.length > 0) process.stdout.write("\n");
+    for (const skillFile of skillFiles) {
+        process.stdout.write(skillFile);
+        process.stdout.write("\0");
+    }
 } catch (error) {
     console.error(`错误: ${error.message}`);
     process.exit(1);
@@ -378,8 +416,7 @@ discover_skill_files() {
             done < <(find_all_skill_files)
             ;;
         plugin)
-            local plugin_dir="$REPO_DIR/plugins/$SELECTOR_VALUE"
-            find_declared_plugin_skills "$plugin_dir"
+            fail "Plugin Skill 列表必须通过预检文件读取"
             ;;
     esac
 }
@@ -415,6 +452,12 @@ success "✓ 仓库已就绪：$REPO_DIR"
 
 if [ "$SELECTOR_TYPE" = "plugin" ]; then
     validate_plugin_selector_path
+    PLUGIN_SKILL_LIST_FILE="$(mktemp "${TMPDIR:-/tmp}/jacky-skills-plugin.XXXXXX")" || \
+        fail "无法创建 Plugin Skill 预检文件"
+    trap cleanup EXIT
+    if ! find_declared_plugin_skills "$REPO_DIR/plugins/$SELECTOR_VALUE" > "$PLUGIN_SKILL_LIST_FILE"; then
+        fail "Plugin manifest 预检失败：$SELECTOR_VALUE"
+    fi
 fi
 
 echo -e "${YELLOW}[3/5] 检查 j-skills CLI...${NC}"
@@ -431,9 +474,15 @@ CURRENT_J_SKILLS_VERSION="$(printf '%s\n' "$J_SKILLS_VERSION_OUTPUT" | sed -nE '
 success "✓ j-skills $CURRENT_J_SKILLS_VERSION"
 
 SKILL_FILES=()
-while IFS= read -r skill_file; do
-    [ -n "$skill_file" ] && SKILL_FILES+=("$skill_file")
-done < <(discover_skill_files)
+if [ "$SELECTOR_TYPE" = "plugin" ]; then
+    while IFS= read -r -d '' skill_file; do
+        [ -n "$skill_file" ] && SKILL_FILES+=("$skill_file")
+    done < "$PLUGIN_SKILL_LIST_FILE"
+else
+    while IFS= read -r skill_file; do
+        [ -n "$skill_file" ] && SKILL_FILES+=("$skill_file")
+    done < <(discover_skill_files)
+fi
 [ "${#SKILL_FILES[@]}" -gt 0 ] || fail "没有找到匹配的 Skill：${SELECTOR_VALUE:-all}"
 
 echo -e "${YELLOW}[4/5] 链接活跃 Skills...${NC}"
