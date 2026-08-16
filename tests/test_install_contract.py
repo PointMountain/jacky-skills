@@ -44,27 +44,41 @@ class InstallContractTests(unittest.TestCase):
                 f'---\nname: {name}\ndescription: "测试 Skill"\n---\n',
                 encoding="utf-8",
             )
+        dev_tools_manifest = repo / "plugins/dev-tools/.claude-plugin/plugin.json"
+        dev_tools_manifest.parent.mkdir(parents=True)
+        dev_tools_manifest.write_text(
+            json.dumps(
+                {
+                    "name": "dev-tools",
+                    "version": "1.0.0",
+                    "skills": ["./plugin-one/", "./plugin-two/"],
+                }
+            ),
+            encoding="utf-8",
+        )
 
         fake_bin = root / "bin"
         fake_bin.mkdir()
         log_file = root / "commands.log"
+        real_node = shutil.which("node")
+        self.assertIsNotNone(real_node)
 
         (fake_bin / "node").write_text(
             textwrap.dedent(
-                """\
+                f"""\
                 #!/usr/bin/env bash
-                if [ "${1:-}" = "-p" ]; then
-                    case "${2:-}" in
+                if [ "${{1:-}}" = "-p" ]; then
+                    case "${{2:-}}" in
                         *process.arch*) echo arm64 ;;
                         *) echo 24 ;;
                     esac
                     exit 0
                 fi
-                if [ "${1:-}" = "-e" ]; then
+                if [ "${{1:-}}" = "-e" ]; then
                     cat >/dev/null
                     exit 0
                 fi
-                exit 0
+                exec "{real_node}" "$@"
                 """
             ),
             encoding="utf-8",
@@ -73,6 +87,7 @@ class InstallContractTests(unittest.TestCase):
             textwrap.dedent(
                 f"""\
                 #!/usr/bin/env bash
+                echo "j-skills:$*" >> "$TEST_COMMAND_LOG"
                 case "${{1:-}}" in
                     --version)
                         echo "j-skills/{j_skills_version} test-arm64 node-v24"
@@ -142,6 +157,26 @@ class InstallContractTests(unittest.TestCase):
             text=True,
             check=False,
         )
+
+    def write_manifest(
+        self, plugin: Path, skills: list[str], *, name: str | None = None
+    ) -> None:
+        manifest = plugin / ".claude-plugin/plugin.json"
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text(
+            json.dumps(
+                {
+                    "name": name or plugin.name,
+                    "version": "1.0.0",
+                    "skills": skills,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    def command_log(self, root: Path) -> str:
+        log = root / "commands.log"
+        return log.read_text(encoding="utf-8") if log.exists() else ""
 
     def test_does_not_use_unsupported_link_all(self) -> None:
         self.assertNotIn("j-skills link --all", INSTALL_SCRIPT)
@@ -247,6 +282,304 @@ class InstallContractTests(unittest.TestCase):
             self.assertNotIn("standalone", command_log)
             self.assertNotIn("sample-ops", command_log)
 
+    def test_plugin_selector_installs_a_declared_shared_root_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            repo, env = self.make_install_fixture(root)
+            plugin = repo / "plugins/shared-plugin"
+            shared_parent = plugin / "skills"
+            shared_parent.mkdir(parents=True)
+            (shared_parent / "standalone").symlink_to(
+                repo / "skills/standalone",
+                target_is_directory=True,
+            )
+            self.write_manifest(plugin, ["./skills/standalone/"])
+
+            completed = self.run_fixture(repo, env, "--plugin", "shared-plugin")
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            command_log = (root / "commands.log").read_text(encoding="utf-8")
+            self.assertIn(
+                f"link:{(repo / 'skills/standalone').resolve()}",
+                command_log,
+            )
+            self.assertIn("install:standalone:", command_log)
+
+    def test_plugin_selector_rejects_a_declared_shared_skill_outside_repo(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            repo, env = self.make_install_fixture(root)
+            external_skill = root / "external/escaped"
+            external_skill.mkdir(parents=True)
+            (external_skill / "SKILL.md").write_text(
+                "---\nname: escaped\ndescription: escaped\n---\n",
+                encoding="utf-8",
+            )
+            plugin = repo / "plugins/shared-plugin"
+            shared_parent = plugin / "skills"
+            shared_parent.mkdir(parents=True)
+            (shared_parent / "escaped").symlink_to(
+                external_skill,
+                target_is_directory=True,
+            )
+            self.write_manifest(plugin, ["./skills/escaped/"])
+
+            completed = self.run_fixture(repo, env, "--plugin", "shared-plugin")
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("根 skills/", completed.stderr)
+            command_log = self.command_log(root)
+            self.assertNotIn("link:", command_log)
+            self.assertNotIn("install:", command_log)
+
+    def test_plugin_selector_rejects_traversal_before_any_j_skills_call(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            repo, env = self.make_install_fixture(root)
+
+            completed = self.run_fixture(repo, env, "--plugin", "../dev-tools")
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("kebab-case", completed.stderr)
+            self.assertEqual(self.command_log(root), "")
+
+    def test_plugin_selector_rejects_a_plugin_directory_symlink_before_j_skills(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            repo, env = self.make_install_fixture(root)
+            (repo / "plugins/linked-plugin").symlink_to(
+                repo / "plugins/dev-tools",
+                target_is_directory=True,
+            )
+
+            completed = self.run_fixture(repo, env, "--plugin", "linked-plugin")
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("真实直接子目录", completed.stderr)
+            self.assertEqual(self.command_log(root), "")
+
+    def test_plugin_selector_rejects_a_symlinked_manifest_before_j_skills(self) -> None:
+        for symlink_parent in (False, True):
+            with self.subTest(symlink_parent=symlink_parent), tempfile.TemporaryDirectory() as tempdir:
+                root = Path(tempdir)
+                repo, env = self.make_install_fixture(root)
+                plugin = repo / "plugins/dev-tools"
+                manifest = plugin / ".claude-plugin/plugin.json"
+                external_parent = root / "external-manifest"
+                external_parent.mkdir()
+                external_manifest = external_parent / "plugin.json"
+                external_manifest.write_text(
+                    manifest.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+                if symlink_parent:
+                    shutil.rmtree(manifest.parent)
+                    manifest.parent.symlink_to(external_parent, target_is_directory=True)
+                else:
+                    manifest.unlink()
+                    manifest.symlink_to(external_manifest)
+
+                completed = self.run_fixture(repo, env, "--plugin", "dev-tools")
+
+                self.assertNotEqual(completed.returncode, 0)
+                self.assertIn("manifest", completed.stderr)
+                self.assertEqual(self.command_log(root), "")
+
+    def test_plugin_selector_rejects_archived_manifest_entry_before_j_skills(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            repo, env = self.make_install_fixture(root)
+            plugin = repo / "plugins/dev-tools"
+            archived = plugin / "archived/old-skill"
+            archived.mkdir(parents=True)
+            (archived / "SKILL.md").write_text(
+                "---\nname: old-skill\ndescription: test\n---\n",
+                encoding="utf-8",
+            )
+            self.write_manifest(plugin, ["./archived/old-skill/"])
+
+            completed = self.run_fixture(repo, env, "--plugin", "dev-tools")
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("不在 Plugin 活跃内容中", completed.stderr)
+            self.assertEqual(self.command_log(root), "")
+
+    def test_plugin_selector_rejects_newline_path_injection_before_j_skills(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            repo, env = self.make_install_fixture(root)
+            plugin = repo / "plugins/dev-tools"
+            external_skill = root / "external/escaped"
+            external_skill.mkdir(parents=True)
+            external_skill_file = external_skill / "SKILL.md"
+            external_skill_file.write_text(
+                "---\nname: escaped\ndescription: escaped\n---\n",
+                encoding="utf-8",
+            )
+            injected_entry = "./skills/line\n" + external_skill.as_posix() + "/"
+            injected_directory = plugin / injected_entry
+            injected_directory.mkdir(parents=True)
+            (injected_directory / "SKILL.md").write_text(
+                "---\nname: injected\ndescription: injected\n---\n",
+                encoding="utf-8",
+            )
+            self.write_manifest(plugin, [injected_entry])
+            temp_root = root / "tmp"
+            temp_root.mkdir()
+            env["TMPDIR"] = str(temp_root)
+
+            completed = self.run_fixture(repo, env, "--plugin", "dev-tools")
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("不安全字符或路径片段", completed.stderr)
+            command_log = self.command_log(root)
+            self.assertEqual(command_log, "")
+            self.assertNotIn(external_skill_file.as_posix(), command_log)
+            self.assertEqual(list(temp_root.iterdir()), [])
+
+    def test_plugin_selector_rejects_control_and_cross_platform_paths_before_j_skills(self) -> None:
+        dangerous_entries = (
+            "./skills/bad\rname/",
+            "./skills/bad\x00name/",
+            "./skills/bad\x1bname/",
+            ".\\skills\\standalone\\",
+            "C:/skills/standalone/",
+            "./skills/../standalone/",
+        )
+        for entry in dangerous_entries:
+            with self.subTest(entry=repr(entry)), tempfile.TemporaryDirectory() as tempdir:
+                root = Path(tempdir)
+                repo, env = self.make_install_fixture(root)
+                self.write_manifest(repo / "plugins/dev-tools", [entry])
+
+                completed = self.run_fixture(repo, env, "--plugin", "dev-tools")
+
+                self.assertNotEqual(completed.returncode, 0)
+                self.assertIn("不安全字符或路径片段", completed.stderr)
+                self.assertEqual(self.command_log(root), "")
+
+    def test_plugin_selector_rejects_a_symlinked_root_skills_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            repo, env = self.make_install_fixture(root)
+            real_skills = repo / "real-skills"
+            (repo / "skills").rename(real_skills)
+            (repo / "skills").symlink_to(real_skills, target_is_directory=True)
+            plugin = repo / "plugins/shared-plugin"
+            shared = plugin / "skills/standalone"
+            shared.parent.mkdir(parents=True)
+            shared.symlink_to(repo / "skills/standalone", target_is_directory=True)
+            self.write_manifest(plugin, ["./skills/standalone/"])
+
+            completed = self.run_fixture(repo, env, "--plugin", "shared-plugin")
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("根 skills/ 必须是真实目录", completed.stderr)
+
+    def test_plugin_selector_rejects_missing_root_skills_for_ordinary_plugin(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            repo, env = self.make_install_fixture(root)
+            shutil.rmtree(repo / "skills")
+
+            completed = self.run_fixture(repo, env, "--plugin", "dev-tools")
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("根 skills/ 必须是真实目录", completed.stderr)
+
+    def test_plugin_selector_rejects_shared_target_with_symlinked_skill_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            repo, env = self.make_install_fixture(root)
+            skill_file = repo / "skills/standalone/SKILL.md"
+            external_file = root / "external-SKILL.md"
+            external_file.write_text(skill_file.read_text(encoding="utf-8"), encoding="utf-8")
+            skill_file.unlink()
+            skill_file.symlink_to(external_file)
+            plugin = repo / "plugins/shared-plugin"
+            shared = plugin / "skills/standalone"
+            shared.parent.mkdir(parents=True)
+            shared.symlink_to(repo / "skills/standalone", target_is_directory=True)
+            self.write_manifest(plugin, ["./skills/standalone/"])
+
+            completed = self.run_fixture(repo, env, "--plugin", "shared-plugin")
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("SKILL.md 必须是普通文件", completed.stderr)
+
+    def test_plugin_selector_rejects_shared_link_to_a_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            repo, env = self.make_install_fixture(root)
+            plugin = repo / "plugins/shared-plugin"
+            shared = plugin / "skills/standalone"
+            shared.parent.mkdir(parents=True)
+            shared.symlink_to(repo / "skills/standalone/SKILL.md")
+            self.write_manifest(plugin, ["./skills/standalone/"])
+
+            completed = self.run_fixture(repo, env, "--plugin", "shared-plugin")
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("目标必须是目录", completed.stderr)
+
+    def test_plugin_selector_rejects_an_undeclared_shared_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            repo, env = self.make_install_fixture(root)
+            plugin = repo / "plugins/shared-plugin"
+            shared_parent = plugin / "skills"
+            shared_parent.mkdir(parents=True)
+            for name in ("standalone", "extra-alias"):
+                (shared_parent / name).symlink_to(
+                    repo / "skills/standalone", target_is_directory=True
+                )
+            self.write_manifest(plugin, ["./skills/standalone/"])
+
+            completed = self.run_fixture(repo, env, "--plugin", "shared-plugin")
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("未在 manifest.skills 声明", completed.stderr)
+
+    def test_plugin_selector_rejects_duplicate_shared_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            repo, env = self.make_install_fixture(root)
+            plugin = repo / "plugins/shared-plugin"
+            shared_parent = plugin / "skills"
+            shared_parent.mkdir(parents=True)
+            for name in ("standalone", "second-alias"):
+                (shared_parent / name).symlink_to(
+                    repo / "skills/standalone", target_is_directory=True
+                )
+            self.write_manifest(
+                plugin,
+                ["./skills/standalone/", "./skills/second-alias/"],
+            )
+
+            completed = self.run_fixture(repo, env, "--plugin", "shared-plugin")
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("重复指向", completed.stderr)
+
+    def test_plugin_selector_rejects_an_extra_ordinary_skills_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            repo, env = self.make_install_fixture(root)
+            plugin = repo / "plugins/shared-plugin"
+            declared = plugin / "skills/declared"
+            extra = plugin / "skills/extra"
+            for name, directory in (("declared", declared), ("extra", extra)):
+                directory.mkdir(parents=True, exist_ok=True)
+                (directory / "SKILL.md").write_text(
+                    f"---\nname: {name}\ndescription: test\n---\n",
+                    encoding="utf-8",
+                )
+            self.write_manifest(plugin, ["./skills/declared/"])
+
+            completed = self.run_fixture(repo, env, "--plugin", "shared-plugin")
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("未在 manifest.skills 声明", completed.stderr)
+
     def test_rejects_multiple_selectors(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
@@ -283,18 +616,38 @@ class DistributionConsistencyTests(unittest.TestCase):
         ):
             plugin_root = manifest_file.parents[1]
             manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
-            declared = {
-                (plugin_root / relative / "SKILL.md").resolve()
+            declared_directories = [
+                Path(os.path.abspath(plugin_root / relative))
                 for relative in manifest["skills"]
-            }
+            ]
+            declared = set(declared_directories)
+            self.assertEqual(len(declared), len(declared_directories), manifest_file)
             actual = {
-                path.resolve()
+                Path(os.path.abspath(path.parent))
                 for path in plugin_root.rglob("SKILL.md")
                 if "archived" not in path.parts
             }
+            nested_root = plugin_root / "skills"
+            if nested_root.is_dir() and not nested_root.is_symlink():
+                actual.update(
+                    Path(os.path.abspath(directory))
+                    for directory in nested_root.iterdir()
+                    if directory.is_dir() or directory.is_symlink()
+                )
             self.assertEqual(declared, actual, manifest_file.as_posix())
-            for path in declared:
-                self.assertTrue(path.is_file(), path.as_posix())
+            for directory in declared_directories:
+                skill_path = directory / "SKILL.md"
+                self.assertTrue(skill_path.is_file(), skill_path.as_posix())
+                self.assertFalse(skill_path.is_symlink(), skill_path.as_posix())
+                if directory.is_symlink():
+                    root_skills = ROOT / "skills"
+                    self.assertTrue(root_skills.is_dir())
+                    self.assertFalse(root_skills.is_symlink())
+                    self.assertEqual(
+                        directory.resolve().parent,
+                        root_skills.resolve(),
+                        directory,
+                    )
 
     def test_marketplace_covers_every_plugin_with_matching_version(self) -> None:
         marketplace = json.loads(

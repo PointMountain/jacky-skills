@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import stat
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
@@ -119,11 +121,15 @@ def is_active_path(path: Path, repo: Path) -> bool:
     return not any(part in IGNORED_PARTS for part in parts)
 
 
-def find_active_skill_files(repo: Path) -> list[Path]:
+def find_active_skill_files(repo: Path, plugins: Iterable[Path]) -> list[Path]:
     skill_files: list[Path] = []
-    for root_name in ("skills", "plugins", "harness"):
-        root = repo / root_name
-        if not root.is_dir():
+    roots = [repo / "skills", repo / "harness", *plugins]
+    for root in roots:
+        try:
+            metadata = root.lstat()
+        except OSError:
+            continue
+        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
             continue
         skill_files.extend(
             path
@@ -214,23 +220,74 @@ def parse_frontmatter(skill_file: Path, result: AuditResult) -> None:
         )
 
 
-def plugin_directories(repo: Path) -> list[Path]:
+def plugin_directories(repo: Path, result: AuditResult) -> list[Path]:
     plugins_root = repo / "plugins"
-    if not plugins_root.is_dir():
+    try:
+        root_metadata = plugins_root.lstat()
+    except FileNotFoundError:
         return []
-    return sorted(
-        path
-        for path in plugins_root.iterdir()
-        if path.is_dir() and not path.name.startswith(".") and path.name != "archived"
-    )
+    except OSError as exc:
+        result.error("plugins_root_invalid", plugins_root, f"无法检查 plugins/：{exc}")
+        return []
+    if stat.S_ISLNK(root_metadata.st_mode) or not stat.S_ISDIR(root_metadata.st_mode):
+        result.error(
+            "plugins_root_invalid",
+            plugins_root,
+            "plugins/ 必须是仓库内的真实目录，不能是软链接",
+        )
+        return []
+    canonical_root = plugins_root.resolve()
+    if canonical_root.parent != repo or canonical_root.name != "plugins":
+        result.error(
+            "plugins_root_invalid",
+            plugins_root,
+            "plugins/ 的规范路径必须是仓库直接子目录",
+        )
+        return []
+
+    plugins: list[Path] = []
+    for path in sorted(plugins_root.iterdir()):
+        if path.name.startswith(".") or path.name == "archived":
+            continue
+        try:
+            metadata = path.lstat()
+        except OSError as exc:
+            result.error("plugin_directory_invalid", path, f"无法检查 Plugin 目录：{exc}")
+            continue
+        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+            result.error(
+                "plugin_directory_invalid",
+                path,
+                "Plugin 必须是 plugins/ 下的真实直接子目录，不能是软链接",
+            )
+            continue
+        canonical_plugin = path.resolve()
+        if canonical_plugin.parent != canonical_root:
+            result.error(
+                "plugin_directory_invalid",
+                path,
+                "Plugin 的规范路径必须是 plugins/ 的直接子目录",
+            )
+            continue
+        plugins.append(path)
+    return plugins
 
 
-def plugin_skill_directories(plugin: Path, active_skill_files: Iterable[Path]) -> set[Path]:
-    return {
-        skill_file.parent.resolve()
+def plugin_skill_entries(
+    plugin: Path, active_skill_files: Iterable[Path]
+) -> dict[Path, Path]:
+    entries = {
+        Path(os.path.abspath(skill_file.parent)): skill_file
         for skill_file in active_skill_files
         if plugin in skill_file.parents
     }
+    nested_root = plugin / "skills"
+    if nested_root.is_dir() and not nested_root.is_symlink():
+        for candidate in nested_root.iterdir():
+            if candidate.is_symlink() or candidate.is_dir():
+                lexical_path = Path(os.path.abspath(candidate))
+                entries[lexical_path] = candidate / "SKILL.md"
+    return entries
 
 
 def parse_manifest(manifest: Path, result: AuditResult) -> dict[str, Any] | None:
@@ -245,13 +302,92 @@ def parse_manifest(manifest: Path, result: AuditResult) -> dict[str, Any] | None
     return data
 
 
-def audit_plugin(plugin: Path, active_skill_files: list[Path], result: AuditResult) -> None:
-    manifest = plugin / ".claude-plugin" / "plugin.json"
-    actual_skills = plugin_skill_directories(plugin, active_skill_files)
+def is_safe_manifest_skill_entry(entry: object) -> bool:
+    if not isinstance(entry, str) or not entry.strip():
+        return False
+    if re.search(r"[\x00-\x1f\x7f\\]", entry):
+        return False
+    if not entry.startswith("./"):
+        return False
+    segments = entry[2:].split("/")
+    if segments and segments[-1] == "":
+        segments.pop()
+    if not segments:
+        return False
+    windows_device = re.compile(
+        r"^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)", re.IGNORECASE
+    )
+    return all(
+        segment not in {"", ".", ".."}
+        and not re.search(r'[<>:"|?*]', segment)
+        and not segment.endswith((".", " "))
+        and not windows_device.match(segment)
+        for segment in segments
+    )
 
-    if not manifest.is_file():
+
+def validate_root_skills(repo: Path, result: AuditResult) -> Path | None:
+    candidate = repo / "skills"
+    try:
+        metadata = candidate.lstat()
+    except OSError:
+        metadata = None
+    if metadata is None or not stat.S_ISDIR(metadata.st_mode) or candidate.is_symlink():
+        result.error(
+            "shared_skills_root_invalid",
+            candidate,
+            "仓库根 skills/ 必须是真实目录，不能是软链接",
+        )
+        return None
+    resolved = candidate.resolve()
+    if resolved.parent != repo or resolved.name != "skills":
+        result.error(
+            "shared_skills_root_invalid",
+            candidate,
+            "仓库根 skills/ 的规范路径必须是仓库直接子目录",
+        )
+        return None
+    return resolved
+
+
+def audit_plugin(
+    plugin: Path,
+    active_skill_files: list[Path],
+    result: AuditResult,
+    shared_skills_root: Path | None,
+) -> None:
+    manifest = plugin / ".claude-plugin" / "plugin.json"
+    manifest_parent = manifest.parent
+    try:
+        parent_metadata = manifest_parent.lstat()
+    except OSError:
         result.error("plugin_manifest_missing", manifest, "Plugin 缺少 .claude-plugin/plugin.json")
         return
+    if (
+        stat.S_ISLNK(parent_metadata.st_mode)
+        or not stat.S_ISDIR(parent_metadata.st_mode)
+        or manifest_parent.resolve() != plugin.resolve() / ".claude-plugin"
+    ):
+        result.error(
+            "plugin_manifest_invalid",
+            manifest_parent,
+            "Plugin manifest 的父目录必须是 Plugin 内的真实目录",
+        )
+        return
+    try:
+        manifest_metadata = manifest.lstat()
+    except OSError:
+        result.error("plugin_manifest_missing", manifest, "Plugin 缺少 .claude-plugin/plugin.json")
+        return
+    if stat.S_ISLNK(manifest_metadata.st_mode) or not stat.S_ISREG(manifest_metadata.st_mode):
+        result.error(
+            "plugin_manifest_invalid",
+            manifest,
+            "Plugin manifest 必须是普通文件，不能是软链接",
+        )
+        return
+
+    actual_entries = plugin_skill_entries(plugin, active_skill_files)
 
     data = parse_manifest(manifest, result)
     if data is None:
@@ -262,16 +398,24 @@ def audit_plugin(plugin: Path, active_skill_files: list[Path], result: AuditResu
         result.error("plugin_skills_invalid", manifest, "Plugin JSON 的 skills 必须是数组")
         return
 
-    declared_skills: set[Path] = set()
-    plugin_root = plugin.resolve()
+    declared_paths: set[Path] = set()
+    declared_targets: dict[Path, str] = {}
+    plugin_root = Path(os.path.abspath(plugin))
+    canonical_plugin_root = plugin.resolve()
     for entry in declared_entries:
-        if not isinstance(entry, str) or not entry.strip():
-            result.error("manifest_skill_path_invalid", manifest, "skills 中的每一项必须是非空路径")
+        if not is_safe_manifest_skill_entry(entry):
+            result.error(
+                "manifest_skill_path_invalid",
+                manifest,
+                "skills 路径包含不安全字符或跨平台危险片段",
+            )
             continue
 
-        target = (plugin / entry).resolve()
+        assert isinstance(entry, str)
+
+        declared_path = Path(os.path.abspath(plugin / entry))
         try:
-            target.relative_to(plugin_root)
+            declared_path.relative_to(plugin_root)
         except ValueError:
             result.error(
                 "manifest_skill_path_invalid",
@@ -279,26 +423,117 @@ def audit_plugin(plugin: Path, active_skill_files: list[Path], result: AuditResu
                 f"Skill 路径不能超出 Plugin 目录：{entry}",
             )
             continue
+        if declared_path in declared_paths:
+            result.error(
+                "manifest_skill_path_duplicate",
+                manifest,
+                f"manifest skills 包含重复入口：{entry}",
+            )
+            continue
+        declared_paths.add(declared_path)
 
-        skill_directory = target.parent if target.name == "SKILL.md" else target
-        declared_skills.add(skill_directory)
-        if not target.exists():
+        try:
+            metadata = declared_path.lstat()
+        except OSError:
             result.error(
                 "manifest_skill_path_missing",
                 manifest,
                 f"manifest 声明的 Skill 路径不存在：{entry}",
             )
-        elif not (skill_directory / "SKILL.md").is_file():
+            continue
+
+        if stat.S_ISLNK(metadata.st_mode):
+            if declared_path.parent != plugin_root / "skills":
+                result.error(
+                    "manifest_skill_path_invalid",
+                    manifest,
+                    f"共享 Skill 链接必须位于 Plugin 的 skills/：{entry}",
+                )
+                continue
+            if shared_skills_root is None:
+                continue
+            try:
+                target = declared_path.resolve(strict=True)
+                target_metadata = target.stat()
+            except OSError:
+                result.error(
+                    "manifest_skill_path_missing",
+                    manifest,
+                    f"共享 Skill 链接目标不存在：{entry}",
+                )
+                continue
+            if not stat.S_ISDIR(target_metadata.st_mode):
+                result.error(
+                    "manifest_skill_path_invalid",
+                    manifest,
+                    f"共享 Skill 链接目标必须是目录：{entry}",
+                )
+                continue
+            if target.parent != shared_skills_root:
+                result.error(
+                    "manifest_skill_path_invalid",
+                    manifest,
+                    f"共享 Skill 必须直接指向仓库根 skills/ 下的 Skill：{entry}",
+                )
+                continue
+        else:
+            if not stat.S_ISDIR(metadata.st_mode):
+                result.error(
+                    "manifest_skill_path_invalid",
+                    manifest,
+                    f"Plugin Skill 入口必须是目录：{entry}",
+                )
+                continue
+            target = declared_path.resolve()
+            try:
+                target.relative_to(canonical_plugin_root)
+            except ValueError:
+                result.error(
+                    "manifest_skill_path_invalid",
+                    manifest,
+                    f"Plugin Skill 入口最终必须位于 Plugin 目录：{entry}",
+                )
+                continue
+
+        skill_file = target / "SKILL.md"
+        try:
+            skill_metadata = skill_file.lstat()
+        except OSError:
             result.error(
                 "manifest_skill_file_missing",
                 manifest,
                 f"manifest 声明路径中缺少 SKILL.md：{entry}",
             )
+            continue
+        if stat.S_ISLNK(skill_metadata.st_mode) or not stat.S_ISREG(skill_metadata.st_mode):
+            result.error(
+                "manifest_skill_file_invalid",
+                manifest,
+                f"Skill 的 SKILL.md 必须是普通文件：{entry}",
+            )
+            continue
 
-    for skill_directory in sorted(actual_skills - declared_skills):
+        previous_entry = declared_targets.get(target)
+        if previous_entry is not None:
+            result.error(
+                "manifest_skill_target_duplicate",
+                manifest,
+                f"manifest skills 中 {entry} 与 {previous_entry} 重复指向同一 Skill",
+            )
+            continue
+        declared_targets[target] = entry
+
+    for entry_path in sorted(declared_paths - set(actual_entries)):
+        result.error(
+            "manifest_skill_not_active",
+            manifest,
+            f"manifest 声明的 Skill 不在 Plugin 活跃内容中：{entry_path.relative_to(plugin_root)}",
+        )
+
+    for entry_path in sorted(set(actual_entries) - declared_paths):
         result.error(
             "plugin_skill_undeclared",
-            skill_directory / "SKILL.md",
+            actual_entries[entry_path],
             "Plugin 中的实际 Skill 未在 plugin.json 的 skills 中声明",
         )
 
@@ -366,16 +601,18 @@ def scan_shared_content(repo: Path, result: AuditResult) -> None:
 def audit(repo: Path, *, include_shared_content: bool = False) -> AuditResult:
     repo = repo.resolve()
     result = AuditResult(repo=repo)
-    active_skill_files = find_active_skill_files(repo)
+    plugins = plugin_directories(repo, result)
+    result.plugins = len(plugins)
+    shared_skills_root = validate_root_skills(repo, result) if plugins else None
+
+    active_skill_files = find_active_skill_files(repo, plugins)
     result.skills = len(active_skill_files)
 
     for skill_file in active_skill_files:
         parse_frontmatter(skill_file, result)
 
-    plugins = plugin_directories(repo)
-    result.plugins = len(plugins)
     for plugin in plugins:
-        audit_plugin(plugin, active_skill_files, result)
+        audit_plugin(plugin, active_skill_files, result, shared_skills_root)
 
     if include_shared_content:
         scan_shared_content(repo, result)

@@ -5,7 +5,7 @@
 ![Claude Code](https://img.shields.io/badge/-Claude%20Code-8A2BE2?logo=claude&logoColor=white)
 ![Codex](https://img.shields.io/badge/-Codex-111111)
 
-模块化的 Agent Skills 集合。仓库同时包含可由 Claude Code Plugin Marketplace 安装的 Plugin、位于 `skills/` 下的独立 Skill，以及位于 `harness/` 下的长期经验 Ops Skills。
+模块化的 Agent Skills 集合。仓库同时包含可由 Claude Code Plugin Marketplace 安装的 Plugin、位于 `skills/` 下的独立或共享 Skill，以及位于 `harness/` 下的长期经验 Ops Skills。
 
 ## Plugin 清单
 
@@ -17,6 +17,7 @@
 | [dev-tools](./plugins/dev-tools) | 2.8.4 | 发布、任务管理、Durable 长任务、联网、浏览器操控与效率审计 | github-repo-publish, efficiency-audit, todo, durable, web-search, browser-control, animate-prompt, web-connect, remote-dev-sync, ssh-connect |
 | [distiller-tools](./plugins/distiller-tools) | 1.1.0 | 资源蒸馏与知识提炼 | distiller |
 | [evaluators](./plugins/evaluators) | 1.1.0 | 任务目标与 Skill 设计质量评估 | harness-benchmark, skill-design-benchmark |
+| [image-effects](./plugins/image-effects) | 1.0.0 | 可版本化图像效果、参考图生成与静态画廊 | image-effects |
 | [knowledge-base](./plugins/knowledge-base) | 1.3.0 | 开发教程、经验与参考方案 | npm-publish, vsix-publish, vscode-extension-dev, gh-workflow-generator, github-profile-coolify, chrome-ext-ai-script, web-to-tauri-migration-loop, llm-wiki, codex-env-config |
 | [language-skills](./plugins/language-skills) | 1.0.1 | 语言学习与表达训练 | spoken-english-coach |
 | [learning-tools](./plugins/learning-tools) | 2.4.1 | 仓库学习、文档教程与技术调研 | learn-repo, repo-study, doc-to-tutorial, youtube-study-note |
@@ -44,6 +45,8 @@
 | [clear-and-brief-output](./skills/clear-and-brief-output) | [happy-visual-workflow](./skills/happy-visual-workflow) | |
 | [android-live-photo](./skills/android-live-photo) |  |  |
 | [photo-to-styled-motion](./skills/photo-to-styled-motion) |  |  |
+
+`image-effects` 的事实源同样位于 [`skills/image-effects`](./skills/image-effects)，并通过目录软链接共享给同名 Plugin，避免维护两份内容。
 
 ## Harness Ops Skills
 
@@ -112,6 +115,7 @@ J_SKILLS_ENVS=claude-code,codex,cursor ./install.sh --all
 ```text
 /plugin marketplace add wangjs-jacky/jacky-skills
 /plugin install dev-tools@jacky-skills
+/plugin install image-effects@jacky-skills
 /plugin install obsidian-tools@jacky-skills
 ```
 
@@ -135,6 +139,10 @@ j-skills install durable -g --env claude-code,codex
 # Harness Ops Skill
 j-skills link ./harness/happy-ops
 j-skills install happy-ops -g --env claude-code,codex
+
+# 图像效果 Skill（Plugin 与独立安装共用这一份源码）
+j-skills link ./skills/image-effects
+j-skills install image-effects -g --env claude-code,codex
 ```
 
 常用管理命令：
@@ -156,6 +164,7 @@ jacky-skills/
 │   ├── dev-tools/
 │   ├── distiller-tools/
 │   ├── evaluators/
+│   ├── image-effects/
 │   ├── knowledge-base/
 │   ├── language-skills/
 │   ├── learning-tools/
@@ -170,9 +179,10 @@ jacky-skills/
 │   ├── translation-tools/
 │   ├── troubleshooting/
 │   └── video-processing/
-├── skills/                    # 不属于 Plugin 的独立 Skills
+├── skills/                    # 独立 Skills 或 Plugin 的共享事实源
 │   ├── happy-app-experience/
 │   ├── happy-visual-workflow/
+│   ├── image-effects/
 │   ├── photo-to-styled-motion/
 │   └── web-e2e/
 ├── harness/                   # 工程/工具的长期经验 Ops Skills（统一以 -ops 结尾）

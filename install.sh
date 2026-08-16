@@ -25,6 +25,7 @@ USE_CURRENT_CHECKOUT=false
 SELECTOR_TYPE="all"
 SELECTOR_VALUE=""
 SELECTOR_SET=false
+PLUGIN_SKILL_LIST_FILE=""
 
 if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -50,6 +51,12 @@ success() {
 fail() {
     echo -e "${RED}错误: $*${NC}" >&2
     exit 1
+}
+
+cleanup() {
+    if [ -n "$PLUGIN_SKILL_LIST_FILE" ] && [ -f "$PLUGIN_SKILL_LIST_FILE" ]; then
+        rm -f -- "$PLUGIN_SKILL_LIST_FILE"
+    fi
 }
 
 usage() {
@@ -109,6 +116,36 @@ while [ "$#" -gt 0 ]; do
             ;;
     esac
 done
+
+validate_plugin_selector_name() {
+    [[ "$SELECTOR_VALUE" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || \
+        fail "Plugin 名称必须使用 kebab-case：$SELECTOR_VALUE"
+}
+
+validate_plugin_selector_path() {
+    local plugins_dir="$REPO_DIR/plugins"
+    local plugin_dir="$plugins_dir/$SELECTOR_VALUE"
+    local canonical_repo
+    local canonical_plugins
+    local canonical_plugin
+
+    [ -d "$plugins_dir" ] && [ ! -L "$plugins_dir" ] || \
+        fail "plugins/ 必须是仓库内的真实目录"
+    [ -d "$plugin_dir" ] && [ ! -L "$plugin_dir" ] || \
+        fail "Plugin 必须是 plugins/ 下的真实直接子目录：$SELECTOR_VALUE"
+
+    canonical_repo="$(cd "$REPO_DIR" && pwd -P)"
+    canonical_plugins="$(cd "$plugins_dir" && pwd -P)"
+    canonical_plugin="$(cd "$plugin_dir" && pwd -P)"
+    [ "$(dirname "$canonical_plugins")" = "$canonical_repo" ] && \
+        [ "$(basename "$canonical_plugins")" = "plugins" ] && \
+        [ "$(dirname "$canonical_plugin")" = "$canonical_plugins" ] || \
+        fail "Plugin 必须是 plugins/ 下的真实直接子目录：$SELECTOR_VALUE"
+}
+
+if [ "$SELECTOR_TYPE" = "plugin" ]; then
+    validate_plugin_selector_name
+fi
 
 read_skill_name() {
     awk '
@@ -184,6 +221,187 @@ find_all_skill_files() {
         -type f -name SKILL.md -print | sort
 }
 
+find_declared_plugin_skills() {
+    local plugin_dir="$1"
+
+    node - "$REPO_DIR" "$plugin_dir" <<'NODE'
+const fs = require("node:fs");
+const path = require("node:path");
+
+const repoRoot = fs.realpathSync(process.argv[2]);
+const pluginRoot = fs.realpathSync(process.argv[3]);
+const pluginsRoot = fs.realpathSync(path.join(repoRoot, "plugins"));
+const manifestDirectory = path.join(pluginRoot, ".claude-plugin");
+const manifestPath = path.join(manifestDirectory, "plugin.json");
+
+const isStrictChild = (candidate, parent) => {
+    const relative = path.relative(parent, candidate);
+    return relative !== "" && relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+};
+
+const isSafeManifestEntry = (entry) => {
+    if (typeof entry !== "string" || entry.trim() === "") return false;
+    if (/[\u0000-\u001f\u007f\\]/u.test(entry)) return false;
+    if (!entry.startsWith("./") || path.posix.isAbsolute(entry) || path.win32.isAbsolute(entry)) {
+        return false;
+    }
+    const segments = entry.slice(2).split("/");
+    if (segments.at(-1) === "") segments.pop();
+    if (segments.length === 0) return false;
+    const windowsDevice = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/iu;
+    return segments.every((segment) =>
+        segment !== "" &&
+        segment !== "." &&
+        segment !== ".." &&
+        !/[<>:"|?*]/u.test(segment) &&
+        !/[. ]$/u.test(segment) &&
+        !windowsDevice.test(segment)
+    );
+};
+
+try {
+    if (path.dirname(pluginRoot) !== pluginsRoot) {
+        throw new Error("Plugin 必须是 plugins/ 下的真实直接子目录");
+    }
+    const manifestDirectoryMetadata = fs.lstatSync(manifestDirectory);
+    if (
+        manifestDirectoryMetadata.isSymbolicLink() ||
+        !manifestDirectoryMetadata.isDirectory() ||
+        fs.realpathSync(manifestDirectory) !== manifestDirectory
+    ) {
+        throw new Error("Plugin manifest 的父目录必须是 Plugin 内的真实目录");
+    }
+    const manifestMetadata = fs.lstatSync(manifestPath);
+    if (!manifestMetadata.isFile() || manifestMetadata.isSymbolicLink()) {
+        throw new Error("Plugin manifest 必须是普通文件");
+    }
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    if (!Array.isArray(manifest.skills)) {
+        throw new Error(`${manifestPath} 的 skills 必须是数组`);
+    }
+
+    let sharedSkillsRoot;
+    const requireSharedSkillsRoot = () => {
+        if (sharedSkillsRoot) return sharedSkillsRoot;
+        const sharedSkillsPath = path.join(repoRoot, "skills");
+        let metadata;
+        try {
+            metadata = fs.lstatSync(sharedSkillsPath);
+        } catch {
+            throw new Error("仓库根 skills/ 必须是真实目录");
+        }
+        if (metadata.isSymbolicLink() || !metadata.isDirectory()) {
+            throw new Error("仓库根 skills/ 必须是真实目录");
+        }
+        sharedSkillsRoot = fs.realpathSync(sharedSkillsPath);
+        if (
+            path.dirname(sharedSkillsRoot) !== repoRoot ||
+            path.basename(sharedSkillsRoot) !== "skills"
+        ) {
+            throw new Error("仓库根 skills/ 必须是真实目录");
+        }
+        return sharedSkillsRoot;
+    };
+
+    const declaredPaths = new Set();
+    const targetOwners = new Map();
+    const skillFiles = [];
+    requireSharedSkillsRoot();
+    for (const entry of manifest.skills) {
+        if (!isSafeManifestEntry(entry)) {
+            throw new Error(`${manifestPath} 包含不安全字符或路径片段`);
+        }
+
+        const declaredPath = path.resolve(pluginRoot, entry);
+        if (!isStrictChild(declaredPath, pluginRoot)) {
+            throw new Error(`Plugin Skill 声明超出 Plugin 目录：${entry}`);
+        }
+        if (declaredPaths.has(declaredPath)) {
+            throw new Error(`manifest.skills 包含重复入口：${entry}`);
+        }
+        declaredPaths.add(declaredPath);
+
+        const metadata = fs.lstatSync(declaredPath);
+        let target;
+        if (metadata.isSymbolicLink()) {
+            if (path.dirname(declaredPath) !== path.join(pluginRoot, "skills")) {
+                throw new Error(`共享 Skill 链接必须位于 Plugin 的 skills/：${entry}`);
+            }
+            target = fs.realpathSync(declaredPath);
+            const allowedRoot = requireSharedSkillsRoot();
+            if (!fs.statSync(target).isDirectory()) {
+                throw new Error(`共享 Skill 链接目标必须是目录：${entry}`);
+            }
+            if (path.dirname(target) !== allowedRoot) {
+                throw new Error(`共享 Skill 链接最终必须指向仓库根 skills/ 的直接 Skill 目录：${entry}`);
+            }
+        } else {
+            if (!metadata.isDirectory()) {
+                throw new Error(`Plugin Skill 入口必须是目录：${entry}`);
+            }
+            target = fs.realpathSync(declaredPath);
+            if (!isStrictChild(target, pluginRoot)) {
+                throw new Error(`Plugin Skill 入口最终必须位于 Plugin 目录：${entry}`);
+            }
+        }
+
+        const skillFile = path.join(target, "SKILL.md");
+        const skillMetadata = fs.lstatSync(skillFile);
+        if (skillMetadata.isSymbolicLink() || !skillMetadata.isFile()) {
+            throw new Error(`Skill 的 SKILL.md 必须是普通文件：${entry}`);
+        }
+        if (targetOwners.has(target)) {
+            throw new Error(`manifest.skills 中 ${entry} 与 ${targetOwners.get(target)} 重复指向同一 Skill`);
+        }
+        targetOwners.set(target, entry);
+        skillFiles.push(skillFile);
+    }
+
+    const actualPaths = new Set();
+    const walk = (directory) => {
+        for (const item of fs.readdirSync(directory, {withFileTypes: true})) {
+            if (item.name === "archived" || item.name === ".claude-plugin") continue;
+            const candidate = path.join(directory, item.name);
+            if (item.isSymbolicLink()) {
+                if (directory === path.join(pluginRoot, "skills")) {
+                    actualPaths.add(candidate);
+                }
+                continue;
+            }
+            if (!item.isDirectory()) continue;
+            if (directory === path.join(pluginRoot, "skills")) {
+                actualPaths.add(candidate);
+            } else {
+                const possibleSkill = path.join(candidate, "SKILL.md");
+                if (fs.existsSync(possibleSkill)) actualPaths.add(candidate);
+            }
+            walk(candidate);
+        }
+    };
+    walk(pluginRoot);
+
+    for (const declaredPath of declaredPaths) {
+        if (!actualPaths.has(declaredPath)) {
+            throw new Error(`manifest.skills 声明的入口不在 Plugin 活跃内容中：${path.relative(pluginRoot, declaredPath)}`);
+        }
+    }
+    for (const actualPath of actualPaths) {
+        if (!declaredPaths.has(actualPath)) {
+            throw new Error(`Plugin Skill 入口未在 manifest.skills 声明：${path.relative(pluginRoot, actualPath)}`);
+        }
+    }
+
+    for (const skillFile of skillFiles) {
+        process.stdout.write(skillFile);
+        process.stdout.write("\0");
+    }
+} catch (error) {
+    console.error(`错误: ${error.message}`);
+    process.exit(1);
+}
+NODE
+}
+
 discover_skill_files() {
     local skill_file
     case "$SELECTOR_TYPE" in
@@ -198,11 +416,7 @@ discover_skill_files() {
             done < <(find_all_skill_files)
             ;;
         plugin)
-            local plugin_dir="$REPO_DIR/plugins/$SELECTOR_VALUE"
-            [ -d "$plugin_dir" ] || fail "Plugin 不存在：$SELECTOR_VALUE"
-            find "$plugin_dir" \
-                -type d -name archived -prune -o \
-                -type f -name SKILL.md -print | sort
+            fail "Plugin Skill 列表必须通过预检文件读取"
             ;;
     esac
 }
@@ -223,20 +437,7 @@ if [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ]; then
 fi
 success "✓ Node.js $(node -v) ($(node -p 'process.arch'))"
 
-echo -e "${YELLOW}[2/5] 检查 j-skills CLI...${NC}"
-if ! command -v j-skills >/dev/null 2>&1; then
-    info "正在安装 j-skills CLI ${REQUIRED_J_SKILLS_VERSION}..."
-    npm install -g "j-skills@$REQUIRED_J_SKILLS_VERSION" --no-audit --no-fund
-fi
-
-J_SKILLS_VERSION_OUTPUT="$(j-skills --version 2>&1)"
-CURRENT_J_SKILLS_VERSION="$(printf '%s\n' "$J_SKILLS_VERSION_OUTPUT" | sed -nE 's/.*j-skills[/ ]([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' | head -1)"
-[ -n "$CURRENT_J_SKILLS_VERSION" ] || fail "无法识别 j-skills 版本：$J_SKILLS_VERSION_OUTPUT"
-[ "$CURRENT_J_SKILLS_VERSION" = "$REQUIRED_J_SKILLS_VERSION" ] || \
-    fail "需要 j-skills ${REQUIRED_J_SKILLS_VERSION}，当前为 ${CURRENT_J_SKILLS_VERSION}；请安装匹配版本或设置 J_SKILLS_VERSION"
-success "✓ j-skills $CURRENT_J_SKILLS_VERSION"
-
-echo -e "${YELLOW}[3/5] 克隆或更新仓库...${NC}"
+echo -e "${YELLOW}[2/5] 克隆或更新仓库...${NC}"
 if [ "$USE_CURRENT_CHECKOUT" = true ]; then
     success "✓ 使用当前 checkout：$REPO_DIR"
 elif [ -e "$REPO_DIR/.git" ]; then
@@ -249,10 +450,39 @@ else
 fi
 success "✓ 仓库已就绪：$REPO_DIR"
 
+if [ "$SELECTOR_TYPE" = "plugin" ]; then
+    validate_plugin_selector_path
+    PLUGIN_SKILL_LIST_FILE="$(mktemp "${TMPDIR:-/tmp}/jacky-skills-plugin.XXXXXX")" || \
+        fail "无法创建 Plugin Skill 预检文件"
+    trap cleanup EXIT
+    if ! find_declared_plugin_skills "$REPO_DIR/plugins/$SELECTOR_VALUE" > "$PLUGIN_SKILL_LIST_FILE"; then
+        fail "Plugin manifest 预检失败：$SELECTOR_VALUE"
+    fi
+fi
+
+echo -e "${YELLOW}[3/5] 检查 j-skills CLI...${NC}"
+if ! command -v j-skills >/dev/null 2>&1; then
+    info "正在安装 j-skills CLI ${REQUIRED_J_SKILLS_VERSION}..."
+    npm install -g "j-skills@$REQUIRED_J_SKILLS_VERSION" --no-audit --no-fund
+fi
+
+J_SKILLS_VERSION_OUTPUT="$(j-skills --version 2>&1)"
+CURRENT_J_SKILLS_VERSION="$(printf '%s\n' "$J_SKILLS_VERSION_OUTPUT" | sed -nE 's/.*j-skills[/ ]([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' | head -1)"
+[ -n "$CURRENT_J_SKILLS_VERSION" ] || fail "无法识别 j-skills 版本：$J_SKILLS_VERSION_OUTPUT"
+[ "$CURRENT_J_SKILLS_VERSION" = "$REQUIRED_J_SKILLS_VERSION" ] || \
+    fail "需要 j-skills ${REQUIRED_J_SKILLS_VERSION}，当前为 ${CURRENT_J_SKILLS_VERSION}；请安装匹配版本或设置 J_SKILLS_VERSION"
+success "✓ j-skills $CURRENT_J_SKILLS_VERSION"
+
 SKILL_FILES=()
-while IFS= read -r skill_file; do
-    [ -n "$skill_file" ] && SKILL_FILES+=("$skill_file")
-done < <(discover_skill_files)
+if [ "$SELECTOR_TYPE" = "plugin" ]; then
+    while IFS= read -r -d '' skill_file; do
+        [ -n "$skill_file" ] && SKILL_FILES+=("$skill_file")
+    done < "$PLUGIN_SKILL_LIST_FILE"
+else
+    while IFS= read -r skill_file; do
+        [ -n "$skill_file" ] && SKILL_FILES+=("$skill_file")
+    done < <(discover_skill_files)
+fi
 [ "${#SKILL_FILES[@]}" -gt 0 ] || fail "没有找到匹配的 Skill：${SELECTOR_VALUE:-all}"
 
 echo -e "${YELLOW}[4/5] 链接活跃 Skills...${NC}"

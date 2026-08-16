@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-15T16:00:00.000Z",
+  "effects": [
+    {
+      "ref": "healing-anime-scribble-v3@1.0.0",
+      "id": "healing-anime-scribble-v3",
+      "version": "1.0.0",
+      "title": {
+        "en": "Healing Anime Scribble",
+        "zh": "治愈系潦草淡彩"
+      },
+      "summary": {
+        "en": "Redraw one portrait as an airy anime construction sketch with dense searching lines, sparse pale color, and quiet warm paper.",
+        "zh": "将一张人物照片重绘为留白通透的动漫结构草图，以密集探索线条、稀薄淡彩和暖白纸张为核心。"
+      },
+      "category": "portrait",
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/healing-anime-scribble-v3@1.0.0.jpg",
+      "sourceUrl": "./source/healing-anime-scribble-v3@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional young adult with glasses, not based on a real person.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect healing-anime-scribble-v3@1.0.0 on my uploaded image."
+    }
+  ]
+}

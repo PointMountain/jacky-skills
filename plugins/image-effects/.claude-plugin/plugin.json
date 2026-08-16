@@ -1,0 +1,23 @@
+{
+  "name": "image-effects",
+  "version": "1.0.0",
+  "description": "可版本化图像效果、参考图生成与静态画廊",
+  "author": {
+    "name": "Jacky Wang",
+    "email": "wangjs.jacky@gmail.com",
+    "url": "https://github.com/wangjs-jacky"
+  },
+  "homepage": "https://github.com/wangjs-jacky/jacky-skills/tree/main/plugins/image-effects",
+  "repository": "https://github.com/wangjs-jacky/jacky-skills",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "image-generation",
+    "style-transfer",
+    "gallery",
+    "skills"
+  ],
+  "skills": [
+    "./skills/image-effects/"
+  ]
+}
