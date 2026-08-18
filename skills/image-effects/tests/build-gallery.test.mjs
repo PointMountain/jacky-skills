@@ -19,6 +19,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { buildGallery } from '../scripts/build-gallery.mjs';
+import { assertMetadataFreeImage } from '../scripts/image-metadata.mjs';
 import {
   fetchGitHubContent,
   validateEffects,
@@ -44,10 +45,47 @@ const MANAGED_PATHS = [
   `gallery/source/${EFFECT_REF}.md`,
   'references/INDEX.md',
 ];
+const FULL_CATALOG = [
+  ['healing-anime-scribble-v3@1.0.0', '.jpg'],
+  ['minimal-zine-poster@1.0.0', '.png'],
+  ['photo-illustration-diptych@1.0.0', '.png'],
+  ['photo-illustration-diptych-lakeside@1.0.0', '.png'],
+  ['photo-illustration-editorial-echo@1.0.0', '.png'],
+  ['scene-distillation-zine@1.0.0', '.png'],
+  ['scenes-gathered-zine@1.0.0', '.png'],
+  ['scenes-gathered-zine-sea@1.0.0', '.png'],
+];
+const FULL_CATALOG_REFS = FULL_CATALOG.map(([ref]) => ref);
+const FULL_MANAGED_PATHS = [
+  'assets/public-repo/THIRD_PARTY_NOTICES.md',
+  'gallery/api/library.json',
+  'references/INDEX.md',
+  ...FULL_CATALOG.flatMap(([ref, extension]) => [
+    `gallery/media/${ref}${extension}`,
+    `gallery/source/${ref}.md`,
+  ]),
+].sort();
+const NOTICE_EXPECTATIONS = [
+  ['references/licenses/conardli-garden-skills-mit.txt', 'Copyright (c) 2026'],
+  [
+    'references/licenses/gathered-scenes-zine-contributors-mit.txt',
+    'Copyright (c) 2026 Gathered Scenes Zine contributors',
+  ],
+  [
+    'references/licenses/happy-coder-contributors-mit.txt',
+    'Copyright (c) 2026 Happy Coder Contributors',
+  ],
+  ['references/licenses/liamgvchi-mit.txt', 'Copyright (c) 2026 LiamGvchi'],
+];
+
+function occurrenceCount(haystack, needle) {
+  return haystack.split(needle).length - 1;
+}
 
 async function makeFixtureSource(root, sourceSha = SOURCE_SHA) {
   await Promise.all([
     mkdir(path.join(root, 'references/effects'), { recursive: true }),
+    mkdir(path.join(root, 'references/licenses'), { recursive: true }),
     mkdir(path.join(root, 'assets/previews'), { recursive: true }),
     mkdir(path.join(root, 'assets/public-repo'), { recursive: true }),
   ]);
@@ -67,12 +105,111 @@ async function makeFixtureSource(root, sourceSha = SOURCE_SHA) {
       path.join(SKILL_ROOT, 'assets/previews/healing-anime-scribble-v3.jpg'),
       path.join(root, 'assets/previews/healing-anime-scribble-v3.jpg'),
     ),
+    cp(
+      path.join(SKILL_ROOT, 'references/licenses/conardli-garden-skills-mit.txt'),
+      path.join(root, 'references/licenses/conardli-garden-skills-mit.txt'),
+    ),
     writeFile(
       path.join(root, 'assets/public-repo/THIRD_PARTY_NOTICES.header.md'),
       '# Fixture notice header\n\nFixture license text.\n',
     ),
   ]);
 }
+
+test('完整目录构建逐字节可复现并包含 8 个效果、真实尺寸与 4 份完整 notice', async () => {
+  const outputOne = await mkdtemp(path.join(tmpdir(), 'image-effects-full-output-one-'));
+  const outputTwo = await mkdtemp(path.join(tmpdir(), 'image-effects-full-output-two-'));
+
+  try {
+    await buildGallery({
+      sourceRoot: SKILL_ROOT,
+      outputRoot: outputOne,
+      generatedAt: '2026-08-18T00:00:00.000Z',
+    });
+    await buildGallery({
+      sourceRoot: SKILL_ROOT,
+      outputRoot: outputTwo,
+      generatedAt: '2026-08-18T00:00:00.000Z',
+    });
+
+    const firstTree = await fileTree(outputOne);
+    assert.deepEqual(firstTree, await fileTree(outputTwo));
+    assert.deepEqual(firstTree.map(([relativePath]) => relativePath), FULL_MANAGED_PATHS);
+
+    const library = JSON.parse(
+      await readFile(path.join(outputOne, 'gallery/api/library.json'), 'utf8'),
+    );
+    assert.equal(library.schemaVersion, 2);
+    assert.equal(library.generatedAt, '2026-08-18T00:00:00.000Z');
+    assert.deepEqual(library.effects.map(({ ref }) => ref), FULL_CATALOG_REFS);
+    for (const effect of library.effects) {
+      const previewPath = path.join(
+        outputOne,
+        'gallery',
+        effect.previewUrl.replace(/^\.\//, ''),
+      );
+      const format = effect.previewUrl.endsWith('.png') ? 'png' : 'jpeg';
+      const metadata = await assertMetadataFreeImage(await readFile(previewPath), format);
+      assert.deepEqual(
+        { width: effect.previewWidth, height: effect.previewHeight },
+        { width: metadata.width, height: metadata.height },
+        `${effect.ref} intrinsic dimensions`,
+      );
+    }
+
+    const notices = await readFile(
+      path.join(outputOne, 'assets/public-repo/THIRD_PARTY_NOTICES.md'),
+      'utf8',
+    );
+    assert.equal(occurrenceCount(notices, 'MIT License'), 4);
+    let previousHeading = -1;
+    for (const [noticePath, copyrightLine] of NOTICE_EXPECTATIONS) {
+      const noticeBody = await readFile(path.join(SKILL_ROOT, noticePath), 'utf8');
+      assert.equal(occurrenceCount(notices, noticeBody.trimEnd()), 1, noticePath);
+      assert.equal(
+        notices.split('\n').filter((line) => line === copyrightLine).length,
+        1,
+        copyrightLine,
+      );
+      const heading = notices.indexOf(`### \`${noticePath}\``);
+      assert.ok(heading > previousHeading, `${noticePath} must be in ASCII path order`);
+      previousHeading = heading;
+    }
+    assert.match(
+      notices,
+      /Zeejay0\/scene-distillation-zine-v1-3@921390baac518c85d60a6d98709f1dd657eec720/,
+    );
+    assert.match(
+      notices,
+      /Zeejay0\/gathered-scenes-zine-skill.*e764b7fd243d7cc501723b9d325279bf6dd852c2/s,
+    );
+  } finally {
+    await Promise.all([
+      rm(outputOne, { recursive: true, force: true }),
+      rm(outputTwo, { recursive: true, force: true }),
+    ]);
+  }
+});
+
+test('提交的生成目录与固定 epoch 构建逐字节一致且没有陈旧单效果树', async () => {
+  const outputRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-checked-artifacts-'));
+  try {
+    await buildGallery({
+      sourceRoot: SKILL_ROOT,
+      outputRoot,
+      generatedAt: '2026-08-18T00:00:00.000Z',
+    });
+    const expectedTree = await fileTree(outputRoot);
+    const checkedTree = [];
+    for (const [relativePath] of expectedTree) {
+      const bytes = await readFile(path.join(SKILL_ROOT, relativePath));
+      checkedTree.push([relativePath, createHash('sha256').update(bytes).digest('hex')]);
+    }
+    assert.deepEqual(checkedTree, expectedTree);
+  } finally {
+    await rm(outputRoot, { recursive: true, force: true });
+  }
+});
 
 async function fileTree(root) {
   const entries = [];

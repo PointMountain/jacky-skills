@@ -1,4 +1,5 @@
 import { readFile, readdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 
 const REQUIRED_FIELDS = [
@@ -501,13 +502,50 @@ function markdownDestination(url) {
   return `<${url.replaceAll('<', '%3C').replaceAll('>', '%3E')}>`;
 }
 
-export function renderThirdPartyNotices(effects, header) {
-  if (typeof header !== 'string') throw new TypeError('Notice header must be a string');
+function noticeBytes(value, noticePath) {
+  if (Buffer.isBuffer(value)) return value;
+  if (typeof value === 'string') return Buffer.from(value);
+  throw new TypeError(`License notice ${noticePath} must be a string or Buffer`);
+}
 
-  const sections = sortEffects(effects).map((effect) => {
+export function renderThirdPartyNotices(effects, header, licenseNoticesByPath) {
+  if (typeof header !== 'string') throw new TypeError('Notice header must be a string');
+  if (!(licenseNoticesByPath instanceof Map)) {
+    throw new TypeError('License notices must be a Map keyed by canonical relative path');
+  }
+
+  const sortedEffects = sortEffects(effects);
+  const noticeRecords = new Map();
+  for (const effect of sortedEffects) {
+    const noticePath = effect.sourceLicenseNotice;
+    if (!licenseNoticesByPath.has(noticePath)) {
+      throw new Error(`License notice is required for ${effect.ref}: ${noticePath}`);
+    }
+    const licenseSources = effect.sources.filter(({ path: sourcePath }) => sourcePath === 'LICENSE');
+    if (licenseSources.length !== 1) {
+      throw new Error(`${effect.ref} must map exactly one pinned LICENSE source`);
+    }
+    const bytes = noticeBytes(licenseNoticesByPath.get(noticePath), noticePath);
+    const actualSha256 = createHash('sha256').update(bytes).digest('hex');
+    if (actualSha256 !== licenseSources[0].sha256) {
+      throw new Error(`License notice SHA-256 mismatch for ${effect.ref}: ${noticePath}`);
+    }
+    const existing = noticeRecords.get(noticePath);
+    if (existing && existing.sha256 !== actualSha256) {
+      throw new Error(`Conflicting license notice bytes for ${noticePath}`);
+    }
+    noticeRecords.set(noticePath, {
+      path: noticePath,
+      sha256: actualSha256,
+      text: bytes.toString('utf8').trimEnd(),
+    });
+  }
+
+  const sections = sortedEffects.map((effect) => {
     const sourceLines = effect.sources.map(
       (source) => `- Source: \`${source.path}\` (SHA-256: \`${source.sha256}\`)`,
     );
+    const notice = noticeRecords.get(effect.sourceLicenseNotice);
     return [
       `## ${effect.ref}`,
       '',
@@ -515,11 +553,23 @@ export function renderThirdPartyNotices(effects, header) {
       `- Revision: \`${effect.sourceRevision}\``,
       ...sourceLines,
       `- License: [${effect.sourceLicense.spdx}](${markdownDestination(effect.sourceLicense.url)})`,
+      `- Notice: \`${effect.sourceLicenseNotice}\` (SHA-256: \`${notice.sha256}\`)`,
       `- Adaptation: ${escapeMarkdownText(effect.adaptationNotice)}`,
     ].join('\n');
   });
 
   if (sections.length === 0) return header;
+  const seenHashes = new Set();
+  const uniqueNotices = [...noticeRecords.values()]
+    .sort((left, right) => compareAscii(left.path, right.path))
+    .filter(({ sha256 }) => {
+      if (seenHashes.has(sha256)) return false;
+      seenHashes.add(sha256);
+      return true;
+    });
+  const fullNotices = uniqueNotices.map(
+    (notice) => `### \`${notice.path}\`\n\n${notice.text}`,
+  );
   const separator = header.endsWith('\n\n') ? '' : header.endsWith('\n') ? '\n' : '\n\n';
-  return `${header}${separator}${sections.join('\n\n')}\n`;
+  return `${header}${separator}${sections.join('\n\n')}\n\n## Full license notices\n\n${fullNotices.join('\n\n')}\n`;
 }

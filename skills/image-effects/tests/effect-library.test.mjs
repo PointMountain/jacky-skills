@@ -488,7 +488,10 @@ test('loadEffects, buildLibrary, and notices reject duplicate versioned referenc
     ),
     /duplicate.*ref/i,
   );
-  assert.throws(() => renderThirdPartyNotices([effect, effect], '# Header\n'), /duplicate.*ref/i);
+  assert.throws(
+    () => renderThirdPartyNotices([effect, effect], '# Header\n', new Map()),
+    /duplicate.*ref/i,
+  );
 
   const root = await mkdtemp(path.join(tmpdir(), 'image-effects-duplicates-'));
   try {
@@ -680,16 +683,23 @@ test('buildLibrary gives every effect version distinct versioned artifact URLs',
 });
 
 test('renderThirdPartyNotices emits the exact escaped machine protocol', () => {
+  const notice = 'MIT License\n\nCopyright (c) Fixture\n';
   const effect = parseEffect(
     card({
-      source_paths: 'upstream/source_file.md',
+      source_paths: 'upstream/source_file.md,LICENSE',
+      source_sha256s: `${SOURCE_SHA},6bfd25bd70599c4f37233ce24ad27099e2e5da6b363231bb3ac4ff6b134bf870`,
+      source_license_notice: 'references/licenses/example-mit.txt',
       adaptation_notice: 'Adapted [guide](https://evil.example).',
     }),
     'references/effects/healing-anime-scribble-v3.md',
   );
 
   assert.equal(
-    renderThirdPartyNotices([effect], '# Third-party notices\n'),
+    renderThirdPartyNotices(
+      [effect],
+      '# Third-party notices\n',
+      new Map([['references/licenses/example-mit.txt', notice]]),
+    ),
     `# Third-party notices
 
 ## healing-anime-scribble-v3@1.0.0
@@ -697,8 +707,43 @@ test('renderThirdPartyNotices emits the exact escaped machine protocol', () => {
 - Repository: \`ConardLi/garden-skills\`
 - Revision: \`${REVISION}\`
 - Source: \`upstream/source_file.md\` (SHA-256: \`${SOURCE_SHA}\`)
+- Source: \`LICENSE\` (SHA-256: \`6bfd25bd70599c4f37233ce24ad27099e2e5da6b363231bb3ac4ff6b134bf870\`)
 - License: [MIT](<https://github.com/ConardLi/garden-skills/blob/${REVISION}/LICENSE>)
+- Notice: \`references/licenses/example-mit.txt\` (SHA-256: \`6bfd25bd70599c4f37233ce24ad27099e2e5da6b363231bb3ac4ff6b134bf870\`)
 - Adaptation: Adapted \\[guide\\]\\(https://evil.example\\).
+
+## Full license notices
+
+### \`references/licenses/example-mit.txt\`
+
+MIT License
+
+Copyright (c) Fixture
 `,
   );
+});
+
+test('renderThirdPartyNotices requires every mapped notice to match the pinned LICENSE bytes', async (t) => {
+  const effect = parseEffect(card({
+    source_paths: 'upstream/source_file.md,LICENSE',
+    source_sha256s: `${SOURCE_SHA},6bfd25bd70599c4f37233ce24ad27099e2e5da6b363231bb3ac4ff6b134bf870`,
+    source_license_notice: 'references/licenses/example-mit.txt',
+  }));
+
+  await t.test('missing local notice', () => {
+    assert.throws(
+      () => renderThirdPartyNotices([effect], '# Header\n', new Map()),
+      /missing.*notice|notice.*required/i,
+    );
+  });
+  await t.test('local notice SHA differs from pinned LICENSE', () => {
+    assert.throws(
+      () => renderThirdPartyNotices(
+        [effect],
+        '# Header\n',
+        new Map([['references/licenses/example-mit.txt', 'changed notice\n']]),
+      ),
+      /notice.*sha-256.*mismatch/i,
+    );
+  });
 });

@@ -505,6 +505,12 @@ export async function buildGallery({
     localPath(sourceRoot, 'assets/public-repo/THIRD_PARTY_NOTICES.header.md'),
     'utf8',
   );
+  const licenseNoticesByPath = new Map();
+  for (const noticePath of [...new Set(effects.map((effect) => effect.sourceLicenseNotice))].sort(
+    compareAscii,
+  )) {
+    licenseNoticesByPath.set(noticePath, await readFile(localPath(sourceRoot, noticePath)));
+  }
   const previewBytesByRef = new Map();
   const previewMetadataByRef = new Map();
   for (const effect of effects) {
@@ -526,7 +532,10 @@ export async function buildGallery({
   }));
   const artifacts = new Map([
     ['references/INDEX.md', renderIndex(effects)],
-    ['assets/public-repo/THIRD_PARTY_NOTICES.md', renderThirdPartyNotices(effects, header)],
+    [
+      'assets/public-repo/THIRD_PARTY_NOTICES.md',
+      renderThirdPartyNotices(effects, header, licenseNoticesByPath),
+    ],
     ['gallery/api/library.json', `${JSON.stringify(library, null, 2)}\n`],
   ]);
 

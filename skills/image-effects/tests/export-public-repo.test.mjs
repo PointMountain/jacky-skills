@@ -31,6 +31,22 @@ const SKILL_ROOT = path.resolve(
 );
 const SCRIPT_PATH = path.join(SKILL_ROOT, "scripts/export-public-repo.mjs");
 const MANIFEST_NAME = ".image-effects-export.json";
+const FIXED_REFS = [
+  ["healing-anime-scribble-v3@1.0.0", ".jpg"],
+  ["minimal-zine-poster@1.0.0", ".png"],
+  ["photo-illustration-diptych@1.0.0", ".png"],
+  ["photo-illustration-diptych-lakeside@1.0.0", ".png"],
+  ["photo-illustration-editorial-echo@1.0.0", ".png"],
+  ["scene-distillation-zine@1.0.0", ".png"],
+  ["scenes-gathered-zine@1.0.0", ".png"],
+  ["scenes-gathered-zine-sea@1.0.0", ".png"],
+];
+const LICENSE_NOTICE_NAMES = [
+  "conardli-garden-skills-mit.txt",
+  "gathered-scenes-zine-contributors-mit.txt",
+  "happy-coder-contributors-mit.txt",
+  "liamgvchi-mit.txt",
+];
 const SAFE_PUBLIC_FILES = {
   "README.md": "# Image Effects\n\nSafe public fixture.\n",
   "README_CN.md": "# 图像效果\n\n安全公开测试。\n",
@@ -54,9 +70,14 @@ const EXPECTED_EXPORT_PATHS = [
   "package-lock.json",
   "package.json",
   "references/INDEX.md",
+  ...LICENSE_NOTICE_NAMES.map((name) => `references/licenses/${name}`),
+  ...FIXED_REFS.flatMap(([ref, extension]) => [
+    `gallery/media/${ref}${extension}`,
+    `gallery/source/${ref}.md`,
+  ]),
   "scripts/run.mjs",
   "tests/run.test.mjs",
-];
+].sort();
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -136,6 +157,15 @@ async function makeSourceFixture() {
     "skills/image-effects/experience.local.md": "must not leak\n",
     "unrelated.txt": "must not leak\n",
   };
+  for (const noticeName of LICENSE_NOTICE_NAMES) {
+    files[`skills/image-effects/references/licenses/${noticeName}`] =
+      `MIT License\n\nCopyright fixture ${noticeName}\n`;
+  }
+  for (const [ref, extension] of FIXED_REFS) {
+    files[`skills/image-effects/gallery/media/${ref}${extension}`] =
+      Buffer.from(`preview ${ref}\n`);
+    files[`skills/image-effects/gallery/source/${ref}.md`] = `# ${ref}\n`;
+  }
   for (const [relativePath, content] of Object.entries(files)) {
     await writeRelative(root, relativePath, content);
   }
@@ -317,6 +347,22 @@ test("从 HEAD Git 对象导出精确白名单，模板映射到根且清单稳�
     assert.deepEqual(
       (await listedFiles(target)).filter((name) => name !== MANIFEST_NAME),
       EXPECTED_EXPORT_PATHS
+    );
+    assert.deepEqual(
+      (await listedFiles(path.join(target, "gallery/media"))).map(
+        (name) => `gallery/media/${name}`
+      ),
+      FIXED_REFS.map(([ref, extension]) => `gallery/media/${ref}${extension}`).sort()
+    );
+    assert.deepEqual(
+      (await listedFiles(path.join(target, "gallery/source"))).map(
+        (name) => `gallery/source/${name}`
+      ),
+      FIXED_REFS.map(([ref]) => `gallery/source/${ref}.md`).sort()
+    );
+    assert.deepEqual(
+      await listedFiles(path.join(target, "references/licenses")),
+      LICENSE_NOTICE_NAMES
     );
     assert.equal(
       (await listedFiles(target)).includes("THIRD_PARTY_NOTICES.header.md"),
