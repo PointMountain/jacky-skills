@@ -42,9 +42,9 @@ Compile the selected card's complete rules together with the user's stated goal.
 
 1. Before Stage A, verify that the host has both native image generation or editing and local HTML/CSS screenshot capability, or an equivalent deterministic layout-and-rasterization path.
 2. If either capability is missing, generate no intermediate or partial image. Return the complete motif prompt, Copy Map, output dimensions, composition plan, and a statement naming each missing capability. Do not claim that the final image was produced.
-3. Stage A generates only the isolated illustrated motif defined by the selected card. Do not ask the image model to render the final page, photo panel, or text.
-4. Stage B lays out the validated source image as an unchanged photo anchor together with the generated motif, real text from the Copy Map, rules, and color swatches at the card's fixed dimensions. Rasterize with the preflighted screenshot or equivalent deterministic capability, without browser chrome or scrollbars.
-5. Keep text crisp and editable in the layout source, keep the photo anchor truthful, and do not turn the motif into a second rectangular photograph. If layout fails, repair and rasterize Stage B again without regenerating an already acceptable motif.
+3. Stage A generates only the isolated illustrated motif defined by the selected card. Do not ask the image model to render the final page, photo panel, or text. If the tool errors or the motif violates a hard quality rule, make at most one targeted regeneration that addresses that specific failure.
+4. Stage B lays out the validated source image as an unchanged photo anchor together with the generated motif, real text from the Copy Map, rules, and color swatches at the card's fixed dimensions. Rasterize with the preflighted screenshot or equivalent deterministic capability, without browser chrome or scrollbars. If the layout or rasterized output violates a hard quality rule, make at most one layout repair and recapture without regenerating an already acceptable motif.
+5. Keep text crisp and editable in the layout source, keep the photo anchor truthful, and do not turn the motif into a second rectangular photograph.
 
 Do not substitute one execution kind for the other or silently omit a required stage. Do not implement a global lock, queue, or concurrency limit; each requested effect output succeeds or fails independently under the host's own execution model.
 

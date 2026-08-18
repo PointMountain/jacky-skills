@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { parseEffect } from '../scripts/effect-library.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const SKILL_PATH = path.join(SKILL_ROOT, 'SKILL.md');
 const EFFECT_CARD_PATH = path.join(
   SKILL_ROOT,
   'references/effects/healing-anime-scribble-v3.md',
@@ -289,6 +290,17 @@ test('完整的固定来源许可证目录只包含已审核的 notice 字节', 
     const notice = await readFile(path.join(LICENSES_PATH, fileName));
     assert.equal(createHash('sha256').update(notice).digest('hex'), expectedHash, fileName);
   }
+});
+
+test('两阶段 layout 路由分别限制 Stage A 重新生成和 Stage B 修复重截的重试次数', async () => {
+  const skill = await readFile(SKILL_PATH, 'utf8');
+  const layoutBranch = skill.match(
+    /### `host-image-generation-and-layout`\n(?<protocol>[\s\S]+?)\nDo not substitute/,
+  )?.groups?.protocol;
+
+  assert.ok(layoutBranch, 'missing host-image-generation-and-layout protocol');
+  assert.match(layoutBranch, /Stage A[^\n]+at most one targeted regeneration/);
+  assert.match(layoutBranch, /Stage B[^\n]+at most one layout repair and recapture/);
 });
 
 test('真实编码的干净 JPEG 和 PNG 可完整解码并通过元数据检查', async () => {
