@@ -316,6 +316,18 @@ test('assertLibrary 验证 input、outputCount、受管路径与 provenance', as
     assert.throws(() => assertLibrary(library), /input/i);
   });
 
+  await t.test('image 拒绝 1..2 输入范围', () => {
+    const library = structuredClone(FIXTURE_LIBRARY);
+    library.effects[0].input.max = 2;
+    assert.throws(() => assertLibrary(library), /input/i);
+  });
+
+  await t.test("image 拒绝语法合法但不受支持的 ['webp'] 格式", () => {
+    const library = structuredClone(FIXTURE_LIBRARY);
+    library.effects[0].input.formats = ['webp'];
+    assert.throws(() => assertLibrary(library), /input/i);
+  });
+
   await t.test('text-or-image 仅接受 0..1 JPEG/PNG 契约', () => {
     const valid = structuredClone(FIXTURE_LIBRARY);
     valid.effects[0].input = {

@@ -105,16 +105,13 @@ function assertInput(input, index) {
     formats.add(format);
   }
   if (
-    input.mode === 'text-or-image'
-    && (
-      input.min !== 0
-      || input.max !== 1
-      || input.formats.length !== 2
-      || input.formats[0] !== 'jpeg'
-      || input.formats[1] !== 'png'
-    )
+    input.min !== minimum
+    || input.max !== 1
+    || input.formats.length !== 2
+    || input.formats[0] !== 'jpeg'
+    || input.formats[1] !== 'png'
   ) {
-    throw libraryError(`${label} text-or-image contract is invalid.`);
+    throw libraryError(`${label} ${input.mode} contract is invalid.`);
   }
 }
 
