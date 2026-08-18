@@ -505,7 +505,18 @@ export async function buildGallery({
     localPath(sourceRoot, 'assets/public-repo/THIRD_PARTY_NOTICES.header.md'),
     'utf8',
   );
-  const library = buildLibrary(effects, timestamp);
+  const previewBytesByRef = new Map();
+  const previewMetadataByRef = new Map();
+  for (const effect of effects) {
+    const preview = await readFile(localPath(sourceRoot, effect.preview));
+    const { width, height } = await assertMetadataFreeImage(
+      preview,
+      previewFormat(effect.preview),
+    );
+    previewBytesByRef.set(effect.ref, preview);
+    previewMetadataByRef.set(effect.ref, { width, height });
+  }
+  const library = buildLibrary(effects, timestamp, previewMetadataByRef);
   const previewExtensionByRef = new Map(
     effects.map((effect) => [effect.ref, publicPreviewExtension(effect.preview)]),
   );
@@ -527,7 +538,7 @@ export async function buildGallery({
     );
     artifacts.set(
       `gallery/media/${effect.ref}${extension}`,
-      await readFile(localPath(sourceRoot, effect.preview)),
+      previewBytesByRef.get(effect.ref),
     );
   }
 

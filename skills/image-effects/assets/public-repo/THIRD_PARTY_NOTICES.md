@@ -31,5 +31,6 @@ SOFTWARE.
 - Repository: `ConardLi/garden-skills`
 - Revision: `aaf9a82f5efd73e87cc0998edc398e75bfc35901`
 - Source: `skills/gpt-image-2/references/avatars-and-profile/style-transfer-selfie.md` (SHA-256: `67021faabdbd9e5d5db6851eb2e5bc6a650a76ef399a4f0949fdae0f93989461`)
+- Source: `LICENSE` (SHA-256: `1126322e2cc8d165adc4c792eeb195717de2bcc7b39be1ce77959d78e87ef685`)
 - License: [MIT](<https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE>)
 - Adaptation: Preserves the one-photo anime construction sketch behavior and adds fixed v3 ratios, host-neutral delivery, privacy gates, and one targeted retry.

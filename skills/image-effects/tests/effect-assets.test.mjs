@@ -17,7 +17,13 @@ const PREVIEW_PATH = path.join(
   SKILL_ROOT,
   'assets/previews/healing-anime-scribble-v3.jpg',
 );
+const SOURCE_LICENSE_NOTICE_PATH = path.join(
+  SKILL_ROOT,
+  'references/licenses/conardli-garden-skills-mit.txt',
+);
 const PREVIEW_SHA256 = '70a3c534832532faed62cb80816df56002382cb661b51d2077d7eab429760daf';
+const SOURCE_LICENSE_NOTICE_SHA256 =
+  '1126322e2cc8d165adc4c792eeb195717de2bcc7b39be1ce77959d78e87ef685';
 
 const EXPECTED_EFFECT = {
   ref: 'healing-anime-scribble-v3@1.0.0',
@@ -43,11 +49,16 @@ const EXPECTED_EFFECT = {
       path: 'skills/gpt-image-2/references/avatars-and-profile/style-transfer-selfie.md',
       sha256: '67021faabdbd9e5d5db6851eb2e5bc6a650a76ef399a4f0949fdae0f93989461',
     },
+    {
+      path: 'LICENSE',
+      sha256: SOURCE_LICENSE_NOTICE_SHA256,
+    },
   ],
   sourceLicense: {
     spdx: 'MIT',
     url: 'https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE',
   },
+  sourceLicenseNotice: 'references/licenses/conardli-garden-skills-mit.txt',
   adaptationNotice:
     'Preserves the one-photo anime construction sketch behavior and adds fixed v3 ratios, host-neutral delivery, privacy gates, and one targeted retry.',
   previewProvenance: {
@@ -264,6 +275,11 @@ test('效果卡严格解析全部 frontmatter 并包含固定六节正文', asyn
     [...body.matchAll(/^## (.+)$/gm)].map((match) => match[1]),
     EXPECTED_SECTIONS,
   );
+});
+
+test('固定来源许可证 notice 字节与效果卡 SHA 一致', async () => {
+  const notice = await readFile(SOURCE_LICENSE_NOTICE_PATH);
+  assert.equal(createHash('sha256').update(notice).digest('hex'), SOURCE_LICENSE_NOTICE_SHA256);
 });
 
 test('真实编码的干净 JPEG 和 PNG 可完整解码并通过元数据检查', async () => {

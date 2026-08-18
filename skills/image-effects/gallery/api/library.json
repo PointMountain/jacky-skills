@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "generatedAt": "2026-08-15T16:00:00.000Z",
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-18T00:00:00.000Z",
   "effects": [
     {
       "ref": "healing-anime-scribble-v3@1.0.0",
@@ -15,6 +15,9 @@
         "zh": "将一张人物照片重绘为留白通透的动漫结构草图，以密集探索线条、稀薄淡彩和暖白纸张为核心。"
       },
       "category": "portrait",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1448,
+      "previewHeight": 1086,
       "input": {
         "mode": "image",
         "min": 1,

@@ -32,6 +32,11 @@ const SOURCE_PATH =
   'skills/gpt-image-2/references/avatars-and-profile/style-transfer-selfie.md';
 const SOURCE_BYTES = Buffer.from('fixed upstream bytes\n');
 const SOURCE_SHA = createHash('sha256').update(SOURCE_BYTES).digest('hex');
+const LICENSE_PATH = 'LICENSE';
+const LICENSE_BYTES = await readFile(
+  path.join(SKILL_ROOT, 'references/licenses/conardli-garden-skills-mit.txt'),
+);
+const LICENSE_SHA = '1126322e2cc8d165adc4c792eeb195717de2bcc7b39be1ce77959d78e87ef685';
 const MANAGED_PATHS = [
   'assets/public-repo/THIRD_PARTY_NOTICES.md',
   'gallery/api/library.json',
@@ -54,7 +59,7 @@ async function makeFixtureSource(root, sourceSha = SOURCE_SHA) {
     )
   ).replace(
     /^source_sha256s: .*$/m,
-    `source_sha256s: ${sourceSha}`,
+    `source_sha256s: ${sourceSha},${LICENSE_SHA}`,
   );
   await Promise.all([
     writeFile(path.join(root, 'references/effects/healing-anime-scribble-v3.md'), card),
@@ -141,7 +146,11 @@ test('固定 epoch 在两个独立输出目录生成逐字节相同的完整受�
     const library = JSON.parse(
       await readFile(path.join(outputOne, 'gallery/api/library.json'), 'utf8'),
     );
+    assert.equal(library.schemaVersion, 2);
     assert.equal(library.generatedAt, '2026-08-15T16:00:00.000Z');
+    assert.equal(library.effects[0].executionKind, 'host-image-generation');
+    assert.equal(library.effects[0].previewWidth, 1448);
+    assert.equal(library.effects[0].previewHeight, 1086);
     assert.deepEqual(library.effects[0].provenance, {
       repository: 'ConardLi/garden-skills',
       revision: REVISION,
@@ -782,7 +791,8 @@ test('在线验证按固定仓库、revision、path 请求并校验 base64 内�
     await validateOnlineSources(effects, {
       fetcher: async (request) => {
         requests.push(request);
-        return { encoding: 'base64', content: SOURCE_BYTES.toString('base64') };
+        const bytes = request.path === LICENSE_PATH ? LICENSE_BYTES : SOURCE_BYTES;
+        return { encoding: 'base64', content: bytes.toString('base64') };
       },
     });
     assert.deepEqual(requests, [
@@ -790,6 +800,11 @@ test('在线验证按固定仓库、revision、path 请求并校验 base64 内�
         repository: 'ConardLi/garden-skills',
         revision: REVISION,
         path: SOURCE_PATH,
+      },
+      {
+        repository: 'ConardLi/garden-skills',
+        revision: REVISION,
+        path: LICENSE_PATH,
       },
     ]);
   } finally {

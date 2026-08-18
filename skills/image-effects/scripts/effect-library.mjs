@@ -22,6 +22,7 @@ const REQUIRED_FIELDS = [
   'source_sha256s',
   'source_license_spdx',
   'source_license_url',
+  'source_license_notice',
   'adaptation_notice',
   'preview_origin',
   'preview_author',
@@ -42,6 +43,16 @@ const YAML_INDICATOR_START_PATTERN = /^[-?:,\[\]{}#&*!|>'"%@`]/;
 const YAML_PLAIN_SEPARATOR_PATTERN = /:[ \t]|[ \t]#/;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
 const MARKDOWN_TEXT_PATTERN = /[\\`*_\[\]()<>!|]/g;
+const CATEGORIES = new Set(['portrait', 'editorial', 'zine']);
+const EXECUTION_KINDS = new Set([
+  'host-image-generation',
+  'host-image-generation-and-layout',
+]);
+const INPUT_CONTRACTS = new Map([
+  ['image', { min: 1, max: 1 }],
+  ['text-or-image', { min: 0, max: 1 }],
+]);
+const MAX_PREVIEW_DIMENSION = 20_000;
 
 /**
  * 只判定本解析器支持的 YAML plain scalar 词法子集：值必须是单行非空文本，
@@ -156,6 +167,17 @@ function assertEqual(value, expected, field, filePath) {
   if (value !== expected) {
     fail(`${field} must be ${expected}`, filePath);
   }
+}
+
+function parseInteger(value, field, filePath) {
+  if (!/^(?:0|[1-9]\d*)$/.test(value)) {
+    fail(`${field} must be a canonical non-negative integer`, filePath);
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) {
+    fail(`${field} must be a safe integer`, filePath);
+  }
+  return parsed;
 }
 
 function containsEncodedControl(value) {
@@ -292,12 +314,38 @@ export function parseEffect(markdown, filePath) {
     fail('preview_sha256 must be a 64-character SHA-256', filePath);
   }
 
-  assertEqual(fields.category, 'portrait', 'category', filePath);
-  assertEqual(fields.execution_kind, 'host-image-generation', 'execution_kind', filePath);
-  assertEqual(fields.input_mode, 'image', 'input_mode', filePath);
-  assertEqual(fields.input_min, '1', 'input_min', filePath);
-  assertEqual(fields.input_max, '1', 'input_max', filePath);
-  assertEqual(fields.output_count, '1', 'output_count', filePath);
+  if (!CATEGORIES.has(fields.category)) {
+    fail('category must be portrait, editorial, or zine', filePath);
+  }
+  if (!EXECUTION_KINDS.has(fields.execution_kind)) {
+    fail(
+      'execution_kind must be host-image-generation or host-image-generation-and-layout',
+      filePath,
+    );
+  }
+  const inputContract = INPUT_CONTRACTS.get(fields.input_mode);
+  if (!inputContract) {
+    fail('input_mode must be image or text-or-image', filePath);
+  }
+  const inputMin = parseInteger(fields.input_min, 'input_min', filePath);
+  const inputMax = parseInteger(fields.input_max, 'input_max', filePath);
+  if (inputMin !== inputContract.min || inputMax !== inputContract.max) {
+    fail(
+      `input contract for ${fields.input_mode} must be ${inputContract.min}..${inputContract.max}`,
+      filePath,
+    );
+  }
+  if (
+    fields.execution_kind === 'host-image-generation-and-layout' &&
+    (fields.category !== 'editorial' || fields.input_mode !== 'image')
+  ) {
+    fail(
+      'execution_kind host-image-generation-and-layout requires category editorial and input_mode image',
+      filePath,
+    );
+  }
+  const outputCount = parseInteger(fields.output_count, 'output_count', filePath);
+  if (outputCount !== 1) fail('output_count must be 1', filePath);
   assertEqual(fields.source_license_spdx, 'MIT', 'source_license_spdx', filePath);
   assertEqual(fields.preview_license_spdx, 'CC-BY-4.0', 'preview_license_spdx', filePath);
   const sourceLicenseUrl = assertHttpsUrl(
@@ -312,6 +360,10 @@ export function parseEffect(markdown, filePath) {
   }
 
   assertCanonicalRelativePath(fields.preview, 'preview', filePath);
+  assertCanonicalRelativePath(fields.source_license_notice, 'source_license_notice', filePath);
+  if (!fields.source_license_notice.startsWith('references/licenses/')) {
+    fail('source_license_notice must be inside references/licenses/', filePath);
+  }
   const sourcePaths = parseCsv(fields.source_paths, 'source_paths', filePath);
   const sourceHashes = parseCsv(fields.source_sha256s, 'source_sha256s', filePath);
   if (sourcePaths.length !== sourceHashes.length) {
@@ -339,8 +391,8 @@ export function parseEffect(markdown, filePath) {
     summary: { en: fields.summary_en, zh: fields.summary_zh },
     category: fields.category,
     executionKind: fields.execution_kind,
-    input: { mode: fields.input_mode, min: 1, max: 1, formats },
-    outputCount: 1,
+    input: { mode: fields.input_mode, min: inputMin, max: inputMax, formats },
+    outputCount,
     preview: fields.preview,
     sourceRepository: fields.source_repository,
     sourceRevision: fields.source_revision.toLowerCase(),
@@ -349,6 +401,7 @@ export function parseEffect(markdown, filePath) {
       spdx: fields.source_license_spdx,
       url: sourceLicenseUrl,
     },
+    sourceLicenseNotice: fields.source_license_notice,
     adaptationNotice: fields.adaptation_notice,
     previewProvenance: {
       origin: fields.preview_origin,
@@ -376,11 +429,36 @@ export async function loadEffects(root) {
   return sortEffects(effects);
 }
 
-export function buildLibrary(effects, generatedAt) {
+export function buildLibrary(effects, generatedAt, previewMetadataByRef) {
+  if (!(previewMetadataByRef instanceof Map)) {
+    throw new TypeError('Preview metadata must be a Map keyed by effect ref');
+  }
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt,
     effects: sortEffects(effects).map((effect) => {
+      const previewMetadata = previewMetadataByRef.get(effect.ref);
+      if (
+        previewMetadata === null ||
+        typeof previewMetadata !== 'object' ||
+        !Object.hasOwn(previewMetadata, 'width') ||
+        !Object.hasOwn(previewMetadata, 'height')
+      ) {
+        throw new Error(`Preview metadata is required for ${effect.ref}`);
+      }
+      const { width, height } = previewMetadata;
+      if (
+        !Number.isInteger(width) ||
+        width <= 0 ||
+        width > MAX_PREVIEW_DIMENSION ||
+        !Number.isInteger(height) ||
+        height <= 0 ||
+        height > MAX_PREVIEW_DIMENSION
+      ) {
+        throw new Error(
+          `Preview dimensions for ${effect.ref} must be integers from 1 to ${MAX_PREVIEW_DIMENSION}`,
+        );
+      }
       const previewExtension = path.posix.extname(effect.preview);
       return {
         ref: effect.ref,
@@ -389,6 +467,9 @@ export function buildLibrary(effects, generatedAt) {
         title: { ...effect.title },
         summary: { ...effect.summary },
         category: effect.category,
+        executionKind: effect.executionKind,
+        previewWidth: width,
+        previewHeight: height,
         input: { ...effect.input, formats: [...effect.input.formats] },
         outputCount: effect.outputCount,
         previewUrl: `./media/${effect.ref}${previewExtension}`,
@@ -403,7 +484,10 @@ export function buildLibrary(effects, generatedAt) {
             licenseSpdx: effect.previewProvenance.licenseSpdx,
           },
         },
-        invocation: `Use $image-effects effect ${effect.ref} on my uploaded image.`,
+        invocation:
+          effect.input.mode === 'text-or-image'
+            ? `Use $image-effects effect ${effect.ref} with this idea or my uploaded image.`
+            : `Use $image-effects effect ${effect.ref} on my uploaded image.`,
       };
     }),
   };
