@@ -63,3 +63,4 @@ Editorial Echo 固定采用两个阶段。创建任何中间资产前，Skill �
 4. 提交前检查生成的索引、Gallery 数据、预览、来源副本和第三方声明。
 
 不要手工修改生成的 Gallery 文件或 `THIRD_PARTY_NOTICES.md`。
+公开仓库会把 `THIRD_PARTY_NOTICES.header.md` 保留在根目录，因此干净检出无需依赖源仓库专用文件即可重新构建并测试 notice 输出。
