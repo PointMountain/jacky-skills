@@ -140,6 +140,8 @@ Editorial Echo 使用 `host-image-generation-and-layout`，流程固定为：
 ```json
 {
   "executionKind": "host-image-generation",
+  "previewWidth": 1024,
+  "previewHeight": 1536,
   "input": {
     "mode": "image",
     "min": 1,
@@ -149,7 +151,7 @@ Editorial Echo 使用 `host-image-generation-and-layout`，流程固定为：
 }
 ```
 
-`executionKind` 成为公共必填字段；Gallery runtime 必须拒绝 schema 1 或字段不完整的数据，并显示安全的可重试错误。`invocation` 按输入模式生成：
+`executionKind`、`previewWidth` 与 `previewHeight` 成为公共必填字段；尺寸来自预览文件的完整像素解码结果，Gallery 必须用它们生成图片的 `width` / `height` 属性，不能继续硬编码旧预览比例。Gallery runtime 必须拒绝 schema 1、非法尺寸或字段不完整的数据，并显示安全的可重试错误。`invocation` 按输入模式生成：
 
 - image：`Use $image-effects effect <ref> on my uploaded image.`
 - text-or-image：`Use $image-effects effect <ref> with this idea or my uploaded image.`
@@ -185,7 +187,7 @@ Gallery 增加 `portrait`、`editorial`、`zine` 的中英文分类标签。搜�
 5. 许可证 notice 路径、字节哈希、去重与 `THIRD_PARTY_NOTICES.md` 确定性生成。
 6. 每张预览可完整像素解码、尺寸有效、SHA 匹配且元数据干净。
 7. 每张预览的作者、CC-BY-4.0 与无现实来源声明完整。
-8. Library schema 2、`executionKind`、条件 invocation、分类翻译与 8 个 artifact URL。
+8. Library schema 2、`executionKind`、真实预览尺寸、条件 invocation、分类翻译与 8 个 artifact URL。
 9. INDEX、Library、Notice、media、source 与公开导出在固定 epoch 下逐字节可复现。
 10. 静态 HTTP 下页面、Library、8 张图片和 8 份源码卡全部返回正确状态与 MIME。
 11. 桌面和移动视口中 8 张卡片可浏览，筛选、搜索、选择与复制可用，无横向溢出或遮挡。
