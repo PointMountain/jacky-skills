@@ -11,9 +11,59 @@ import { effectTitleId, readLocationFilters, syncLocationFilters } from '../gall
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const GALLERY_ROOT = path.join(SKILL_ROOT, 'gallery');
-const EXPECTED_REVISION = 'aaf9a82f5efd73e87cc0998edc398e75bfc35901';
-const EXPECTED_LICENSE_URL =
-  `https://github.com/ConardLi/garden-skills/blob/${EXPECTED_REVISION}/LICENSE`;
+const PUBLIC_ROOT = path.join(SKILL_ROOT, 'assets/public-repo');
+const EXPECTED_REFS = [
+  'healing-anime-scribble-v3@1.0.0',
+  'minimal-zine-poster@1.0.0',
+  'photo-illustration-diptych@1.0.0',
+  'photo-illustration-diptych-lakeside@1.0.0',
+  'photo-illustration-editorial-echo@1.0.0',
+  'scene-distillation-zine@1.0.0',
+  'scenes-gathered-zine@1.0.0',
+  'scenes-gathered-zine-sea@1.0.0',
+];
+const EXPECTED_PROVENANCE = {
+  'healing-anime-scribble-v3@1.0.0': {
+    repository: 'ConardLi/garden-skills',
+    revision: 'aaf9a82f5efd73e87cc0998edc398e75bfc35901',
+    origin: 'Text-only image generation of a fictional young adult with glasses, not based on a real person.',
+  },
+  'minimal-zine-poster@1.0.0': {
+    repository: 'LiamGvchi/gc-minimal-zine-poster',
+    revision: '4cb0396ad4e834019f753b37e1c4f415f5e02026',
+    origin: 'Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.',
+  },
+  'photo-illustration-diptych@1.0.0': {
+    repository: 'wangjs-jacky/happy',
+    revision: '532e49bb711283cbe2738439039298f9cea1ef7b',
+    origin: 'Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.',
+  },
+  'photo-illustration-diptych-lakeside@1.0.0': {
+    repository: 'wangjs-jacky/happy',
+    revision: 'fa6c30497d01b077d7d4d58e1a4c00bca4c38fcd',
+    origin: 'Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.',
+  },
+  'photo-illustration-editorial-echo@1.0.0': {
+    repository: 'wangjs-jacky/happy',
+    revision: 'e8716a0a0c949f8e2b45e1e3d7c8d36ad7bba17c',
+    origin: 'Locally composed from two text-only generated fictional assets; not based on a real person, place, brand, or third-party image.',
+  },
+  'scene-distillation-zine@1.0.0': {
+    repository: 'Zeejay0/gathered-scenes-zine-skill',
+    revision: 'e764b7fd243d7cc501723b9d325279bf6dd852c2',
+    origin: 'Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.',
+  },
+  'scenes-gathered-zine@1.0.0': {
+    repository: 'Zeejay0/gathered-scenes-zine-skill',
+    revision: 'e764b7fd243d7cc501723b9d325279bf6dd852c2',
+    origin: 'Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.',
+  },
+  'scenes-gathered-zine-sea@1.0.0': {
+    repository: 'Zeejay0/gathered-scenes-zine-skill',
+    revision: 'e764b7fd243d7cc501723b9d325279bf6dd852c2',
+    origin: 'Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.',
+  },
+};
 
 function contentType(filePath) {
   return {
@@ -146,21 +196,50 @@ test('Library 固定公开来源、源码许可和预览署名契约', async (t)
 
   const library = await (await expectOk(new URL('api/library.json', staticServer.baseUrl))).json();
   for (const effect of library.effects) {
+    const expected = EXPECTED_PROVENANCE[effect.ref];
+    assert.ok(expected, `unexpected effect ref: ${effect.ref}`);
     assert.deepEqual(effect.provenance, {
-      repository: 'ConardLi/garden-skills',
-      revision: EXPECTED_REVISION,
+      repository: expected.repository,
+      revision: expected.revision,
       license: {
         spdx: 'MIT',
-        url: EXPECTED_LICENSE_URL,
+        url: `https://github.com/${expected.repository}/blob/${expected.revision}/LICENSE`,
       },
       preview: {
-        origin:
-          'Text-only image generation of a fictional young adult with glasses, not based on a real person.',
+        origin: expected.origin,
         author: 'wangjs-jacky',
         licenseSpdx: 'CC-BY-4.0',
       },
     });
   }
+});
+
+test('English public README documents the complete standalone catalog contract', async () => {
+  const readme = await readFile(path.join(PUBLIC_ROOT, 'README.md'), 'utf8');
+
+  assert.match(readme, /eight effects/i);
+  for (const ref of EXPECTED_REFS) assert.match(readme, new RegExp(`\\b${ref.replaceAll('.', '\\.')}`));
+  assert.match(readme, /Use \$image-effects effect healing-anime-scribble-v3@1\.0\.0 on my uploaded image\./);
+  assert.match(readme, /Use \$image-effects effect minimal-zine-poster@1\.0\.0 with this idea or my uploaded image\./);
+  assert.match(readme, /Editorial Echo[\s\S]*Stage A[\s\S]*Stage B[\s\S]*fallback/i);
+  assert.match(readme, /no extra Skill dependenc/i);
+  assert.match(readme, /does not include `grade-images`/i);
+  assert.match(readme, /\[Gallery\]\(https:\/\/wangjs-jacky\.github\.io\/image-effects\/\)/);
+  assert.match(readme, /\[THIRD_PARTY_NOTICES\.md\]\(\.\/THIRD_PARTY_NOTICES\.md\)/);
+});
+
+test('Chinese public README documents the complete standalone catalog contract', async () => {
+  const readme = await readFile(path.join(PUBLIC_ROOT, 'README_CN.md'), 'utf8');
+
+  assert.match(readme, /8 个效果/);
+  for (const ref of EXPECTED_REFS) assert.match(readme, new RegExp(`\\b${ref.replaceAll('.', '\\.')}`));
+  assert.match(readme, /Use \$image-effects effect healing-anime-scribble-v3@1\.0\.0 on my uploaded image\./);
+  assert.match(readme, /Use \$image-effects effect minimal-zine-poster@1\.0\.0 with this idea or my uploaded image\./);
+  assert.match(readme, /Editorial Echo[\s\S]*Stage A[\s\S]*Stage B[\s\S]*降级/);
+  assert.match(readme, /不需要额外安装任何 Skill 依赖/);
+  assert.match(readme, /不包含 `grade-images`/);
+  assert.match(readme, /\[Gallery\]\(https:\/\/wangjs-jacky\.github\.io\/image-effects\/\)/);
+  assert.match(readme, /\[THIRD_PARTY_NOTICES\.md\]\(\.\/THIRD_PARTY_NOTICES\.md\)/);
 });
 
 test('Library 的每个分类都有中英文展示标签', async () => {

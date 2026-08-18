@@ -1,6 +1,6 @@
 # Image Effects
 
-Reusable, versioned image-effect cards for AI coding agents, plus a static Gallery for browsing the available recipes.
+Eight effects packaged as reusable, versioned cards for AI coding agents, plus a static Gallery for browsing every recipe.
 
 [中文说明](./README_CN.md) · [Gallery](https://wangjs-jacky.github.io/image-effects/)
 
@@ -10,31 +10,56 @@ Reusable, versioned image-effect cards for AI coding agents, plus a static Galle
 npx skills add wangjs-jacky/image-effects
 ```
 
+This one installation contains the complete behavior for every card. There is no extra Skill dependency, and the catalog does not include `grade-images` or deterministic color-grading recipes.
+
+## Catalog
+
+- `healing-anime-scribble-v3@1.0.0` — image input
+- `minimal-zine-poster@1.0.0` — text or image input
+- `photo-illustration-diptych@1.0.0` — image input
+- `photo-illustration-diptych-lakeside@1.0.0` — image input
+- `photo-illustration-editorial-echo@1.0.0` — image input, with deterministic layout
+- `scene-distillation-zine@1.0.0` — image input
+- `scenes-gathered-zine@1.0.0` — image input
+- `scenes-gathered-zine-sea@1.0.0` — image input
+
+Every ref includes an exact version. The Skill will not silently replace an unknown version, so an existing invocation remains stable while later recipes can evolve independently.
+
 ## Use
 
-Attach one JPEG or PNG, then ask your agent:
+For an image effect, explicitly attach exactly one JPEG or PNG and ask your agent:
 
 ```text
 Use $image-effects effect healing-anime-scribble-v3@1.0.0 on my uploaded image.
 ```
 
-The MVP intentionally contains one effect: `healing-anime-scribble-v3@1.0.0`. Effect IDs include a version so an existing recipe can remain stable while later revisions evolve independently.
+Minimal Zine accepts either a non-empty text idea with no image, or one explicitly attached JPEG/PNG with optional art direction:
 
-## How it works
+```text
+Use $image-effects effect minimal-zine-poster@1.0.0 with this idea or my uploaded image.
+```
 
-The Skill resolves the selected effect card, validates the attached image, compiles the card into an image-editing prompt, and hands that prompt to the host's native image-generation capability. Image bytes are processed by the host; this repository does not upload them to a separate service. The library has no global generation lock, so unrelated host jobs are not serialized by the Skill.
+The Skill only uses input from the current request. It does not scan attachment directories or previous messages to guess an image.
+
+## How generation works
+
+The Skill resolves the selected card, validates its input contract, and hands the complete recipe to the host's native image-generation or image-editing capability. Image bytes are processed by that host; this repository neither uploads them to an additional service nor provides an online generation backend. Review the host's privacy policy before using sensitive images. Temporary transfer or layout files are cleaned after success or failure.
+
+Editorial Echo requires a two-stage workflow. Before creating an intermediate asset, the Skill checks that the host can both generate an image and render a local HTML/CSS (or equivalent deterministic) layout. Stage A generates only the illustrated motif. Stage B combines that motif with the unchanged source photo and real text into the final page. If either capability is missing, the fallback stops before generation and returns the complete motif prompt, dimensions, copy map, layout plan, and missing-capability explanation; it never presents a motif-only result as a finished poster.
+
+If a host has no compatible image tool for a single-stage effect, the Skill returns a complete copyable prompt and says that no image was generated.
+
+## Gallery, previews, and licensing
+
+The [Gallery](https://wangjs-jacky.github.io/image-effects/) is static: it browses and copies versioned invocations but does not generate images or receive user uploads. Its seven new previews were independently generated from fictional, text-only subjects; Editorial Echo was locally composed from fictional generated assets. Preview attribution is `wangjs-jacky`, licensed under CC-BY-4.0.
+
+The root [LICENSE](./LICENSE) covers only original code and adaptations in this repository and does not relicense third-party material. Full pinned upstream authorship, source revisions, file hashes, license links, adaptation notes, and MIT notices are preserved in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
 
 ## Contributing an effect
 
-1. Add one versioned card under `references/effects/` with its provenance and license fields.
+1. Add one versioned card under `references/effects/` with complete provenance and license fields.
 2. Add a metadata-free JPEG or PNG preview under `assets/previews/`.
 3. Run the Gallery build and effect validation commands documented by the Skill package.
 4. Review the generated index, Gallery data, preview, source copy, and third-party notice before opening a pull request.
 
 Do not hand-edit generated Gallery files or `THIRD_PARTY_NOTICES.md`.
-
-## Privacy and licensing
-
-Only the explicitly attached image is passed to the host-native generator. Review your host's privacy policy before using sensitive images.
-
-The root [LICENSE](./LICENSE) covers only original code and adaptations in this repository. It does not relicense third-party material. Upstream attribution and license details are listed in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
