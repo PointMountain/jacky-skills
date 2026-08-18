@@ -339,6 +339,30 @@ test('完整目录的协议、来源许可证和预览字节均可独立验证',
   }
 });
 
+test('Scene Distillation 保留无预设的作者型 Typography Director', async () => {
+  const effects = await loadEffects(EFFECTS_PATH);
+  const effect = effects.find(({ ref }) => ref === 'scene-distillation-zine@1.0.0');
+
+  assert.ok(effect, 'missing Scene Distillation card');
+  assert.match(
+    effect.body,
+    /Do not impose a preset language, word count, character count, copy length, type voice, hierarchy, or legibility threshold/,
+  );
+  assert.match(
+    effect.body,
+    /tiny, oversized, cropped, scattered, stacked, rotated, curved, obscured, fragmented, or overwritten/,
+  );
+  assert.match(effect.body, /one type voice or many/);
+  assert.match(
+    effect.body,
+    /Accidental tool-generated gibberish is a failure only when it was not deliberately chosen as authorial invented language, marks, or fragments/,
+  );
+  assert.doesNotMatch(
+    effect.body,
+    /at most one short title|large display type|pseudo-text|typography is authorial, correct, and subordinate|invalid text/i,
+  );
+});
+
 test('完整的固定来源许可证目录只包含已审核的 notice 字节', async () => {
   assert.deepEqual((await readdir(LICENSES_PATH)).sort(), Object.keys(LICENSE_HASHES).sort());
 
