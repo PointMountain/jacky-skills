@@ -271,15 +271,17 @@ function makeEffectCard(effect, t) {
       alt: withTokens(t.imageAlt, { title: effect.title }),
       loading: 'lazy',
       decoding: 'async',
-      width: '1448',
-      height: '1086',
+      width: effect.previewWidth,
+      height: effect.previewHeight,
     },
   });
 
   const inputValue = withTokens(
-    effect.input.min === effect.input.max && effect.input.min === 1
-      ? t.imageInput
-      : t.imageInputPlural,
+    effect.input.mode === 'text-or-image'
+      ? t.textOrImageInput
+      : effect.input.min === effect.input.max && effect.input.min === 1
+        ? t.imageInput
+        : t.imageInputPlural,
     { min: effect.input.min, max: effect.input.max, formats: effect.input.formats.join(' / ') },
   );
   const outputKey = effect.outputCount === 1 ? 'outputCount' : 'outputCountPlural';

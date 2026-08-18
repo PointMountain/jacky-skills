@@ -34,6 +34,9 @@ function effect({
     ref,
     id,
     version,
+    executionKind: 'host-image-generation',
+    previewWidth: 1024,
+    previewHeight: 1536,
     title: { en: titleEn, ...(titleZh === undefined ? {} : { zh: titleZh }) },
     summary: { en: summaryEn, ...(summaryZh === undefined ? {} : { zh: summaryZh }) },
     category,
@@ -56,7 +59,7 @@ function effect({
 }
 
 const FIXTURE_LIBRARY = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   generatedAt: '2026-08-16T00:00:00.000Z',
   effects: [
     effect({
@@ -104,11 +107,11 @@ test('assertLibrary 接受真实生成的 Library，并拒绝版本错误或无�
     assert.throws(
       () =>
         assertLibrary({
-          schemaVersion: 2,
+          schemaVersion: 1,
           generatedAt: '2026-08-16T00:00:00.000Z',
           effects: [],
         }),
-      (error) => error instanceof Error && /schema.*2/i.test(error.message),
+      (error) => error instanceof Error && /schema.*1/i.test(error.message),
     );
   });
 
@@ -116,7 +119,7 @@ test('assertLibrary 接受真实生成的 Library，并拒绝版本错误或无�
     assert.throws(
       () =>
         assertLibrary({
-          schemaVersion: 1,
+          schemaVersion: 2,
           generatedAt: '2026-08-16T00:00:00.000Z',
           effects: null,
         }),
@@ -128,7 +131,7 @@ test('assertLibrary 接受真实生成的 Library，并拒绝版本错误或无�
     assert.throws(
       () =>
         assertLibrary({
-          schemaVersion: 1,
+          schemaVersion: 2,
           generatedAt: '2026-08-16T00:00:00.000Z',
           effects: [{ id: 'broken' }],
         }),
@@ -174,6 +177,9 @@ test('assertLibrary 要求 effect 完整公共 schema 且拒绝继承字段', as
     'ref',
     'id',
     'version',
+    'executionKind',
+    'previewWidth',
+    'previewHeight',
     'title',
     'summary',
     'category',
@@ -271,6 +277,11 @@ test('assertLibrary 验证 input、outputCount、受管路径与 provenance', as
   }
 
   const invalidCases = [
+    ['executionKind', (item) => (item.executionKind = 'browser-canvas')],
+    ['previewWidth', (item) => (item.previewWidth = 0)],
+    ['previewWidth maximum', (item) => (item.previewWidth = 20_001)],
+    ['previewHeight', (item) => (item.previewHeight = 1.5)],
+    ['previewHeight maximum', (item) => (item.previewHeight = 20_001)],
     ['input.mode', (item) => (item.input.mode = 'video')],
     ['input.min', (item) => (item.input.min = -1)],
     ['input.max', (item) => (item.input.max = 0)],
@@ -304,6 +315,29 @@ test('assertLibrary 验证 input、outputCount、受管路径与 provenance', as
     library.effects[0].input = Object.create(library.effects[0].input);
     assert.throws(() => assertLibrary(library), /input/i);
   });
+
+  await t.test('text-or-image 仅接受 0..1 JPEG/PNG 契约', () => {
+    const valid = structuredClone(FIXTURE_LIBRARY);
+    valid.effects[0].input = {
+      mode: 'text-or-image',
+      min: 0,
+      max: 1,
+      formats: ['jpeg', 'png'],
+    };
+    assert.equal(assertLibrary(valid), valid);
+
+    const invalidContracts = [
+      (input) => (input.min = 1),
+      (input) => (input.max = 0),
+      (input) => (input.formats = ['jpeg']),
+      (input) => (input.formats = ['png', 'jpeg']),
+    ];
+    for (const mutate of invalidContracts) {
+      const library = structuredClone(valid);
+      mutate(library.effects[0].input);
+      assert.throws(() => assertLibrary(library), /input/i);
+    }
+  });
 });
 
 test('localizeEffect 投影中英文并在缺少翻译时回退英文，同时保留其他字段', () => {
@@ -323,6 +357,9 @@ test('localizeEffect 投影中英文并在缺少翻译时回退英文，同时�
   assert.equal(zh.summary, '以墨线绘制安静的人像。');
   assert.equal(zh.ref, source.ref);
   assert.equal(zh.category, source.category);
+  assert.equal(zh.executionKind, source.executionKind);
+  assert.equal(zh.previewWidth, source.previewWidth);
+  assert.equal(zh.previewHeight, source.previewHeight);
   assert.equal(localizeEffect(fallbackSource, 'zh').title, 'English only');
   assert.equal(localizeEffect(fallbackSource, 'zh').summary, 'Fallback summary');
   assert.notEqual(zh, source);
@@ -459,6 +496,9 @@ test('loadSucceeded 保存深冻结 canonical snapshot，localizeEffect 不产�
   assert.ok(Object.isFrozen(ready.library.effects[0].input.formats));
   assert.ok(Object.isFrozen(ready.library.effects[0].provenance.license));
   assert.ok(Object.isFrozen(ready.library.effects[0].provenance.preview));
+  assert.equal(ready.library.effects[0].executionKind, 'host-image-generation');
+  assert.equal(ready.library.effects[0].previewWidth, 1024);
+  assert.equal(ready.library.effects[0].previewHeight, 1536);
 
   inputLibrary.effects[0].title.en = 'Mutated title';
   inputLibrary.effects[0].input.formats.push('gif');

@@ -174,6 +174,29 @@ test('Library 的每个分类都有中英文展示标签', async () => {
     assert.equal(typeof translations.zh.categories[category], 'string');
     assert.notEqual(translations.en.categories[category], translations.zh.categories[category]);
   }
+
+  assert.deepEqual(translations.en.categories, {
+    portrait: 'Portrait',
+    editorial: 'Editorial',
+    zine: 'Zine',
+  });
+  assert.deepEqual(translations.zh.categories, {
+    portrait: '人物',
+    editorial: '编辑设计',
+    zine: '纸本杂志',
+  });
+});
+
+test('Gallery 使用 Library 图片尺寸和 text-or-image 专用文案', async () => {
+  const appSource = await readFile(path.join(GALLERY_ROOT, 'app.js'), 'utf8');
+
+  assert.match(appSource, /width:\s*effect\.previewWidth/);
+  assert.match(appSource, /height:\s*effect\.previewHeight/);
+  assert.match(appSource, /t\.textOrImageInput/);
+  assert.doesNotMatch(appSource, /width:\s*['"]1448['"]/);
+  assert.doesNotMatch(appSource, /height:\s*['"]1086['"]/);
+  assert.equal(translations.en.textOrImageInput, 'Text or up to {max} image · {formats}');
+  assert.equal(translations.zh.textOrImageInput, '文字或最多 {max} 张图片 · {formats}');
 });
 
 test('运行时筛选参数可往返 URL，版本引用生成安全且唯一的标题 ID', () => {

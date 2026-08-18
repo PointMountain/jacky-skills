@@ -1,6 +1,10 @@
-const SUPPORTED_SCHEMA_VERSION = 1;
+const SUPPORTED_SCHEMA_VERSION = 2;
 const MAX_EFFECTS = 1000;
 const MAX_SELECTED_REFS = 1000;
+const EXECUTION_KINDS = new Set([
+  'host-image-generation',
+  'host-image-generation-and-layout',
+]);
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SEMVER_PATTERN =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
@@ -84,8 +88,11 @@ function assertHttpsUrl(value, label) {
 function assertInput(input, index) {
   const label = `effect ${index}.input`;
   requireOwnFields(input, ['mode', 'min', 'max', 'formats'], label);
-  if (input.mode !== 'image') throw libraryError(`${label}.mode is invalid.`);
-  assertInteger(input.min, `${label}.min`, 1, 1000);
+  if (!['image', 'text-or-image'].includes(input.mode)) {
+    throw libraryError(`${label}.mode is invalid.`);
+  }
+  const minimum = input.mode === 'text-or-image' ? 0 : 1;
+  assertInteger(input.min, `${label}.min`, minimum, 1000);
   assertInteger(input.max, `${label}.max`, input.min, 1000);
   if (!Array.isArray(input.formats) || input.formats.length === 0 || input.formats.length > 20) {
     throw libraryError(`${label}.formats is invalid.`);
@@ -96,6 +103,18 @@ function assertInput(input, index) {
       throw libraryError(`${label}.formats is invalid.`);
     }
     formats.add(format);
+  }
+  if (
+    input.mode === 'text-or-image'
+    && (
+      input.min !== 0
+      || input.max !== 1
+      || input.formats.length !== 2
+      || input.formats[0] !== 'jpeg'
+      || input.formats[1] !== 'png'
+    )
+  ) {
+    throw libraryError(`${label} text-or-image contract is invalid.`);
   }
 }
 
@@ -150,6 +169,9 @@ function assertEffect(effect, index, seenRefs) {
       'ref',
       'id',
       'version',
+      'executionKind',
+      'previewWidth',
+      'previewHeight',
       'title',
       'summary',
       'category',
@@ -171,6 +193,12 @@ function assertEffect(effect, index, seenRefs) {
   }
   if (seenRefs.has(effect.ref)) throw libraryError(`${label}.ref is duplicated.`);
   seenRefs.add(effect.ref);
+
+  if (!EXECUTION_KINDS.has(effect.executionKind)) {
+    throw libraryError(`${label}.executionKind is invalid.`);
+  }
+  assertInteger(effect.previewWidth, `${label}.previewWidth`, 1, 20_000);
+  assertInteger(effect.previewHeight, `${label}.previewHeight`, 1, 20_000);
 
   assertLocalizedField(effect, 'title', index, 200);
   assertLocalizedField(effect, 'summary', index, 2000);
@@ -206,6 +234,9 @@ function canonicalizeEffect(effect) {
     ref: effect.ref,
     id: effect.id,
     version: effect.version,
+    executionKind: effect.executionKind,
+    previewWidth: effect.previewWidth,
+    previewHeight: effect.previewHeight,
     title: { en: effect.title.en, zh: effect.title.zh },
     summary: { en: effect.summary.en, zh: effect.summary.zh },
     category: effect.category,
@@ -299,7 +330,7 @@ export function assertLibrary(library) {
   if (library.schemaVersion !== SUPPORTED_SCHEMA_VERSION) {
     const received =
       typeof library.schemaVersion === 'number' ? ` (received ${library.schemaVersion})` : '';
-    throw libraryError(`library.schemaVersion must be 1${received}.`);
+    throw libraryError(`library.schemaVersion must be 2${received}.`);
   }
   assertString(library.generatedAt, 'library.generatedAt', 40);
   const timestamp = new Date(library.generatedAt);
