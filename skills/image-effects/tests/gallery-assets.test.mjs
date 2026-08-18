@@ -8,10 +8,10 @@ import { fileURLToPath } from 'node:url';
 
 import { translations } from '../gallery/translations.js';
 import { effectTitleId, readLocationFilters, syncLocationFilters } from '../gallery/gallery-runtime.mjs';
+import { publicTemplatePath } from '../scripts/public-layout.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const GALLERY_ROOT = path.join(SKILL_ROOT, 'gallery');
-const PUBLIC_ROOT = path.join(SKILL_ROOT, 'assets/public-repo');
 const EXPECTED_REFS = [
   'healing-anime-scribble-v3@1.0.0',
   'minimal-zine-poster@1.0.0',
@@ -215,7 +215,7 @@ test('Library 固定公开来源、源码许可和预览署名契约', async (t)
 });
 
 test('English public README documents the complete standalone catalog contract', async () => {
-  const readme = await readFile(path.join(PUBLIC_ROOT, 'README.md'), 'utf8');
+  const readme = await readFile(publicTemplatePath(SKILL_ROOT, 'README.md'), 'utf8');
 
   assert.match(readme, /eight effects/i);
   for (const ref of EXPECTED_REFS) assert.match(readme, new RegExp(`\\b${ref.replaceAll('.', '\\.')}`));
@@ -229,7 +229,7 @@ test('English public README documents the complete standalone catalog contract',
 });
 
 test('Chinese public README documents the complete standalone catalog contract', async () => {
-  const readme = await readFile(path.join(PUBLIC_ROOT, 'README_CN.md'), 'utf8');
+  const readme = await readFile(publicTemplatePath(SKILL_ROOT, 'README_CN.md'), 'utf8');
 
   assert.match(readme, /8 个效果/);
   for (const ref of EXPECTED_REFS) assert.match(readme, new RegExp(`\\b${ref.replaceAll('.', '\\.')}`));

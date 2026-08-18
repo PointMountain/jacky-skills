@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import {
   cp,
   mkdir,
@@ -27,6 +28,14 @@ import {
 } from '../scripts/validate-effects.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const PUBLIC_TEMPLATE_ROOT = existsSync(
+  path.join(SKILL_ROOT, 'assets/public-repo/THIRD_PARTY_NOTICES.header.md'),
+)
+  ? path.join(SKILL_ROOT, 'assets/public-repo')
+  : SKILL_ROOT;
+const GENERATED_NOTICE_PATH = PUBLIC_TEMPLATE_ROOT === SKILL_ROOT
+  ? 'THIRD_PARTY_NOTICES.md'
+  : 'assets/public-repo/THIRD_PARTY_NOTICES.md';
 const EFFECT_REF = 'healing-anime-scribble-v3@1.0.0';
 const REVISION = 'aaf9a82f5efd73e87cc0998edc398e75bfc35901';
 const SOURCE_PATH =
@@ -57,7 +66,7 @@ const FULL_CATALOG = [
 ];
 const FULL_CATALOG_REFS = FULL_CATALOG.map(([ref]) => ref);
 const FULL_MANAGED_PATHS = [
-  'assets/public-repo/THIRD_PARTY_NOTICES.md',
+  GENERATED_NOTICE_PATH,
   'gallery/api/library.json',
   'references/INDEX.md',
   ...FULL_CATALOG.flatMap(([ref, extension]) => [
@@ -157,10 +166,7 @@ test('完整目录构建逐字节可复现并包含 8 个效果、真实尺寸�
       );
     }
 
-    const notices = await readFile(
-      path.join(outputOne, 'assets/public-repo/THIRD_PARTY_NOTICES.md'),
-      'utf8',
-    );
+    const notices = await readFile(path.join(outputOne, GENERATED_NOTICE_PATH), 'utf8');
     assert.equal(occurrenceCount(notices, 'MIT License'), 4);
     let previousHeading = -1;
     for (const [noticePath, copyrightLine] of NOTICE_EXPECTATIONS) {
@@ -187,6 +193,38 @@ test('完整目录构建逐字节可复现并包含 8 个效果、真实尺寸�
     await Promise.all([
       rm(outputOne, { recursive: true, force: true }),
       rm(outputTwo, { recursive: true, force: true }),
+    ]);
+  }
+});
+
+test('公开根布局可用根 notice 模板完成构建并把生成 notice 留在根目录', async () => {
+  const sourceRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-public-root-source-'));
+  const outputRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-public-root-output-'));
+  try {
+    await makeFixtureSource(sourceRoot);
+    const nestedHeader = path.join(
+      sourceRoot,
+      'assets/public-repo/THIRD_PARTY_NOTICES.header.md',
+    );
+    await writeFile(
+      path.join(sourceRoot, 'THIRD_PARTY_NOTICES.header.md'),
+      await readFile(nestedHeader),
+    );
+    await rm(nestedHeader);
+
+    const { paths } = await buildGallery({ sourceRoot, outputRoot });
+
+    assert.ok(paths.includes('THIRD_PARTY_NOTICES.md'));
+    assert.ok(!paths.includes('assets/public-repo/THIRD_PARTY_NOTICES.md'));
+    assert.match(await readFile(path.join(outputRoot, 'THIRD_PARTY_NOTICES.md'), 'utf8'), /MIT License/);
+    await assert.rejects(
+      stat(path.join(outputRoot, 'assets/public-repo/THIRD_PARTY_NOTICES.md')),
+      { code: 'ENOENT' },
+    );
+  } finally {
+    await Promise.all([
+      rm(sourceRoot, { recursive: true, force: true }),
+      rm(outputRoot, { recursive: true, force: true }),
     ]);
   }
 });

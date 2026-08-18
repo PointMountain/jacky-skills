@@ -26,15 +26,11 @@ import {
   renderThirdPartyNotices,
 } from './effect-library.mjs';
 import { assertMetadataFreeImage } from './image-metadata.mjs';
+import { generatedPublicNoticePath, publicTemplatePath } from './public-layout.mjs';
 import { loadValidatedEffects } from './validate-effects.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const DEFAULT_SKILL_ROOT = path.resolve(path.dirname(SCRIPT_PATH), '..');
-const FIXED_ARTIFACTS = [
-  'assets/public-repo/THIRD_PARTY_NOTICES.md',
-  'gallery/api/library.json',
-  'references/INDEX.md',
-];
 const MANAGED_DIRECTORIES = [
   'assets',
   'assets/public-repo',
@@ -505,10 +501,13 @@ export async function buildGallery({
     previewReader,
   });
   const timestamp = generatedTimestamp(generatedAt);
-  const header = await readFile(
-    localPath(sourceRoot, 'assets/public-repo/THIRD_PARTY_NOTICES.header.md'),
-    'utf8',
-  );
+  const noticeArtifactPath = generatedPublicNoticePath(sourceRoot);
+  const fixedArtifacts = [
+    noticeArtifactPath,
+    'gallery/api/library.json',
+    'references/INDEX.md',
+  ];
+  const header = await readFile(publicTemplatePath(sourceRoot, 'THIRD_PARTY_NOTICES.header.md'), 'utf8');
   const licenseNoticesByPath = new Map();
   for (const noticePath of [...new Set(effects.map((effect) => effect.sourceLicenseNotice))].sort(
     compareAscii,
@@ -533,7 +532,7 @@ export async function buildGallery({
   const artifacts = new Map([
     ['references/INDEX.md', renderIndex(effects)],
     [
-      'assets/public-repo/THIRD_PARTY_NOTICES.md',
+      noticeArtifactPath,
       renderThirdPartyNotices(effects, header, licenseNoticesByPath),
     ],
     ['gallery/api/library.json', `${JSON.stringify(library, null, 2)}\n`],
@@ -601,8 +600,8 @@ export async function buildGallery({
   }
 
   const paths = [
-    ...FIXED_ARTIFACTS,
-    ...artifactPaths.filter((item) => !FIXED_ARTIFACTS.includes(item)),
+    ...fixedArtifacts,
+    ...artifactPaths.filter((item) => !fixedArtifacts.includes(item)),
   ].sort(compareAscii);
   return { library, paths };
 }

@@ -23,6 +23,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 import { exportPublicRepository } from "../scripts/export-public-repo.mjs";
+import { publicTemplatePath } from "../scripts/public-layout.mjs";
 
 const execFile = promisify(execFileCallback);
 const SKILL_ROOT = path.resolve(
@@ -54,6 +55,7 @@ const SAFE_PUBLIC_FILES = {
   THIRD_PARTY_NOTICES: "# Third-Party Notices\n\nFixture notice.\n",
   ".gitignore": "node_modules/\n",
   "pages.yml": "name: Pages\n",
+  "THIRD_PARTY_NOTICES.header.md": "# Third-Party Notices\n\nGenerated from pinned notices.\n",
 };
 
 const EXPECTED_EXPORT_PATHS = [
@@ -64,6 +66,7 @@ const EXPECTED_EXPORT_PATHS = [
   "README_CN.md",
   "SKILL.md",
   "THIRD_PARTY_NOTICES.md",
+  "THIRD_PARTY_NOTICES.header.md",
   "agents/openai.yaml",
   "assets/previews/example.png",
   "gallery/index.html",
@@ -151,7 +154,7 @@ async function makeSourceFixture() {
     "skills/image-effects/assets/public-repo/.github/workflows/pages.yml":
       SAFE_PUBLIC_FILES["pages.yml"],
     "skills/image-effects/assets/public-repo/THIRD_PARTY_NOTICES.header.md":
-      "# Must not be exported\n",
+      SAFE_PUBLIC_FILES["THIRD_PARTY_NOTICES.header.md"],
     "skills/image-effects/assets/public-repo/private.txt": "must not leak\n",
     "skills/image-effects/assets/internal.txt": "must not leak\n",
     "skills/image-effects/experience.local.md": "must not leak\n",
@@ -365,8 +368,8 @@ test("从 HEAD Git 对象导出精确白名单，模板映射到根且清单稳�
       LICENSE_NOTICE_NAMES
     );
     assert.equal(
-      (await listedFiles(target)).includes("THIRD_PARTY_NOTICES.header.md"),
-      false
+      await readFile(path.join(target, "THIRD_PARTY_NOTICES.header.md"), "utf8"),
+      SAFE_PUBLIC_FILES["THIRD_PARTY_NOTICES.header.md"]
     );
 
     const manifestBytes = await readFile(path.join(target, MANIFEST_NAME));
@@ -1676,15 +1679,15 @@ test("同一 target 并发导出由独立维护锁 fail-fast，首个事务完�
 
 test("公开仓库模板保留安装、调用、Gallery 与 Pages 机器契约", async () => {
   const readme = await readFile(
-    path.join(SKILL_ROOT, "assets/public-repo/README.md"),
+    publicTemplatePath(SKILL_ROOT, "README.md"),
     "utf8"
   );
   const readmeCn = await readFile(
-    path.join(SKILL_ROOT, "assets/public-repo/README_CN.md"),
+    publicTemplatePath(SKILL_ROOT, "README_CN.md"),
     "utf8"
   );
   const workflow = await readFile(
-    path.join(SKILL_ROOT, "assets/public-repo/.github/workflows/pages.yml"),
+    publicTemplatePath(SKILL_ROOT, ".github/workflows/pages.yml"),
     "utf8"
   );
   const combined = `${readme}\n${readmeCn}`;
@@ -1704,8 +1707,8 @@ test("公开仓库模板保留安装、调用、Gallery 与 Pages 机器契约",
     true
   );
   await Promise.all([
-    stat(path.join(SKILL_ROOT, "assets/public-repo/LICENSE")),
-    stat(path.join(SKILL_ROOT, "assets/public-repo/THIRD_PARTY_NOTICES.md")),
+    stat(publicTemplatePath(SKILL_ROOT, "LICENSE")),
+    stat(publicTemplatePath(SKILL_ROOT, "THIRD_PARTY_NOTICES.md")),
   ]);
 
   assert.match(workflow, /push:/);

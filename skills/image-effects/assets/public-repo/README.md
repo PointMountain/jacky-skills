@@ -63,3 +63,4 @@ The root [LICENSE](./LICENSE) covers only original code and adaptations in this 
 4. Review the generated index, Gallery data, preview, source copy, and third-party notice before opening a pull request.
 
 Do not hand-edit generated Gallery files or `THIRD_PARTY_NOTICES.md`.
+The exported repository keeps `THIRD_PARTY_NOTICES.header.md` at its root so a clean checkout can rebuild and test the notice output without source-only files.

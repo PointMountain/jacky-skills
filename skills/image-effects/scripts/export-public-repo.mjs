@@ -36,6 +36,7 @@ const PUBLIC_TEMPLATE_MAP = new Map([
   ["README_CN.md", "README_CN.md"],
   ["LICENSE", "LICENSE"],
   ["THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.md"],
+  ["THIRD_PARTY_NOTICES.header.md", "THIRD_PARTY_NOTICES.header.md"],
   [".gitignore", ".gitignore"],
   [".github/workflows/pages.yml", ".github/workflows/pages.yml"],
 ]);
@@ -57,6 +58,7 @@ const MANAGED_ROOT_FILES = new Set([
   "README_CN.md",
   "LICENSE",
   "THIRD_PARTY_NOTICES.md",
+  "THIRD_PARTY_NOTICES.header.md",
   ".gitignore",
   "SKILL.md",
   "package.json",
