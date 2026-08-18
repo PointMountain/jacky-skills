@@ -329,6 +329,43 @@ test('固定 epoch 在两个独立输出目录生成逐字节相同的完整受�
   }
 });
 
+test('单次构建只读取一次预览并发布完成 SHA 与元数据校验的同一缓冲区', async () => {
+  const sourceRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-single-read-source-'));
+  const outputRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-single-read-output-'));
+  const previewPath = path.join(
+    sourceRoot,
+    'assets/previews/healing-anime-scribble-v3.jpg',
+  );
+  let reads = 0;
+  let validatedBytes;
+
+  try {
+    await makeFixtureSource(sourceRoot);
+    await buildGallery({
+      sourceRoot,
+      outputRoot,
+      generatedAt: '2026-08-18T00:00:00.000Z',
+      previewReader: async (candidate) => {
+        reads += 1;
+        validatedBytes = await readFile(candidate);
+        await writeFile(candidate, 'changed after the validated read\n');
+        return validatedBytes;
+      },
+    });
+
+    assert.equal(reads, 1);
+    assert.deepEqual(
+      await readFile(path.join(outputRoot, `gallery/media/${EFFECT_REF}.jpg`)),
+      validatedBytes,
+    );
+  } finally {
+    await Promise.all([
+      rm(sourceRoot, { recursive: true, force: true }),
+      rm(outputRoot, { recursive: true, force: true }),
+    ]);
+  }
+});
+
 test('重建删除旧清单拥有的陈旧产物并保留非受管文件', async () => {
   const sourceRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-source-'));
   const outputRoot = await mkdtemp(path.join(tmpdir(), 'image-effects-output-'));
