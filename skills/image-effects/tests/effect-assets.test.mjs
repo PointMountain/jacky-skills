@@ -21,13 +21,13 @@ const PREVIEW_PATH = path.join(
 const LICENSES_PATH = path.join(SKILL_ROOT, 'references/licenses');
 const PREVIEW_SHA256 = '70a3c534832532faed62cb80816df56002382cb661b51d2077d7eab429760daf';
 const GENERATED_PREVIEWS = {
-  'photo-illustration-editorial-echo.png': '3:5',
-  'photo-illustration-diptych-lakeside.png': '3:5',
-  'photo-illustration-diptych.png': '3:5',
-  'scenes-gathered-zine-sea.png': '5:3',
-  'scenes-gathered-zine.png': '3:5',
-  'scene-distillation-zine.png': '3:5',
-  'minimal-zine-poster.png': '3:5',
+  'photo-illustration-editorial-echo.png': { width: 1024, height: 1536 },
+  'photo-illustration-diptych-lakeside.png': { width: 1024, height: 1536 },
+  'photo-illustration-diptych.png': { width: 1024, height: 1536 },
+  'scenes-gathered-zine-sea.png': { width: 1536, height: 1024 },
+  'scenes-gathered-zine.png': { width: 1024, height: 1536 },
+  'scene-distillation-zine.png': { width: 1024, height: 1536 },
+  'minimal-zine-poster.png': { width: 1024, height: 1536 },
 };
 const SOURCE_LICENSE_NOTICE_SHA256 =
   '1126322e2cc8d165adc4c792eeb195717de2bcc7b39be1ce77959d78e87ef685';
@@ -684,7 +684,7 @@ test('授权预览具有固定 SHA、尺寸且不含被禁止的元数据', asyn
 test('七张独立生成预览可完整解码、无禁止元数据且符合目标方向', async () => {
   const { assertMetadataFreeImage } = await loadImageTools();
 
-  for (const [fileName, orientation] of Object.entries(GENERATED_PREVIEWS)) {
+  for (const [fileName, expectedDimensions] of Object.entries(GENERATED_PREVIEWS)) {
     const previewPath = path.join(SKILL_ROOT, 'assets/previews', fileName);
     const buffer = await readFile(previewPath);
     const digest = createHash('sha256').update(buffer).digest('hex');
@@ -692,10 +692,10 @@ test('七张独立生成预览可完整解码、无禁止元数据且符合目�
 
     assert.match(digest, /^[0-9a-f]{64}$/, fileName);
     assert.equal(image.format, 'png', fileName);
-    if (orientation === '3:5') {
-      assert.ok(image.width < image.height, fileName);
-    } else {
-      assert.ok(image.width > image.height, fileName);
-    }
+    assert.deepEqual(
+      { width: image.width, height: image.height },
+      expectedDimensions,
+      fileName,
+    );
   }
 });
