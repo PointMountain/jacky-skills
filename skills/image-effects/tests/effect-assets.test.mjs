@@ -292,15 +292,26 @@ test('完整的固定来源许可证目录只包含已审核的 notice 字节', 
   }
 });
 
-test('两阶段 layout 路由分别限制 Stage A 重新生成和 Stage B 修复重截的重试次数', async () => {
+test('两阶段 layout 路由在 Stage A 和 Stage B 之间共享一次定向重试额度', async () => {
   const skill = await readFile(SKILL_PATH, 'utf8');
   const layoutBranch = skill.match(
     /### `host-image-generation-and-layout`\n(?<protocol>[\s\S]+?)\nDo not substitute/,
   )?.groups?.protocol;
 
   assert.ok(layoutBranch, 'missing host-image-generation-and-layout protocol');
-  assert.match(layoutBranch, /Stage A[^\n]+at most one targeted regeneration/);
-  assert.match(layoutBranch, /Stage B[^\n]+at most one layout repair and recapture/);
+  assert.match(layoutBranch, /Stage A and Stage B share one total targeted retry budget/);
+  assert.match(
+    layoutBranch,
+    /Stage A regeneration after an image-tool error or hard-quality failure[^\n]+Stage B repair and recapture after a layout or screenshot tool error or hard-quality failure, never both/,
+  );
+  assert.match(
+    layoutBranch,
+    /If Stage A spends the budget, report any Stage B failure without another retry/,
+  );
+  assert.match(
+    layoutBranch,
+    /When Stage B spends the budget, do not regenerate an already acceptable motif/,
+  );
 });
 
 test('真实编码的干净 JPEG 和 PNG 可完整解码并通过元数据检查', async () => {
