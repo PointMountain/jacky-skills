@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "generatedAt": "2026-08-15T16:00:00.000Z",
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-18T00:00:00.000Z",
   "effects": [
     {
       "ref": "healing-anime-scribble-v3@1.0.0",
@@ -15,6 +15,9 @@
         "zh": "将一张人物照片重绘为留白通透的动漫结构草图，以密集探索线条、稀薄淡彩和暖白纸张为核心。"
       },
       "category": "portrait",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1448,
+      "previewHeight": 1086,
       "input": {
         "mode": "image",
         "min": 1,
@@ -41,6 +44,307 @@
         }
       },
       "invocation": "Use $image-effects effect healing-anime-scribble-v3@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "minimal-zine-poster@1.0.0",
+      "id": "minimal-zine-poster",
+      "version": "1.0.0",
+      "title": {
+        "en": "Minimal Zine Poster",
+        "zh": "极简纸刊海报"
+      },
+      "summary": {
+        "en": "Turn a short idea or one image into a sparse 3:5 paper poster with one imageable metaphor, a small cluster, and one saturated ink anchor.",
+        "zh": "将短主题或一张图片转成稀疏的 3:5 纸面海报，以一个可成像隐喻、小型构图簇和一处饱和墨色锚点为核心。"
+      },
+      "category": "zine",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 1536,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/minimal-zine-poster@1.0.0.png",
+      "sourceUrl": "./source/minimal-zine-poster@1.0.0.md",
+      "provenance": {
+        "repository": "LiamGvchi/gc-minimal-zine-poster",
+        "revision": "4cb0396ad4e834019f753b37e1c4f415f5e02026",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/LiamGvchi/gc-minimal-zine-poster/blob/4cb0396ad4e834019f753b37e1c4f415f5e02026/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect minimal-zine-poster@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "photo-illustration-diptych@1.0.0",
+      "id": "photo-illustration-diptych",
+      "version": "1.0.0",
+      "title": {
+        "en": "Photo–Illustration Diptych",
+        "zh": "摄影插画双联画"
+      },
+      "summary": {
+        "en": "Express one observed scene twice as a truthful upper photograph and a composition-matched editorial illustration below.",
+        "zh": "以真实上部照片和构图对应的下部编辑插画，对同一观察场景做双重表达。"
+      },
+      "category": "editorial",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 1536,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/photo-illustration-diptych@1.0.0.png",
+      "sourceUrl": "./source/photo-illustration-diptych@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "532e49bb711283cbe2738439039298f9cea1ef7b",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/532e49bb711283cbe2738439039298f9cea1ef7b/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect photo-illustration-diptych@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "photo-illustration-diptych-lakeside@1.0.0",
+      "id": "photo-illustration-diptych-lakeside",
+      "version": "1.0.0",
+      "title": {
+        "en": "Lakeside Minimal Diptych",
+        "zh": "湖畔极简双联画"
+      },
+      "summary": {
+        "en": "Pair a truthful waterside photo with a radically reduced geometric echo that preserves its path, horizon, vessel, and landform.",
+        "zh": "将真实水岸照片与极度简化的几何回声配对，保留路径、地平线、船只和远端地貌。"
+      },
+      "category": "editorial",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 1536,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/photo-illustration-diptych-lakeside@1.0.0.png",
+      "sourceUrl": "./source/photo-illustration-diptych-lakeside@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "fa6c30497d01b077d7d4d58e1a4c00bca4c38fcd",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/fa6c30497d01b077d7d4d58e1a4c00bca4c38fcd/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect photo-illustration-diptych-lakeside@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "photo-illustration-editorial-echo@1.0.0",
+      "id": "photo-illustration-editorial-echo",
+      "version": "1.0.0",
+      "title": {
+        "en": "Photo–Illustration Editorial Echo",
+        "zh": "摄影插画编辑回声"
+      },
+      "summary": {
+        "en": "Pair one truthful photo with an isolated illustrated echo and scene-authored type in a deterministic editorial poster.",
+        "zh": "将一张真实照片、独立插画回声与场景文案组合为确定性编辑海报。"
+      },
+      "category": "editorial",
+      "executionKind": "host-image-generation-and-layout",
+      "previewWidth": 1024,
+      "previewHeight": 1536,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/photo-illustration-editorial-echo@1.0.0.png",
+      "sourceUrl": "./source/photo-illustration-editorial-echo@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "e8716a0a0c949f8e2b45e1e3d7c8d36ad7bba17c",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/e8716a0a0c949f8e2b45e1e3d7c8d36ad7bba17c/LICENSE"
+        },
+        "preview": {
+          "origin": "Locally composed from two text-only generated fictional assets; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect photo-illustration-editorial-echo@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "scene-distillation-zine@1.0.0",
+      "id": "scene-distillation-zine",
+      "version": "1.0.0",
+      "title": {
+        "en": "Scene Distillation Zine",
+        "zh": "场景蒸馏纸刊"
+      },
+      "summary": {
+        "en": "Distill one photo into a mostly quiet paper proposition with no retained pixels, one tension, one metaphor, and one accent system.",
+        "zh": "将一张照片蒸馏为大面积安静纸面的命题，不保留照片像素，只留一种张力、一个隐喻和一套强调色。"
+      },
+      "category": "zine",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 1536,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/scene-distillation-zine@1.0.0.png",
+      "sourceUrl": "./source/scene-distillation-zine@1.0.0.md",
+      "provenance": {
+        "repository": "Zeejay0/gathered-scenes-zine-skill",
+        "revision": "e764b7fd243d7cc501723b9d325279bf6dd852c2",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/Zeejay0/gathered-scenes-zine-skill/blob/e764b7fd243d7cc501723b9d325279bf6dd852c2/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect scene-distillation-zine@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "scenes-gathered-zine@1.0.0",
+      "id": "scenes-gathered-zine",
+      "version": "1.0.0",
+      "title": {
+        "en": "Gathered Scenes Zine",
+        "zh": "拾景纸刊"
+      },
+      "summary": {
+        "en": "Recompose one truthful photo as a spacious source-driven paper zine with aggressive detail compression and one structural color.",
+        "zh": "将一张真实照片重组为空间充足、由来源驱动的纸刊，以大幅细节压缩和一种结构色为核心。"
+      },
+      "category": "zine",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 1536,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/scenes-gathered-zine@1.0.0.png",
+      "sourceUrl": "./source/scenes-gathered-zine@1.0.0.md",
+      "provenance": {
+        "repository": "Zeejay0/gathered-scenes-zine-skill",
+        "revision": "e764b7fd243d7cc501723b9d325279bf6dd852c2",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/Zeejay0/gathered-scenes-zine-skill/blob/e764b7fd243d7cc501723b9d325279bf6dd852c2/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect scenes-gathered-zine@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "scenes-gathered-zine-sea@1.0.0",
+      "id": "scenes-gathered-zine-sea",
+      "version": "1.0.0",
+      "title": {
+        "en": "Gathered Scenes Zine · Sea",
+        "zh": "拾景纸刊 · 海"
+      },
+      "summary": {
+        "en": "Anchor a truthful coastal photograph to a quiet compressed print field through one fibrous tear and one structural hue.",
+        "zh": "以一道纤维撕边和一种结构色，将真实海岸照片锚定到安静的压缩印刷场。"
+      },
+      "category": "zine",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1536,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/scenes-gathered-zine-sea@1.0.0.png",
+      "sourceUrl": "./source/scenes-gathered-zine-sea@1.0.0.md",
+      "provenance": {
+        "repository": "Zeejay0/gathered-scenes-zine-skill",
+        "revision": "e764b7fd243d7cc501723b9d325279bf6dd852c2",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/Zeejay0/gathered-scenes-zine-skill/blob/e764b7fd243d7cc501723b9d325279bf6dd852c2/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect scenes-gathered-zine-sea@1.0.0 on my uploaded image."
     }
   ]
 }

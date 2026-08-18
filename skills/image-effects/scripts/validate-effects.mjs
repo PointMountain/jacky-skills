@@ -70,23 +70,36 @@ function decodeBase64Content(payload, request) {
   return Buffer.from(compact, 'base64');
 }
 
-export async function validateEffects({
+export async function loadValidatedEffects({
   sourceRoot = DEFAULT_SKILL_ROOT,
   online = false,
   fetcher = fetchGitHubContent,
+  previewReader = readFile,
 } = {}) {
   const effects = await loadEffects(path.join(sourceRoot, 'references/effects'));
+  const previewAssetsByRef = new Map();
 
   for (const effect of effects) {
-    const previewBytes = await readFile(path.join(sourceRoot, ...effect.preview.split('/')));
-    await assertMetadataFreeImage(previewBytes, previewFormat(effect.preview));
+    const previewBytes = await previewReader(
+      path.join(sourceRoot, ...effect.preview.split('/')),
+    );
+    const { width, height } = await assertMetadataFreeImage(
+      previewBytes,
+      previewFormat(effect.preview),
+    );
     const actualSha = sha256(previewBytes);
     if (actualSha !== effect.previewProvenance.sha256) {
       throw new Error(`Preview SHA-256 mismatch for ${effect.ref}`);
     }
+    previewAssetsByRef.set(effect.ref, { bytes: previewBytes, width, height });
   }
 
   if (online) await validateOnlineSources(effects, { fetcher });
+  return { effects, previewAssetsByRef };
+}
+
+export async function validateEffects(options = {}) {
+  const { effects } = await loadValidatedEffects(options);
   return effects;
 }
 

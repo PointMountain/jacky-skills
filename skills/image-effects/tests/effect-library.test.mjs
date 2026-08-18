@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   buildLibrary,
@@ -14,6 +15,20 @@ import {
 const SOURCE_SHA = '67021faabdbd9e5d5db6851eb2e5bc6a650a76ef399a4f0949fdae0f93989461';
 const PREVIEW_SHA = '0'.repeat(64);
 const REVISION = 'aaf9a82f5efd73e87cc0998edc398e75bfc35901';
+const EFFECTS_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../references/effects',
+);
+const EXPECTED_CATALOG_REFS = [
+  'healing-anime-scribble-v3@1.0.0',
+  'minimal-zine-poster@1.0.0',
+  'photo-illustration-diptych@1.0.0',
+  'photo-illustration-diptych-lakeside@1.0.0',
+  'photo-illustration-editorial-echo@1.0.0',
+  'scene-distillation-zine@1.0.0',
+  'scenes-gathered-zine@1.0.0',
+  'scenes-gathered-zine-sea@1.0.0',
+];
 
 const REQUIRED_FIELDS = {
   id: 'healing-anime-scribble-v3',
@@ -36,6 +51,7 @@ const REQUIRED_FIELDS = {
   source_sha256s: SOURCE_SHA,
   source_license_spdx: 'MIT',
   source_license_url: `https://github.com/ConardLi/garden-skills/blob/${REVISION}/LICENSE`,
+  source_license_notice: 'references/licenses/example-mit.txt',
   adaptation_notice: 'Adapted into a versioned image-effect card.',
   preview_origin: 'Generated fictional portrait.',
   preview_author: 'Example author',
@@ -52,6 +68,10 @@ function card(overrides = {}, omitted = []) {
   return `---\n${lines.join('\n')}\n---\n\n## 适用场景\n\nFixture body.\n`;
 }
 
+function previewMetadata(...effects) {
+  return new Map(effects.map((effect) => [effect.ref, { width: 1448, height: 1086 }]));
+}
+
 test('parseEffect parses valid simple scalar frontmatter and normalizes sources', () => {
   const effect = parseEffect(card(), 'references/effects/healing-anime-scribble-v3.md');
 
@@ -65,6 +85,7 @@ test('parseEffect parses valid simple scalar frontmatter and normalizes sources'
   assert.equal(effect.input.min, 1);
   assert.deepEqual(effect.input.formats, ['jpeg', 'png']);
   assert.equal(effect.outputCount, 1);
+  assert.equal(effect.sourceLicenseNotice, 'references/licenses/example-mit.txt');
   assert.equal(effect.body, '## 适用场景\n\nFixture body.');
 });
 
@@ -81,6 +102,13 @@ test('parseEffect rejects unknown, missing, and empty fields', async (t) => {
 
   await t.test('missing field', () => {
     assert.throws(() => parseEffect(card({}, ['summary_zh'])), /missing.*summary_zh/i);
+  });
+
+  await t.test('missing source license notice', () => {
+    assert.throws(
+      () => parseEffect(card({}, ['source_license_notice'])),
+      /missing.*source_license_notice/i,
+    );
   });
 
   await t.test('empty key', () => {
@@ -312,22 +340,110 @@ test('parseEffect rejects invalid source mappings', async (t) => {
   });
 });
 
-test('parseEffect enforces the MVP input, output, and license contract', async (t) => {
+test('parseEffect accepts the approved category, execution, and input combinations', async (t) => {
+  const accepted = [
+    {
+      category: 'portrait',
+      execution_kind: 'host-image-generation',
+      input_mode: 'image',
+      input_min: '1',
+      input_max: '1',
+    },
+    {
+      category: 'editorial',
+      execution_kind: 'host-image-generation',
+      input_mode: 'image',
+      input_min: '1',
+      input_max: '1',
+    },
+    {
+      category: 'zine',
+      execution_kind: 'host-image-generation',
+      input_mode: 'image',
+      input_min: '1',
+      input_max: '1',
+    },
+    {
+      category: 'editorial',
+      execution_kind: 'host-image-generation-and-layout',
+      input_mode: 'image',
+      input_min: '1',
+      input_max: '1',
+    },
+    {
+      category: 'zine',
+      execution_kind: 'host-image-generation',
+      input_mode: 'text-or-image',
+      input_min: '0',
+      input_max: '1',
+    },
+  ];
+
+  for (const combination of accepted) {
+    await t.test(JSON.stringify(combination), () => {
+      const effect = parseEffect(card(combination));
+      assert.equal(effect.category, combination.category);
+      assert.equal(effect.executionKind, combination.execution_kind);
+      assert.deepEqual(
+        { mode: effect.input.mode, min: effect.input.min, max: effect.input.max },
+        {
+          mode: combination.input_mode,
+          min: Number(combination.input_min),
+          max: Number(combination.input_max),
+        },
+      );
+    });
+  }
+});
+
+test('parseEffect rejects invalid category, execution, input, output, and license contracts', async (t) => {
   const invalidCases = [
-    ['category', 'landscape', /category/i],
+    ['category', 'grade', /category/i],
     ['execution_kind', 'local-script', /execution_kind/i],
+    ['input_mode', 'image-required', /input_mode/i],
     ['input_mode', 'text', /input_mode/i],
-    ['input_min', '0', /input_min/i],
-    ['input_max', '2', /input_max/i],
+    ['non-canonical input_min', { input_min: '01' }, /input_min/i],
+    ['fractional input_min', { input_min: '1.0' }, /input_min/i],
+    [
+      'image 0..1',
+      { input_mode: 'image', input_min: '0', input_max: '1' },
+      /input_min|input contract/i,
+    ],
+    [
+      'text-or-image 1..1',
+      { input_mode: 'text-or-image', input_min: '1', input_max: '1' },
+      /input_min|input contract/i,
+    ],
+    [
+      'layout outside editorial',
+      { category: 'zine', execution_kind: 'host-image-generation-and-layout' },
+      /execution_kind|editorial/i,
+    ],
+    [
+      'layout outside image',
+      {
+        execution_kind: 'host-image-generation-and-layout',
+        input_mode: 'text-or-image',
+        input_min: '0',
+      },
+      /execution_kind|input_mode|image/i,
+    ],
     ['input_formats', 'png,jpeg', /input_formats/i],
     ['output_count', '2', /output_count/i],
     ['source_license_spdx', 'Apache-2.0', /source_license_spdx/i],
     ['preview_license_spdx', 'MIT', /preview_license_spdx/i],
+    ['source_license_notice', 'licenses/example-mit.txt', /source_license_notice/i],
+    [
+      'source_license_notice traversal',
+      { source_license_notice: 'references/licenses/../private.txt' },
+      /source_license_notice|\.\./i,
+    ],
   ];
 
-  for (const [field, value, pattern] of invalidCases) {
-    await t.test(field, () => {
-      assert.throws(() => parseEffect(card({ [field]: value })), pattern);
+  for (const [name, value, pattern] of invalidCases) {
+    await t.test(name, () => {
+      const overrides = typeof value === 'object' ? value : { [name]: value };
+      assert.throws(() => parseEffect(card(overrides)), pattern);
     });
   }
 });
@@ -353,10 +469,29 @@ test('loadEffects reads Markdown cards and returns stable ID and SemVer order', 
   }
 });
 
+test('published effect directory loads the exact approved eight-effect catalog', async () => {
+  const effects = await loadEffects(EFFECTS_PATH);
+
+  assert.deepEqual(
+    effects.map((effect) => effect.ref),
+    EXPECTED_CATALOG_REFS,
+  );
+});
+
 test('loadEffects, buildLibrary, and notices reject duplicate versioned references', async () => {
   const effect = parseEffect(card());
-  assert.throws(() => buildLibrary([effect, effect], '2026-08-16T00:00:00.000Z'), /duplicate.*ref/i);
-  assert.throws(() => renderThirdPartyNotices([effect, effect], '# Header\n'), /duplicate.*ref/i);
+  assert.throws(
+    () => buildLibrary(
+      [effect, effect],
+      '2026-08-16T00:00:00.000Z',
+      previewMetadata(effect),
+    ),
+    /duplicate.*ref/i,
+  );
+  assert.throws(
+    () => renderThirdPartyNotices([effect, effect], '# Header\n', new Map()),
+    /duplicate.*ref/i,
+  );
 
   const root = await mkdtemp(path.join(tmpdir(), 'image-effects-duplicates-'));
   try {
@@ -378,9 +513,11 @@ test('effect IDs use ASCII code-unit order without locale comparison', () => {
     throw new Error('localeCompare must not be used');
   };
   try {
-    ids = buildLibrary([later, earlier], '2026-08-16T00:00:00.000Z').effects.map(
-      (effect) => effect.id,
-    );
+    ids = buildLibrary(
+      [later, earlier],
+      '2026-08-16T00:00:00.000Z',
+      previewMetadata(later, earlier),
+    ).effects.map((effect) => effect.id);
   } finally {
     String.prototype.localeCompare = originalLocaleCompare;
   }
@@ -392,7 +529,11 @@ test('SemVer sorting preserves numeric precedence beyond Number safe integers', 
   const larger = parseEffect(card({ version: '9007199254740993.0.0' }));
   const smaller = parseEffect(card({ version: '9007199254740992.0.0' }));
 
-  const library = buildLibrary([larger, smaller], '2026-08-16T00:00:00.000Z');
+  const library = buildLibrary(
+    [larger, smaller],
+    '2026-08-16T00:00:00.000Z',
+    previewMetadata(larger, smaller),
+  );
 
   assert.deepEqual(
     library.effects.map((effect) => effect.version),
@@ -404,7 +545,11 @@ test('SemVer prerelease text identifiers use ASCII code-unit order', () => {
   const lowercase = parseEffect(card({ version: '1.0.0-a' }));
   const uppercase = parseEffect(card({ version: '1.0.0-B' }));
 
-  const library = buildLibrary([lowercase, uppercase], '2026-08-16T00:00:00.000Z');
+  const library = buildLibrary(
+    [lowercase, uppercase],
+    '2026-08-16T00:00:00.000Z',
+    previewMetadata(lowercase, uppercase),
+  );
 
   assert.deepEqual(
     library.effects.map((effect) => effect.version),
@@ -415,9 +560,12 @@ test('SemVer prerelease text identifiers use ASCII code-unit order', () => {
 test('buildLibrary projects the public schema with versioned invocations', () => {
   const effect = parseEffect(card(), 'references/effects/healing-anime-scribble-v3.md');
   const generatedAt = '2026-08-16T00:00:00.000Z';
+  const previewMetadataByRef = new Map([
+    ['healing-anime-scribble-v3@1.0.0', { width: 1448, height: 1086 }],
+  ]);
 
-  assert.deepEqual(buildLibrary([effect], generatedAt), {
-    schemaVersion: 1,
+  assert.deepEqual(buildLibrary([effect], generatedAt, previewMetadataByRef), {
+    schemaVersion: 2,
     generatedAt,
     effects: [
       {
@@ -430,6 +578,9 @@ test('buildLibrary projects the public schema with versioned invocations', () =>
           zh: '将人像转换为温柔的手绘场景。',
         },
         category: 'portrait',
+        executionKind: 'host-image-generation',
+        previewWidth: 1448,
+        previewHeight: 1086,
         input: { mode: 'image', min: 1, max: 1, formats: ['jpeg', 'png'] },
         outputCount: 1,
         previewUrl: './media/healing-anime-scribble-v3@1.0.0.jpg',
@@ -454,11 +605,67 @@ test('buildLibrary projects the public schema with versioned invocations', () =>
   });
 });
 
+test('buildLibrary selects the text-or-image invocation for Minimal Zine', () => {
+  const effect = parseEffect(card({
+    id: 'minimal-zine-poster',
+    category: 'zine',
+    input_mode: 'text-or-image',
+    input_min: '0',
+  }));
+  const library = buildLibrary(
+    [effect],
+    '2026-08-16T00:00:00.000Z',
+    previewMetadata(effect),
+  );
+
+  assert.equal(
+    library.effects[0].invocation,
+    'Use $image-effects effect minimal-zine-poster@1.0.0 with this idea or my uploaded image.',
+  );
+});
+
+test('buildLibrary does not mutate effects or preview metadata', () => {
+  const effect = parseEffect(card());
+  const effects = [effect];
+  const metadata = previewMetadata(effect);
+  const effectSnapshot = structuredClone(effect);
+  const metadataSnapshot = structuredClone([...metadata]);
+
+  buildLibrary(effects, '2026-08-16T00:00:00.000Z', metadata);
+
+  assert.deepEqual(effect, effectSnapshot);
+  assert.deepEqual([...metadata], metadataSnapshot);
+});
+
+test('buildLibrary rejects missing or invalid preview dimensions', async (t) => {
+  const effect = parseEffect(card());
+  const invalidMetadata = [
+    ['missing', new Map()],
+    ['zero width', new Map([[effect.ref, { width: 0, height: 1086 }]])],
+    ['negative height', new Map([[effect.ref, { width: 1448, height: -1 }]])],
+    ['fractional width', new Map([[effect.ref, { width: 1448.5, height: 1086 }]])],
+    ['oversized height', new Map([[effect.ref, { width: 1448, height: 20001 }]])],
+  ];
+
+  for (const [name, metadata] of invalidMetadata) {
+    await t.test(name, () => {
+      assert.throws(
+        () => buildLibrary([effect], '2026-08-16T00:00:00.000Z', metadata),
+        /preview.*(?:metadata|width|height|dimension)/i,
+      );
+    });
+  }
+});
+
 test('buildLibrary gives every effect version distinct versioned artifact URLs', () => {
   const first = parseEffect(card({ version: '1.0.0' }));
   const second = parseEffect(card({ version: '2.0.0' }));
 
-  const library = buildLibrary([second, first], '2026-08-16T00:00:00.000Z');
+  const library = buildLibrary(
+    [second, first],
+    '2026-08-16T00:00:00.000Z',
+    previewMetadata(second, first),
+  );
 
   assert.deepEqual(
     library.effects.map(({ previewUrl, sourceUrl }) => ({ previewUrl, sourceUrl })),
@@ -476,16 +683,23 @@ test('buildLibrary gives every effect version distinct versioned artifact URLs',
 });
 
 test('renderThirdPartyNotices emits the exact escaped machine protocol', () => {
+  const notice = 'MIT License\n\nCopyright (c) Fixture\n';
   const effect = parseEffect(
     card({
-      source_paths: 'upstream/source_file.md',
+      source_paths: 'upstream/source_file.md,LICENSE',
+      source_sha256s: `${SOURCE_SHA},6bfd25bd70599c4f37233ce24ad27099e2e5da6b363231bb3ac4ff6b134bf870`,
+      source_license_notice: 'references/licenses/example-mit.txt',
       adaptation_notice: 'Adapted [guide](https://evil.example).',
     }),
     'references/effects/healing-anime-scribble-v3.md',
   );
 
   assert.equal(
-    renderThirdPartyNotices([effect], '# Third-party notices\n'),
+    renderThirdPartyNotices(
+      [effect],
+      '# Third-party notices\n',
+      new Map([['references/licenses/example-mit.txt', notice]]),
+    ),
     `# Third-party notices
 
 ## healing-anime-scribble-v3@1.0.0
@@ -493,8 +707,43 @@ test('renderThirdPartyNotices emits the exact escaped machine protocol', () => {
 - Repository: \`ConardLi/garden-skills\`
 - Revision: \`${REVISION}\`
 - Source: \`upstream/source_file.md\` (SHA-256: \`${SOURCE_SHA}\`)
+- Source: \`LICENSE\` (SHA-256: \`6bfd25bd70599c4f37233ce24ad27099e2e5da6b363231bb3ac4ff6b134bf870\`)
 - License: [MIT](<https://github.com/ConardLi/garden-skills/blob/${REVISION}/LICENSE>)
+- Notice: \`references/licenses/example-mit.txt\` (SHA-256: \`6bfd25bd70599c4f37233ce24ad27099e2e5da6b363231bb3ac4ff6b134bf870\`)
 - Adaptation: Adapted \\[guide\\]\\(https://evil.example\\).
+
+## Full license notices
+
+### \`references/licenses/example-mit.txt\`
+
+MIT License
+
+Copyright (c) Fixture
 `,
   );
+});
+
+test('renderThirdPartyNotices requires every mapped notice to match the pinned LICENSE bytes', async (t) => {
+  const effect = parseEffect(card({
+    source_paths: 'upstream/source_file.md,LICENSE',
+    source_sha256s: `${SOURCE_SHA},6bfd25bd70599c4f37233ce24ad27099e2e5da6b363231bb3ac4ff6b134bf870`,
+    source_license_notice: 'references/licenses/example-mit.txt',
+  }));
+
+  await t.test('missing local notice', () => {
+    assert.throws(
+      () => renderThirdPartyNotices([effect], '# Header\n', new Map()),
+      /missing.*notice|notice.*required/i,
+    );
+  });
+  await t.test('local notice SHA differs from pinned LICENSE', () => {
+    assert.throws(
+      () => renderThirdPartyNotices(
+        [effect],
+        '# Header\n',
+        new Map([['references/licenses/example-mit.txt', 'changed notice\n']]),
+      ),
+      /notice.*sha-256.*mismatch/i,
+    );
+  });
 });

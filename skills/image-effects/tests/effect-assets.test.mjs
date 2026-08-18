@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { parseEffect } from '../scripts/effect-library.mjs';
+import { loadEffects, parseEffect } from '../scripts/effect-library.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const SKILL_PATH = path.join(SKILL_ROOT, 'SKILL.md');
 const EFFECT_CARD_PATH = path.join(
   SKILL_ROOT,
   'references/effects/healing-anime-scribble-v3.md',
@@ -17,7 +18,28 @@ const PREVIEW_PATH = path.join(
   SKILL_ROOT,
   'assets/previews/healing-anime-scribble-v3.jpg',
 );
+const LICENSES_PATH = path.join(SKILL_ROOT, 'references/licenses');
+const EFFECTS_PATH = path.join(SKILL_ROOT, 'references/effects');
 const PREVIEW_SHA256 = '70a3c534832532faed62cb80816df56002382cb661b51d2077d7eab429760daf';
+const GENERATED_PREVIEWS = {
+  'photo-illustration-editorial-echo.png': { width: 1024, height: 1536 },
+  'photo-illustration-diptych-lakeside.png': { width: 1024, height: 1536 },
+  'photo-illustration-diptych.png': { width: 1024, height: 1536 },
+  'scenes-gathered-zine-sea.png': { width: 1536, height: 1024 },
+  'scenes-gathered-zine.png': { width: 1024, height: 1536 },
+  'scene-distillation-zine.png': { width: 1024, height: 1536 },
+  'minimal-zine-poster.png': { width: 1024, height: 1536 },
+};
+const SOURCE_LICENSE_NOTICE_SHA256 =
+  '1126322e2cc8d165adc4c792eeb195717de2bcc7b39be1ce77959d78e87ef685';
+const LICENSE_HASHES = {
+  'conardli-garden-skills-mit.txt': SOURCE_LICENSE_NOTICE_SHA256,
+  'gathered-scenes-zine-contributors-mit.txt':
+    '7d063a2fe4a45ac0adf349ab8d568de5bc93206aaa3982a243dd8d067a3e2f4a',
+  'happy-coder-contributors-mit.txt':
+    'e251d0448ef3ce023c20ebac9b90a7d8642b1434825838247d6e457668eb3e00',
+  'liamgvchi-mit.txt': 'd15c81ae8fa9a0b4b1db46c66e4490cc92e4898fb1f55e030559fbd2a2e2a232',
+};
 
 const EXPECTED_EFFECT = {
   ref: 'healing-anime-scribble-v3@1.0.0',
@@ -43,11 +65,16 @@ const EXPECTED_EFFECT = {
       path: 'skills/gpt-image-2/references/avatars-and-profile/style-transfer-selfie.md',
       sha256: '67021faabdbd9e5d5db6851eb2e5bc6a650a76ef399a4f0949fdae0f93989461',
     },
+    {
+      path: 'LICENSE',
+      sha256: SOURCE_LICENSE_NOTICE_SHA256,
+    },
   ],
   sourceLicense: {
     spdx: 'MIT',
     url: 'https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE',
   },
+  sourceLicenseNotice: 'references/licenses/conardli-garden-skills-mit.txt',
   adaptationNotice:
     'Preserves the one-photo anime construction sketch behavior and adds fixed v3 ratios, host-neutral delivery, privacy gates, and one targeted retry.',
   previewProvenance: {
@@ -66,6 +93,17 @@ const EXPECTED_SECTIONS = [
   '硬性禁止项',
   '质量检查',
   '交付要求',
+];
+
+const EXPECTED_CATALOG_REFS = [
+  'healing-anime-scribble-v3@1.0.0',
+  'minimal-zine-poster@1.0.0',
+  'photo-illustration-diptych@1.0.0',
+  'photo-illustration-diptych-lakeside@1.0.0',
+  'photo-illustration-editorial-echo@1.0.0',
+  'scene-distillation-zine@1.0.0',
+  'scenes-gathered-zine@1.0.0',
+  'scenes-gathered-zine-sea@1.0.0',
 ];
 
 async function loadImageTools() {
@@ -264,6 +302,129 @@ test('效果卡严格解析全部 frontmatter 并包含固定六节正文', asyn
     [...body.matchAll(/^## (.+)$/gm)].map((match) => match[1]),
     EXPECTED_SECTIONS,
   );
+});
+
+test('完整目录的协议、来源许可证和预览字节均可独立验证', async () => {
+  const effects = await loadEffects(EFFECTS_PATH);
+
+  assert.deepEqual(
+    effects.map((effect) => effect.ref),
+    EXPECTED_CATALOG_REFS,
+  );
+
+  for (const effect of effects) {
+    assert.doesNotMatch(effect.ref, /grade-images/i);
+    assert.doesNotMatch(effect.body, /grade-images/i);
+    assert.deepEqual(
+      [...effect.body.matchAll(/^## (.+)$/gm)].map((match) => match[1]),
+      EXPECTED_SECTIONS,
+      effect.ref,
+    );
+
+    const licenseSource = effect.sources.find(({ path: sourcePath }) => sourcePath === 'LICENSE');
+    assert.ok(licenseSource, `${effect.ref} must map the fixed source LICENSE`);
+    const noticeBytes = await readFile(path.join(SKILL_ROOT, effect.sourceLicenseNotice));
+    assert.equal(
+      licenseSource.sha256,
+      createHash('sha256').update(noticeBytes).digest('hex'),
+      `${effect.ref} LICENSE mapping`,
+    );
+
+    const previewBytes = await readFile(path.join(SKILL_ROOT, effect.preview));
+    assert.equal(
+      effect.previewProvenance.sha256,
+      createHash('sha256').update(previewBytes).digest('hex'),
+      `${effect.ref} preview mapping`,
+    );
+  }
+});
+
+test('Scene Distillation 保留无预设的作者型 Typography Director', async () => {
+  const effects = await loadEffects(EFFECTS_PATH);
+  const effect = effects.find(({ ref }) => ref === 'scene-distillation-zine@1.0.0');
+
+  assert.ok(effect, 'missing Scene Distillation card');
+  assert.match(
+    effect.body,
+    /Do not impose a preset language, word count, character count, copy length, type voice, hierarchy, or legibility threshold/,
+  );
+  assert.match(
+    effect.body,
+    /tiny, oversized, cropped, scattered, stacked, rotated, curved, obscured, fragmented, or overwritten/,
+  );
+  assert.match(effect.body, /one type voice or many/);
+  assert.match(
+    effect.body,
+    /Accidental tool-generated gibberish is a failure only when it was not deliberately chosen as authorial invented language, marks, or fragments/,
+  );
+  assert.doesNotMatch(
+    effect.body,
+    /at most one short title|large display type|pseudo-text|typography is authorial, correct, and subordinate|invalid text/i,
+  );
+});
+
+test('完整的固定来源许可证目录只包含已审核的 notice 字节', async () => {
+  assert.deepEqual((await readdir(LICENSES_PATH)).sort(), Object.keys(LICENSE_HASHES).sort());
+
+  for (const [fileName, expectedHash] of Object.entries(LICENSE_HASHES)) {
+    const notice = await readFile(path.join(LICENSES_PATH, fileName));
+    assert.equal(createHash('sha256').update(notice).digest('hex'), expectedHash, fileName);
+  }
+});
+
+test('两阶段 layout 路由在 Stage A 和 Stage B 之间共享一次定向重试额度', async () => {
+  const skill = await readFile(SKILL_PATH, 'utf8');
+  const layoutBranch = skill.match(
+    /### `host-image-generation-and-layout`\n(?<protocol>[\s\S]+?)\nDo not substitute/,
+  )?.groups?.protocol;
+
+  assert.ok(layoutBranch, 'missing host-image-generation-and-layout protocol');
+  assert.match(layoutBranch, /Stage A and Stage B share one total targeted retry budget/);
+  assert.match(
+    layoutBranch,
+    /Stage A regeneration after an image-tool error or hard-quality failure[^\n]+Stage B repair and recapture after a layout or screenshot tool error or hard-quality failure, never both/,
+  );
+  assert.match(
+    layoutBranch,
+    /If Stage A spends the budget, report any Stage B failure without another retry/,
+  );
+  assert.match(
+    layoutBranch,
+    /When Stage B spends the budget, do not regenerate an already acceptable motif/,
+  );
+});
+
+test('Skill 只接受精确版本引用，裸 ID 必须回到 INDEX 选择', async () => {
+  const skill = await readFile(SKILL_PATH, 'utf8');
+  const resolveProtocol = skill.match(
+    /## Resolve the effect\n(?<protocol>[\s\S]+?)\n## Validate the input/,
+  )?.groups?.protocol;
+
+  assert.ok(resolveProtocol, 'missing effect resolution protocol');
+  assert.match(resolveProtocol, /complete `<id>@<version>`/);
+  assert.match(
+    resolveProtocol,
+    /ID without a version[\s\S]+references\/INDEX\.md[\s\S]+exact version/,
+  );
+  assert.doesNotMatch(resolveProtocol, /exactly one version[\s\S]+resolve/i);
+});
+
+test('Minimal Zine 保留固定来源的版式与字体变化能力', async () => {
+  const effects = await loadEffects(EFFECTS_PATH);
+  const effect = effects.find(({ ref }) => ref === 'minimal-zine-poster@1.0.0');
+
+  assert.ok(effect, 'missing Minimal Zine card');
+  assert.match(effect.body, /center-fragment[\s\S]+dual-panel[\s\S]+type-led/);
+  assert.match(effect.body, /optional tiny date, location, weather, or signature/i);
+  assert.match(effect.body, /semi-legible microtext|fragmented letters/i);
+  assert.match(effect.body, /headline-as-object/i);
+  assert.match(
+    effect.body,
+    /variation recipe[\s\S]+layout[\s\S]+anchor[\s\S]+typography[\s\S]+texture[\s\S]+mood/i,
+  );
+  assert.doesNotMatch(effect.body, /Keep it subordinate, legible/);
+  assert.doesNotMatch(effect.body, /Add no metadata[\s\S]+second text block/);
+  assert.doesNotMatch(effect.body, /large display copy|pseudo-text|signatures, watermarks/i);
 });
 
 test('真实编码的干净 JPEG 和 PNG 可完整解码并通过元数据检查', async () => {
@@ -622,4 +783,23 @@ test('授权预览具有固定 SHA、尺寸且不含被禁止的元数据', asyn
   const { info } = await sharp(buffer, { failOn: 'error' }).raw().toBuffer({ resolveWithObject: true });
   assert.equal(info.width, 1448);
   assert.equal(info.height, 1086);
+});
+
+test('七张独立生成预览可完整解码、无禁止元数据且符合目标方向', async () => {
+  const { assertMetadataFreeImage } = await loadImageTools();
+
+  for (const [fileName, expectedDimensions] of Object.entries(GENERATED_PREVIEWS)) {
+    const previewPath = path.join(SKILL_ROOT, 'assets/previews', fileName);
+    const buffer = await readFile(previewPath);
+    const digest = createHash('sha256').update(buffer).digest('hex');
+    const image = await assertMetadataFreeImage(buffer, 'png');
+
+    assert.match(digest, /^[0-9a-f]{64}$/, fileName);
+    assert.equal(image.format, 'png', fileName);
+    assert.deepEqual(
+      { width: image.width, height: image.height },
+      expectedDimensions,
+      fileName,
+    );
+  }
 });

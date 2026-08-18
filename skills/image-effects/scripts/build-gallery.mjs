@@ -26,7 +26,7 @@ import {
   renderThirdPartyNotices,
 } from './effect-library.mjs';
 import { assertMetadataFreeImage } from './image-metadata.mjs';
-import { validateEffects } from './validate-effects.mjs';
+import { loadValidatedEffects } from './validate-effects.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const DEFAULT_SKILL_ROOT = path.resolve(path.dirname(SCRIPT_PATH), '..');
@@ -497,15 +497,32 @@ export async function buildGallery({
   sourceRoot = DEFAULT_SKILL_ROOT,
   outputRoot = DEFAULT_SKILL_ROOT,
   generatedAt,
+  previewReader,
   transactionHooks,
 } = {}) {
-  const effects = await validateEffects({ sourceRoot });
+  const { effects, previewAssetsByRef } = await loadValidatedEffects({
+    sourceRoot,
+    previewReader,
+  });
   const timestamp = generatedTimestamp(generatedAt);
   const header = await readFile(
     localPath(sourceRoot, 'assets/public-repo/THIRD_PARTY_NOTICES.header.md'),
     'utf8',
   );
-  const library = buildLibrary(effects, timestamp);
+  const licenseNoticesByPath = new Map();
+  for (const noticePath of [...new Set(effects.map((effect) => effect.sourceLicenseNotice))].sort(
+    compareAscii,
+  )) {
+    licenseNoticesByPath.set(noticePath, await readFile(localPath(sourceRoot, noticePath)));
+  }
+  const previewBytesByRef = new Map();
+  const previewMetadataByRef = new Map();
+  for (const effect of effects) {
+    const { bytes, width, height } = previewAssetsByRef.get(effect.ref);
+    previewBytesByRef.set(effect.ref, bytes);
+    previewMetadataByRef.set(effect.ref, { width, height });
+  }
+  const library = buildLibrary(effects, timestamp, previewMetadataByRef);
   const previewExtensionByRef = new Map(
     effects.map((effect) => [effect.ref, publicPreviewExtension(effect.preview)]),
   );
@@ -515,7 +532,10 @@ export async function buildGallery({
   }));
   const artifacts = new Map([
     ['references/INDEX.md', renderIndex(effects)],
-    ['assets/public-repo/THIRD_PARTY_NOTICES.md', renderThirdPartyNotices(effects, header)],
+    [
+      'assets/public-repo/THIRD_PARTY_NOTICES.md',
+      renderThirdPartyNotices(effects, header, licenseNoticesByPath),
+    ],
     ['gallery/api/library.json', `${JSON.stringify(library, null, 2)}\n`],
   ]);
 
@@ -527,7 +547,7 @@ export async function buildGallery({
     );
     artifacts.set(
       `gallery/media/${effect.ref}${extension}`,
-      await readFile(localPath(sourceRoot, effect.preview)),
+      previewBytesByRef.get(effect.ref),
     );
   }
 

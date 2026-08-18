@@ -15,10 +15,11 @@ output_count: 1
 preview: assets/previews/healing-anime-scribble-v3.jpg
 source_repository: ConardLi/garden-skills
 source_revision: aaf9a82f5efd73e87cc0998edc398e75bfc35901
-source_paths: skills/gpt-image-2/references/avatars-and-profile/style-transfer-selfie.md
-source_sha256s: 67021faabdbd9e5d5db6851eb2e5bc6a650a76ef399a4f0949fdae0f93989461
+source_paths: skills/gpt-image-2/references/avatars-and-profile/style-transfer-selfie.md,LICENSE
+source_sha256s: 67021faabdbd9e5d5db6851eb2e5bc6a650a76ef399a4f0949fdae0f93989461,1126322e2cc8d165adc4c792eeb195717de2bcc7b39be1ce77959d78e87ef685
 source_license_spdx: MIT
 source_license_url: https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE
+source_license_notice: references/licenses/conardli-garden-skills-mit.txt
 adaptation_notice: Preserves the one-photo anime construction sketch behavior and adds fixed v3 ratios, host-neutral delivery, privacy gates, and one targeted retry.
 preview_origin: Text-only image generation of a fictional young adult with glasses, not based on a real person.
 preview_author: wangjs-jacky
