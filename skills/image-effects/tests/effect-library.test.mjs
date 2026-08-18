@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   buildLibrary,
@@ -14,6 +15,20 @@ import {
 const SOURCE_SHA = '67021faabdbd9e5d5db6851eb2e5bc6a650a76ef399a4f0949fdae0f93989461';
 const PREVIEW_SHA = '0'.repeat(64);
 const REVISION = 'aaf9a82f5efd73e87cc0998edc398e75bfc35901';
+const EFFECTS_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../references/effects',
+);
+const EXPECTED_CATALOG_REFS = [
+  'healing-anime-scribble-v3@1.0.0',
+  'minimal-zine-poster@1.0.0',
+  'photo-illustration-diptych@1.0.0',
+  'photo-illustration-diptych-lakeside@1.0.0',
+  'photo-illustration-editorial-echo@1.0.0',
+  'scene-distillation-zine@1.0.0',
+  'scenes-gathered-zine@1.0.0',
+  'scenes-gathered-zine-sea@1.0.0',
+];
 
 const REQUIRED_FIELDS = {
   id: 'healing-anime-scribble-v3',
@@ -452,6 +467,15 @@ test('loadEffects reads Markdown cards and returns stable ID and SemVer order', 
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('published effect directory loads the exact approved eight-effect catalog', async () => {
+  const effects = await loadEffects(EFFECTS_PATH);
+
+  assert.deepEqual(
+    effects.map((effect) => effect.ref),
+    EXPECTED_CATALOG_REFS,
+  );
 });
 
 test('loadEffects, buildLibrary, and notices reject duplicate versioned references', async () => {

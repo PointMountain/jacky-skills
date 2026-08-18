@@ -6,7 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { parseEffect } from '../scripts/effect-library.mjs';
+import { loadEffects, parseEffect } from '../scripts/effect-library.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SKILL_PATH = path.join(SKILL_ROOT, 'SKILL.md');
@@ -19,6 +19,7 @@ const PREVIEW_PATH = path.join(
   'assets/previews/healing-anime-scribble-v3.jpg',
 );
 const LICENSES_PATH = path.join(SKILL_ROOT, 'references/licenses');
+const EFFECTS_PATH = path.join(SKILL_ROOT, 'references/effects');
 const PREVIEW_SHA256 = '70a3c534832532faed62cb80816df56002382cb661b51d2077d7eab429760daf';
 const GENERATED_PREVIEWS = {
   'photo-illustration-editorial-echo.png': { width: 1024, height: 1536 },
@@ -92,6 +93,17 @@ const EXPECTED_SECTIONS = [
   '硬性禁止项',
   '质量检查',
   '交付要求',
+];
+
+const EXPECTED_CATALOG_REFS = [
+  'healing-anime-scribble-v3@1.0.0',
+  'minimal-zine-poster@1.0.0',
+  'photo-illustration-diptych@1.0.0',
+  'photo-illustration-diptych-lakeside@1.0.0',
+  'photo-illustration-editorial-echo@1.0.0',
+  'scene-distillation-zine@1.0.0',
+  'scenes-gathered-zine@1.0.0',
+  'scenes-gathered-zine-sea@1.0.0',
 ];
 
 async function loadImageTools() {
@@ -290,6 +302,41 @@ test('效果卡严格解析全部 frontmatter 并包含固定六节正文', asyn
     [...body.matchAll(/^## (.+)$/gm)].map((match) => match[1]),
     EXPECTED_SECTIONS,
   );
+});
+
+test('完整目录的协议、来源许可证和预览字节均可独立验证', async () => {
+  const effects = await loadEffects(EFFECTS_PATH);
+
+  assert.deepEqual(
+    effects.map((effect) => effect.ref),
+    EXPECTED_CATALOG_REFS,
+  );
+
+  for (const effect of effects) {
+    assert.doesNotMatch(effect.ref, /grade-images/i);
+    assert.doesNotMatch(effect.body, /grade-images/i);
+    assert.deepEqual(
+      [...effect.body.matchAll(/^## (.+)$/gm)].map((match) => match[1]),
+      EXPECTED_SECTIONS,
+      effect.ref,
+    );
+
+    const licenseSource = effect.sources.find(({ path: sourcePath }) => sourcePath === 'LICENSE');
+    assert.ok(licenseSource, `${effect.ref} must map the fixed source LICENSE`);
+    const noticeBytes = await readFile(path.join(SKILL_ROOT, effect.sourceLicenseNotice));
+    assert.equal(
+      licenseSource.sha256,
+      createHash('sha256').update(noticeBytes).digest('hex'),
+      `${effect.ref} LICENSE mapping`,
+    );
+
+    const previewBytes = await readFile(path.join(SKILL_ROOT, effect.preview));
+    assert.equal(
+      effect.previewProvenance.sha256,
+      createHash('sha256').update(previewBytes).digest('hex'),
+      `${effect.ref} preview mapping`,
+    );
+  }
 });
 
 test('完整的固定来源许可证目录只包含已审核的 notice 字节', async () => {
