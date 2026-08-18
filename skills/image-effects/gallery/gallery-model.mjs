@@ -5,6 +5,7 @@ const EXECUTION_KINDS = new Set([
   'host-image-generation',
   'host-image-generation-and-layout',
 ]);
+const CATEGORIES = new Set(['portrait', 'editorial', 'zine']);
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SEMVER_PATTERN =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
@@ -199,8 +200,21 @@ function assertEffect(effect, index, seenRefs) {
 
   assertLocalizedField(effect, 'title', index, 200);
   assertLocalizedField(effect, 'summary', index, 2000);
-  assertString(effect.category, `${label}.category`, 100, ID_PATTERN);
+  if (!CATEGORIES.has(effect.category)) {
+    throw libraryError(`${label}.category is invalid.`);
+  }
   assertInput(effect.input, index);
+  if (
+    effect.executionKind === 'host-image-generation-and-layout'
+    && (effect.category !== 'editorial'
+      || effect.input.mode !== 'image'
+      || effect.input.min !== 1
+      || effect.input.max !== 1)
+  ) {
+    throw libraryError(
+      `${label}.executionKind requires category editorial and input image 1..1.`,
+    );
+  }
   assertInteger(effect.outputCount, `${label}.outputCount`, 1, 1000);
   assertManagedUrls(effect, index);
   assertProvenance(effect.provenance, index);

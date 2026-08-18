@@ -394,6 +394,39 @@ test('两阶段 layout 路由在 Stage A 和 Stage B 之间共享一次定向重
   );
 });
 
+test('Skill 只接受精确版本引用，裸 ID 必须回到 INDEX 选择', async () => {
+  const skill = await readFile(SKILL_PATH, 'utf8');
+  const resolveProtocol = skill.match(
+    /## Resolve the effect\n(?<protocol>[\s\S]+?)\n## Validate the input/,
+  )?.groups?.protocol;
+
+  assert.ok(resolveProtocol, 'missing effect resolution protocol');
+  assert.match(resolveProtocol, /complete `<id>@<version>`/);
+  assert.match(
+    resolveProtocol,
+    /ID without a version[\s\S]+references\/INDEX\.md[\s\S]+exact version/,
+  );
+  assert.doesNotMatch(resolveProtocol, /exactly one version[\s\S]+resolve/i);
+});
+
+test('Minimal Zine 保留固定来源的版式与字体变化能力', async () => {
+  const effects = await loadEffects(EFFECTS_PATH);
+  const effect = effects.find(({ ref }) => ref === 'minimal-zine-poster@1.0.0');
+
+  assert.ok(effect, 'missing Minimal Zine card');
+  assert.match(effect.body, /center-fragment[\s\S]+dual-panel[\s\S]+type-led/);
+  assert.match(effect.body, /optional tiny date, location, weather, or signature/i);
+  assert.match(effect.body, /semi-legible microtext|fragmented letters/i);
+  assert.match(effect.body, /headline-as-object/i);
+  assert.match(
+    effect.body,
+    /variation recipe[\s\S]+layout[\s\S]+anchor[\s\S]+typography[\s\S]+texture[\s\S]+mood/i,
+  );
+  assert.doesNotMatch(effect.body, /Keep it subordinate, legible/);
+  assert.doesNotMatch(effect.body, /Add no metadata[\s\S]+second text block/);
+  assert.doesNotMatch(effect.body, /large display copy|pseudo-text|signatures, watermarks/i);
+});
+
 test('真实编码的干净 JPEG 和 PNG 可完整解码并通过元数据检查', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'image-effects-media-'));
   try {

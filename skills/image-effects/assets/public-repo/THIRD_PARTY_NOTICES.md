@@ -20,7 +20,7 @@ The repository root `LICENSE` applies to this repository's own material. It does
 - Source: `LICENSE` (SHA-256: `d15c81ae8fa9a0b4b1db46c66e4490cc92e4898fb1f55e030559fbd2a2e2a232`)
 - License: [MIT](<https://github.com/LiamGvchi/gc-minimal-zine-poster/blob/4cb0396ad4e834019f753b37e1c4f415f5e02026/LICENSE>)
 - Notice: `references/licenses/liamgvchi-mit.txt` (SHA-256: `d15c81ae8fa9a0b4b1db46c66e4490cc92e4898fb1f55e030559fbd2a2e2a232`)
-- Adaptation: Preserves the original minimal-zine composition ratios, metaphor discipline, paper material, text-or-image routes, visible ink anchor, and targeted correction in a host-neutral card.
+- Adaptation: Preserves the original minimal-zine composition ratios, metaphor discipline, paper material, text-or-image routes, variation engine, experimental typography, visible ink anchor, and targeted correction in a host-neutral card.
 
 ## photo-illustration-diptych@1.0.0
 

@@ -9,9 +9,9 @@ Apply one bundled library effect while preserving the selected effect version, i
 
 ## Resolve the effect
 
-1. Treat `<id>@<version>` as the stable effect reference.
+1. Every effect request must use the complete `<id>@<version>` stable reference before execution.
 2. If the user provides no ID, read `references/INDEX.md` and recommend at most five relevant effects. Do not read every effect card to make recommendations.
-3. If the user provides an ID without a version, resolve it only when the library contains exactly one version of that ID. Otherwise, ask the user to choose a version.
+3. If the user provides an ID without a version, do not infer or substitute a version. Read `references/INDEX.md`, show the matching versioned choices, and require the user to select an exact version before execution.
 4. If the ID or version is unknown, return nearby choices from the index and stop. Do not execute a similar effect automatically.
 5. After resolving an exact reference, read only its selected card under `references/effects/`. Treat that card as the complete behavior and provenance source of truth.
 

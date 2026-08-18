@@ -20,7 +20,7 @@ source_sha256s: d4e1199623ee4d98e948189308eedc601f83ab0ae923568c6e9240f89c783b8b
 source_license_spdx: MIT
 source_license_url: https://github.com/LiamGvchi/gc-minimal-zine-poster/blob/4cb0396ad4e834019f753b37e1c4f415f5e02026/LICENSE
 source_license_notice: references/licenses/liamgvchi-mit.txt
-adaptation_notice: Preserves the original minimal-zine composition ratios, metaphor discipline, paper material, text-or-image routes, visible ink anchor, and targeted correction in a host-neutral card.
+adaptation_notice: Preserves the original minimal-zine composition ratios, metaphor discipline, paper material, text-or-image routes, variation engine, experimental typography, visible ink anchor, and targeted correction in a host-neutral card.
 preview_origin: Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.
 preview_author: wangjs-jacky
 preview_license_spdx: CC-BY-4.0
@@ -41,19 +41,20 @@ For text-only input, extract one concrete imageable metaphor rather than illustr
 
 - Use a strict vertical 3:5 canvas with aged or warm matte paper, flat orthographic scan behavior, visible but restrained fibers, xerox softness, and no artificial perspective.
 - Reserve 70–90% of the page as quiet paper. Keep all active illustration, supplied-image reduction, typography, and ink within one coherent cluster occupying roughly 8–25% of the canvas.
-- Build exactly one imageable metaphor from the theme or source. Give it one dominant silhouette and at most two supporting fragments. Omit decorative objects that do not strengthen that metaphor.
-- Use one primary paper grammar such as torn-paper collage, photocopy, dry ink, typewriter, relief print, or sparse cut-paper geometry, with at most one quiet supporting texture.
-- Add one clearly visible saturated ink anchor in a single hue. It must be large enough to read at thumbnail size and structurally attach to the metaphor or cluster, never float as a token swatch. Warm paper and neutral black, graphite, or brown inks are not additional hues.
-- Typography must be sparse and exact. Use supplied wording verbatim when present; otherwise derive one short line from the theme. Keep it subordinate, legible, and integrated through typewriter, letterpress, pencil, or dry-ink texture. Add no metadata, attribution, slogan, or second text block.
+- Build exactly one imageable metaphor from the theme or source. Give it one dominant silhouette and only the fragments needed by the selected visual grammar. Omit decorative objects that do not strengthen that metaphor.
+- Choose a fresh variation recipe across layout, anchor, typography, accent, texture, and mood. Layout may be center-fragment, lower-left-float, upper-right-block, dual-panel, irregular-cutout, type-led, dot-orbit, or single-specimen. Do not default repeatedly to the same tiny-photo grammar; recent visible outputs should materially change the composition, not only its position.
+- Choose the anchor from a faded photo reduction, torn clipping, flat silhouette, solid color block, old printed illustration, object specimen, translucent overlay, or abstract texture window. Use one primary reproduction grammar such as xerox softness, risograph grain, letterpress ink bleed, halftone degradation, scan noise, aged mottling, or selected text blur.
+- Add one clearly visible saturated ink anchor in a single main hue. It must remain visible at thumbnail size, occupy about 0.8–2.5% of the canvas or 15–35% of the cluster, and structurally attach to the metaphor. It may be the subject, a block, cutout, partial-color photo region, or bold fragmented type rather than a token dot. A tiny secondary hue is allowed only when it supports the subject without making the poster commercially colorful.
+- Typography may use a short readable serif, typewriter, or monospaced phrase; optional tiny date, location, weather, or signature; semi-legible microtext or fragmented letters; text pressed against an image edge; or headline-as-object with rough letterpress. Type-led layouts may make typography the main anchor and keep imagery secondary or absent. Preserve supplied wording wherever it is intended to be readable; intentional fragments may crop, blur, drift, or misregister. Any optional signature is a user-supplied or explicitly fictional graphic mark—never invent a real person's identity, brand, logo, or attribution.
 - Balance the cluster asymmetrically with broad uninterrupted paper. Let one edge, axis, or baseline connect image, ink, and text.
 
 ## 硬性禁止项
 
-Do not fill the page, build multiple clusters, illustrate every idea, retain a full photo, add multiple metaphors, use more than one saturated hue, hide the ink anchor, scatter decorative scraps, use gradients, neon glow, glossy lighting, 3D, depth of field, mockup perspective, commercial advertising hierarchy, CTA, logos, QR codes, icons, frames, rounded cards, drop shadows, large display copy, pseudo-text, invented quotations, signatures, watermarks, or UI.
+Do not fill the page, build competing clusters, illustrate every idea, retain a full photo, add multiple metaphors, hide or wash out the ink anchor, scatter decorative scraps, or use gradients, neon glow, glossy lighting, 3D, depth of field, mockup perspective, commercial headline hierarchy, product-ad composition, CTA, logos, QR codes, brand marks, rounded UI cards, drop shadows, long clean text blocks, invented real-person attribution, or watermarks.
 
 ## 质量检查
 
-Confirm the output is exactly 3:5; quiet paper occupies 70–90%; one coherent cluster occupies 8–25%; there is exactly one imageable metaphor and no competing narrative; one saturated ink anchor is visible at thumbnail size and attached to the composition; image mode retains only truthful core cues rather than a full photo; text mode turns a non-empty theme into a concrete form; typography is exact, sparse, and legible; the material reads as flat aged paper; and no brand, commercial UI, signature, or watermark appears.
+Confirm the output is exactly 3:5; quiet paper occupies 70–90%; one coherent cluster occupies 8–25%; there is exactly one imageable metaphor and no competing narrative; the chosen variation recipe is materially expressed; one saturated ink anchor is visible at thumbnail size and attached to the composition; image mode retains only truthful core cues rather than a full photo; text mode turns a non-empty theme into a concrete form; readable wording is accurate while intentional microtext or fragments remain visibly authored; the material reads as flat aged paper; and no brand, commercial UI, invented identity, or watermark appears.
 
 On a hard failure in ratio, paper share, cluster size, metaphor clarity, source fidelity, ink visibility, or text, regenerate at most once with a correction limited to that defect.
 

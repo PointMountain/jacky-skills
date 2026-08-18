@@ -77,7 +77,7 @@ const FIXTURE_LIBRARY = {
       titleZh: '纸上地平线',
       summaryEn: 'A wide landscape in pale color.',
       summaryZh: '用淡彩绘制开阔风景。',
-      category: 'landscape',
+      category: 'editorial',
     }),
     effect({
       id: 'neon-face',
@@ -348,6 +348,63 @@ test('assertLibrary 验证 input、outputCount、受管路径与 provenance', as
       const library = structuredClone(valid);
       mutate(library.effects[0].input);
       assert.throws(() => assertLibrary(library), /input/i);
+    }
+  });
+});
+
+test('assertLibrary 只接受发布分类和合法 execution/category/input 组合', async (t) => {
+  await t.test('拒绝 grade 等未发布分类', () => {
+    const library = structuredClone(FIXTURE_LIBRARY);
+    library.effects[0].category = 'grade';
+    assert.throws(() => assertLibrary(library), /category/i);
+  });
+
+  await t.test('layout 只接受 editorial image 1..1', () => {
+    const valid = structuredClone(FIXTURE_LIBRARY);
+    valid.effects[1].executionKind = 'host-image-generation-and-layout';
+    assert.equal(assertLibrary(valid), valid);
+
+    const wrongCategory = structuredClone(valid);
+    wrongCategory.effects[1].category = 'zine';
+    assert.throws(() => assertLibrary(wrongCategory), /executionKind|category|input/i);
+
+    const wrongInput = structuredClone(valid);
+    wrongInput.effects[1].input = {
+      mode: 'text-or-image',
+      min: 0,
+      max: 1,
+      formats: ['jpeg', 'png'],
+    };
+    assert.throws(() => assertLibrary(wrongInput), /executionKind|category|input/i);
+  });
+
+  await t.test('拒绝被篡改为 layout 的真实 Minimal Zine 条目', async () => {
+    const library = JSON.parse(
+      await readFile(path.join(SKILL_ROOT, 'gallery/api/library.json'), 'utf8'),
+    );
+    const minimal = library.effects.find(({ ref }) => ref === 'minimal-zine-poster@1.0.0');
+    assert.ok(minimal, 'missing Minimal Zine entry');
+    minimal.executionKind = 'host-image-generation-and-layout';
+    assert.throws(() => assertLibrary(library), /executionKind|category|input/i);
+  });
+
+  await t.test('保留其余已批准的单阶段组合', () => {
+    const approved = [
+      ['portrait', 'image'],
+      ['editorial', 'image'],
+      ['zine', 'image'],
+      ['zine', 'text-or-image'],
+    ];
+    for (const [category, mode] of approved) {
+      const library = structuredClone(FIXTURE_LIBRARY);
+      library.effects[0].category = category;
+      library.effects[0].input = {
+        mode,
+        min: mode === 'text-or-image' ? 0 : 1,
+        max: 1,
+        formats: ['jpeg', 'png'],
+      };
+      assert.equal(assertLibrary(library), library, `${category}/${mode}`);
     }
   });
 });
