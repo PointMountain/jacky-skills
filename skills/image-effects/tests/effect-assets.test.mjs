@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -17,13 +17,18 @@ const PREVIEW_PATH = path.join(
   SKILL_ROOT,
   'assets/previews/healing-anime-scribble-v3.jpg',
 );
-const SOURCE_LICENSE_NOTICE_PATH = path.join(
-  SKILL_ROOT,
-  'references/licenses/conardli-garden-skills-mit.txt',
-);
+const LICENSES_PATH = path.join(SKILL_ROOT, 'references/licenses');
 const PREVIEW_SHA256 = '70a3c534832532faed62cb80816df56002382cb661b51d2077d7eab429760daf';
 const SOURCE_LICENSE_NOTICE_SHA256 =
   '1126322e2cc8d165adc4c792eeb195717de2bcc7b39be1ce77959d78e87ef685';
+const LICENSE_HASHES = {
+  'conardli-garden-skills-mit.txt': SOURCE_LICENSE_NOTICE_SHA256,
+  'gathered-scenes-zine-contributors-mit.txt':
+    '7d063a2fe4a45ac0adf349ab8d568de5bc93206aaa3982a243dd8d067a3e2f4a',
+  'happy-coder-contributors-mit.txt':
+    'e251d0448ef3ce023c20ebac9b90a7d8642b1434825838247d6e457668eb3e00',
+  'liamgvchi-mit.txt': 'd15c81ae8fa9a0b4b1db46c66e4490cc92e4898fb1f55e030559fbd2a2e2a232',
+};
 
 const EXPECTED_EFFECT = {
   ref: 'healing-anime-scribble-v3@1.0.0',
@@ -277,9 +282,13 @@ test('效果卡严格解析全部 frontmatter 并包含固定六节正文', asyn
   );
 });
 
-test('固定来源许可证 notice 字节与效果卡 SHA 一致', async () => {
-  const notice = await readFile(SOURCE_LICENSE_NOTICE_PATH);
-  assert.equal(createHash('sha256').update(notice).digest('hex'), SOURCE_LICENSE_NOTICE_SHA256);
+test('完整的固定来源许可证目录只包含已审核的 notice 字节', async () => {
+  assert.deepEqual((await readdir(LICENSES_PATH)).sort(), Object.keys(LICENSE_HASHES).sort());
+
+  for (const [fileName, expectedHash] of Object.entries(LICENSE_HASHES)) {
+    const notice = await readFile(path.join(LICENSES_PATH, fileName));
+    assert.equal(createHash('sha256').update(notice).digest('hex'), expectedHash, fileName);
+  }
 });
 
 test('真实编码的干净 JPEG 和 PNG 可完整解码并通过元数据检查', async () => {

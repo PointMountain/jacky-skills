@@ -20,7 +20,7 @@
 - Source licenses are MIT; generated previews are authored by `wangjs-jacky` and published under CC-BY-4.0.
 - Every preview is independently created from a fictional subject; do not use user attachments, historical Gallery images, real-person photos, brands, copyrighted characters, or third-party images.
 - All behavior changes follow RED → verify failure → GREEN → verify pass. Generated preview assets get a missing-file/hash RED test before generation.
-- Development stays in `/Users/jacky/jacky-github/jacky-skills--image-effects-full-catalog`; do not modify the dirty `/Users/jacky/jacky-github/jacky-skills` root worktree.
+- Development stays in the sibling worktree named `jacky-skills--image-effects-full-catalog` returned by `git rev-parse --show-toplevel`; do not modify the sibling root worktree at `../jacky-skills`.
 - Publish only after the source PR is merged. Export the public repository from the clean merged `jacky-skills/main` Git tree, never from this feature branch.
 
 ## File Structure and Responsibilities
@@ -696,26 +696,35 @@ Expected: state `MERGED`, a non-null merge commit, and `origin/main` contains th
 
 - [ ] **Step 1: Create a clean post-merge source worktree**
 
-Create `/Users/jacky/jacky-github/jacky-skills--image-effects-release` as a temporary sibling worktree detached at the exact merge commit. Confirm `git status --short` is empty and `HEAD == origin/main`. Install `skills/image-effects` maintenance dependencies with `npm ci --prefix skills/image-effects`.
+Resolve exact sibling targets from the current repository, then create the source release worktree detached at the exact merge commit:
+
+```bash
+IMAGE_EFFECTS_WORKTREE_PARENT="$(dirname "$(git rev-parse --show-toplevel)")"
+IMAGE_EFFECTS_SOURCE_RELEASE="$IMAGE_EFFECTS_WORKTREE_PARENT/jacky-skills--image-effects-release"
+IMAGE_EFFECTS_PUBLIC_RELEASE="$IMAGE_EFFECTS_WORKTREE_PARENT/image-effects--release"
+git worktree add --detach "$IMAGE_EFFECTS_SOURCE_RELEASE" "$(git rev-parse origin/main)"
+```
+
+Confirm the source release worktree has an empty `git status --short` and `HEAD == origin/main`. Install `skills/image-effects` maintenance dependencies there with `npm ci --prefix skills/image-effects`.
 
 - [ ] **Step 2: Inspect and prepare the existing public repository**
 
-Use `gh repo view wangjs-jacky/image-effects` and clone it to `/Users/jacky/jacky-github/image-effects--release`. Fetch `main`, require a clean worktree, and confirm the current `.image-effects-export.json` source commit matches the previous source release. Do not overwrite a dirty or unexpected target.
+Use `gh repo view wangjs-jacky/image-effects` and clone it to the exact `"$IMAGE_EFFECTS_PUBLIC_RELEASE"` target resolved in Step 1. Fetch `main`, require a clean worktree, and confirm the current `.image-effects-export.json` source commit matches the previous source release. Do not overwrite a dirty or unexpected target.
 
 - [ ] **Step 3: Export only from merged Git objects**
 
 From the clean source worktree run:
 
 ```bash
-node skills/image-effects/scripts/export-public-repo.mjs --target /Users/jacky/jacky-github/image-effects--release
-node skills/image-effects/scripts/export-public-repo.mjs --target /Users/jacky/jacky-github/image-effects--release --check
+node skills/image-effects/scripts/export-public-repo.mjs --target "$IMAGE_EFFECTS_PUBLIC_RELEASE"
+node skills/image-effects/scripts/export-public-repo.mjs --target "$IMAGE_EFFECTS_PUBLIC_RELEASE" --check
 ```
 
 Expected: export and `--check` pass; manifest `sourceCommit` equals the source merge commit; managed files include all eight cards, four licenses, eight previews, and Gallery artifacts.
 
 - [ ] **Step 4: Validate the uncommitted public export**
 
-In the public clone run `npm ci`, the full Node test suite, local static HTTP crawl, desktop/mobile browser checks, `git diff --check`, and a content scan for `/Users/`, attachment paths, private keys, tokens, and unintended files. Expected: all pass; only manifest-managed files differ.
+In the public clone run `npm ci`, the full Node test suite, local static HTTP crawl, desktop/mobile browser checks, `git diff --check`, and a content scan for absolute macOS home-directory paths, attachment paths, private keys, tokens, and unintended files. Expected: all pass; only manifest-managed files differ.
 
 - [ ] **Step 5: Commit and push public main**
 
