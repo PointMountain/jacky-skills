@@ -18,7 +18,7 @@
       "name": "dev-tools",
       "source": "./plugins/dev-tools",
       "description": "发布、任务管理、Durable 长任务、联网、浏览器操控与效率审计工具",
-      "version": "2.8.4"
+      "version": "2.8.5"
     },
     {
       "name": "distiller-tools",
@@ -102,7 +102,7 @@
       "name": "ticktick-manager",
       "source": "./plugins/ticktick-manager",
       "description": "滴答清单任务与日程管理工具",
-      "version": "1.2.1"
+      "version": "1.2.2"
     },
     {
       "name": "translation-tools",

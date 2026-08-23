@@ -14,7 +14,7 @@
 | Plugin | 版本 | 说明 | Skills |
 |--------|------|------|--------|
 | [claude-config](./plugins/claude-config) | 0.3.0 | Claude Code 配置 | statusline-setup |
-| [dev-tools](./plugins/dev-tools) | 2.8.4 | 发布、任务管理、Durable 长任务、联网、浏览器操控与效率审计 | github-repo-publish, efficiency-audit, todo, durable, web-search, browser-control, animate-prompt, web-connect, remote-dev-sync, ssh-connect |
+| [dev-tools](./plugins/dev-tools) | 2.8.5 | 发布、任务管理、Durable 长任务、联网、浏览器操控与效率审计 | github-repo-publish, efficiency-audit, todo, durable, web-search, browser-control, animate-prompt, web-connect, remote-dev-sync, ssh-connect |
 | [distiller-tools](./plugins/distiller-tools) | 1.1.0 | 资源蒸馏与知识提炼 | distiller |
 | [evaluators](./plugins/evaluators) | 1.1.0 | 任务目标与 Skill 设计质量评估 | harness-benchmark, skill-design-benchmark |
 | [image-effects](./plugins/image-effects) | 1.0.0 | 可版本化图像效果、参考图生成与静态画廊 | image-effects |
@@ -28,7 +28,7 @@
 | [skill-tooling](./plugins/skill-tooling) | 1.1.1 | Skill 优化与调研 | skill-optimizer, skill-researcher |
 | [skills-management](./plugins/skills-management) | 1.0.2 | Skills 链接、安装与批量管理 | j-skills, link-all-skills |
 | [thinking-tools](./plugins/thinking-tools) | 0.1.0 | 结构化对话与思考 | sounding-board |
-| [ticktick-manager](./plugins/ticktick-manager) | 1.2.1 | 滴答清单任务与日程管理 | tt, tt-defer, tt-worker |
+| [ticktick-manager](./plugins/ticktick-manager) | 1.2.2 | 滴答清单任务与日程管理 | tt, tt-defer, tt-worker |
 | [translation-tools](./plugins/translation-tools) | 1.0.1 | 单文件与多文件并行翻译 | parallel-translation |
 | [troubleshooting](./plugins/troubleshooting) | 1.1.1 | CLI、浏览器自动化与 Tauri 故障排查 | agent-browser-troubleshooting, tauri-troubleshooting, cli-tool-troubleshooting |
 | [video-processing](./plugins/video-processing) | 3.0.2 | 音视频 ASR 转录 | audio-to-subtitle |
@@ -57,6 +57,7 @@
 | [happy-ops](./harness/happy-ops) | Happy/Paws 自托管工程 | 拓扑理解、运行维护、故障路由和复盘经验 |
 | [opencli-ops](./harness/opencli-ops) | OpenCLI | 站点配方、adapter 缺口、浏览器兜底和本机实测经验 |
 | [hyperframes-ops](./harness/hyperframes-ops) | HyperFrames 官方 Skills | 最佳实践、复杂能力组合、本机水土不服和环境兼容性 |
+| [ego-ops](./harness/ego-ops) | 浏览器自动化经验 | 最小授权执行、可观察验证与已验证操作知识沉淀 |
 
 每个 Ops Skill 的 `SKILL.md` 保存可分享协议，gitignored 的 `experience.local.md` 保存本机路径、代理、版本、拓扑和验证记录。创建新的 harness skill 时，默认放到 `harness/<target>-ops/`；详细规范见 [`harness/CLAUDE.md`](./harness/CLAUDE.md)。
 
@@ -189,7 +190,8 @@ jacky-skills/
 │   ├── CLAUDE.md
 │   ├── happy-ops/
 │   ├── opencli-ops/
-│   └── hyperframes-ops/
+│   ├── hyperframes-ops/
+│   └── ego-ops/
 ├── labs/                      # 实验性 Skill 与轻量 Workflow（预览版）
 │   ├── app-flow/
 │   │   └── app-flow/

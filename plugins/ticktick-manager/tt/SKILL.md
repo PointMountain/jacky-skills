@@ -169,11 +169,13 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
 
 | 场景 | 标题（title） | 内容（--content） |
 |------|--------------|-------------------|
-| 用户说"我刚发布了一个包 v1.1.1" | 发布 jacky-skills v1.1.1 | `- 修复了 skill 链接问题\n- 新增 xxx 功能\n- 更新了文档` |
-| 用户说"优化了 tt-cli 的性能" | tt-cli 性能优化 | `- 修复 --json 输出污染问题\n- 优化 spinner 渲染逻辑\n- 减少不必要的 API 调用` |
-| 用户说"研究了 PaperWM" | 研究 PaperWM | `- 了解 PaperWM 的窗口管理概念\n- 尝试安装和基础配置\n- 评估是否适合日常使用` |
-| 用户说"开了一下午会" | 团队周会 | `- 讨论了 Q2 计划\n- 同步了各模块进度\n- 确认了下周交付节点` |
+| 用户说"我刚发布了一个包 v1.1.1" | 发布 jacky-skills v1.1.1 | `- 修复了 skill 链接问题` |
+| 用户说"优化了 tt-cli 的性能" | tt-cli 性能优化 | `- 修复 --json 输出污染问题` |
+| 用户说"研究了 PaperWM" | 研究 PaperWM | `- 了解 PaperWM 的窗口管理概念` |
+| 用户说"开了一下午会" | 团队周会 | `- 讨论了 Q2 计划` |
 | 简单任务（如"吃午饭"） | 午饭 | 可留空，不加 --content |
+
+> ⚠️ **多行 content 禁止用命令行 `--content` 直接传**（换行会破坏参数解析，CLI 报 Usage 或静默丢内容）。**多行/列表要点必须走 `task-batch-add` 或 `task-batch-update` 的 `--stdin` JSON 方式**，详见下「多行内容写法」。
 
 **内容生成规则**：
 1. 根据用户描述、对话上下文，总结 2-5 个要点
@@ -182,6 +184,37 @@ TickTick（滴答清单）日程管理 Skill，通过 `tt` CLI 提供完整的�
 4. 如果用户只给了简单的任务名（如"午饭"、"休息"），可以不加 content
 
 **批量创建时**：JSON 数组中每个任务对象也必须包含 `content` 字段（除非是简单生活类任务）。
+
+#### 多行内容写法（`--content` 只传单行）
+
+CLI 的 `--content` 参数在 shell 命令行里只能安全传**单行**文本。凡是内容需要 2 行以上（Markdown 列表要点），一律走 `--stdin` JSON：
+
+**单条任务 + 多行 content**（创建后补内容）：
+```bash
+tt task-add "标题" -p <projectId>            # 先建任务，得到 taskId
+python3 - <<'PY' | tt task-batch-update --stdin
+import json
+print(json.dumps([{
+  "id": "<taskId>",
+  "projectId": "<projectId>",
+  "content": "- 要点1\n- 要点2\n- 要点3"
+}], ensure_ascii=False))
+PY
+```
+
+**批量创建（含多行 content）**：
+```bash
+python3 - <<'PY' | tt task-batch-add --stdin
+import json
+print(json.dumps([{
+  "title": "标题",
+  "projectId": "<projectId>",
+  "content": "- 要点1\n- 要点2"
+}], ensure_ascii=False))
+PY
+```
+
+> 不要用 `$'...\n...'` 或字面 `\n` 传给命令行 `--content`——实测都会被参数解析吃掉或报 Usage。用 Python `json.dumps(ensure_ascii=False)` 生成 JSON 最稳（自动处理换行与中文）。
 
 ### 时区处理
 
