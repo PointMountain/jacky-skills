@@ -2,6 +2,7 @@
 
 import path from "node:path";
 import process from "node:process";
+import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const SCHEMA_VERSION = 1;
@@ -21,7 +22,7 @@ const ATTEMPT_VALUES = new Set([
 export const SLOT_PRIORITIES = Object.freeze({
   browser_with_existing_login: Object.freeze([
     "codex-browser-control",
-    "web-access",
+    "ego-ops",
   ]),
   browser_without_existing_login: Object.freeze([
     "chrome-devtools",
@@ -40,19 +41,13 @@ function normalizeState(state) {
     throw new Error(`不支持的能力槽位：${String(state.slot)}`);
   }
 
-  if (
-    state.allowExternalFallback !== undefined &&
-    typeof state.allowExternalFallback !== "boolean"
-  ) {
-    throw new Error("allowExternalFallback 必须是布尔值");
+  if (state.allowExternalFallback !== undefined) {
+    throw new Error(
+      "allowExternalFallback 已废弃；browser-control 固定回退 ego-ops",
+    );
   }
 
-  const allowExternalFallback = state.allowExternalFallback ?? false;
-  const priority =
-    state.slot === "browser_with_existing_login" &&
-    !allowExternalFallback
-      ? catalogPriority.slice(0, 1)
-      : catalogPriority;
+  const priority = catalogPriority;
 
   const rawProviders = state.providers ?? {};
   if (
@@ -101,21 +96,10 @@ function normalizeState(state) {
     }),
   );
 
-  if (
-    state.slot === "browser_with_existing_login" &&
-    !allowExternalFallback &&
-    providers["web-access"].attempt !== "not_attempted"
-  ) {
-    throw new Error(
-      "外部后备 WebAccess 未获授权，不得记录为已调用",
-    );
-  }
-
   return {
     slot: state.slot,
     priority,
     providers,
-    allowExternalFallback,
   };
 }
 
@@ -251,9 +235,20 @@ async function main() {
   }
 }
 
+function resolveEntryPath(target) {
+  const absolutePath = path.resolve(target);
+
+  try {
+    return realpathSync(absolutePath);
+  } catch {
+    return absolutePath;
+  }
+}
+
 const isMain =
   process.argv[1] &&
-  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  resolveEntryPath(process.argv[1]) ===
+    resolveEntryPath(fileURLToPath(import.meta.url));
 
 if (isMain) {
   await main();

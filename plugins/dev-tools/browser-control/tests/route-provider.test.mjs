@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdtemp, rm, symlink } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
@@ -26,11 +29,40 @@ function runRouterInput(input) {
   });
 }
 
-test("登录态任务默认只暴露 Codex Browser Control 主能力", () => {
+test("通过安装符号链接启动时仍执行 CLI 主函数", async (t) => {
+  const directory = await mkdtemp(
+    path.join(os.tmpdir(), "browser-control-router-"),
+  );
+  t.after(() => rm(directory, { recursive: true, force: true }));
+
+  const linkedRouter = path.join(directory, "route-provider.mjs");
+  await symlink(routerPath, linkedRouter);
+
+  const result = spawnSync(process.execPath, [linkedRouter], {
+    encoding: "utf8",
+    input: JSON.stringify({
+      slot: "browser_with_existing_login",
+      providers: {
+        "codex-browser-control": {
+          status: "missing",
+          attempt: "not_attempted",
+        },
+        "ego-ops": { status: "available", attempt: "not_attempted" },
+      },
+    }),
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const json = JSON.parse(result.stdout);
+  assert.equal(json.action, "use");
+  assert.equal(json.provider, "ego-ops");
+});
+
+test("登录态任务固定按 Codex Browser Control 到 Ego Ops 排序", () => {
   const result = runRouter({
     slot: "browser_with_existing_login",
     providers: {
-      "web-access": { status: "available", attempt: "not_attempted" },
+      "ego-ops": { status: "available", attempt: "not_attempted" },
     },
   });
 
@@ -38,14 +70,14 @@ test("登录态任务默认只暴露 Codex Browser Control 主能力", () => {
   assert.deepEqual(result.json, {
     schemaVersion: 1,
     slot: "browser_with_existing_login",
-    priority: ["codex-browser-control"],
+    priority: ["codex-browser-control", "ego-ops"],
     action: "probe",
     provider: "codex-browser-control",
     reason: "provider_not_checked",
   });
 });
 
-test("Codex Browser Control 与 WebAccess 都可用时只选择 Codex Browser Control", () => {
+test("Codex Browser Control 与 Ego Ops 都可用时优先选择 Codex Browser Control", () => {
   const result = runRouter({
     slot: "browser_with_existing_login",
     providers: {
@@ -53,7 +85,7 @@ test("Codex Browser Control 与 WebAccess 都可用时只选择 Codex Browser Co
         status: "available",
         attempt: "not_attempted",
       },
-      "web-access": { status: "available", attempt: "not_attempted" },
+      "ego-ops": { status: "available", attempt: "not_attempted" },
     },
   });
 
@@ -63,12 +95,12 @@ test("Codex Browser Control 与 WebAccess 都可用时只选择 Codex Browser Co
   assert.equal(result.json.reason, "provider_available");
 });
 
-test("Codex Browser Control 完成后路由器直接结束，不再放行 WebAccess", () => {
+test("Codex Browser Control 完成后路由器直接结束，不再进入 Ego Ops", () => {
   const result = runRouter({
     slot: "browser_with_existing_login",
     providers: {
       "codex-browser-control": { status: "available", attempt: "passed" },
-      "web-access": { status: "available", attempt: "not_attempted" },
+      "ego-ops": { status: "available", attempt: "not_attempted" },
     },
   });
 
@@ -86,7 +118,7 @@ test("Codex Browser Control 局部证据降级时仍由主能力完成", () => {
         status: "available",
         attempt: "degraded",
       },
-      "web-access": { status: "available", attempt: "not_attempted" },
+      "ego-ops": { status: "available", attempt: "not_attempted" },
     },
   });
 
@@ -94,10 +126,10 @@ test("Codex Browser Control 局部证据降级时仍由主能力完成", () => {
   assert.equal(result.json.action, "complete");
   assert.equal(result.json.provider, "codex-browser-control");
   assert.equal(result.json.reason, "provider_degraded_but_usable");
-  assert.deepEqual(result.json.priority, ["codex-browser-control"]);
+  assert.deepEqual(result.json.priority, ["codex-browser-control", "ego-ops"]);
 });
 
-test("Codex Browser Control 缺失且未授权外部后备时明确阻断", () => {
+test("Codex Browser Control 缺失时自动使用 Ego Ops", () => {
   const result = runRouter({
     slot: "browser_with_existing_login",
     providers: {
@@ -105,53 +137,20 @@ test("Codex Browser Control 缺失且未授权外部后备时明确阻断", () =
         status: "missing",
         attempt: "not_attempted",
       },
-      "web-access": { status: "available", attempt: "not_attempted" },
-    },
-  });
-
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.json.action, "blocked");
-  assert.equal(result.json.provider, null);
-  assert.equal(result.json.reason, "no_provider_available");
-  assert.deepEqual(result.json.priority, ["codex-browser-control"]);
-});
-
-test("Codex Browser Control 调用失败且未授权外部后备时明确阻断", () => {
-  const result = runRouter({
-    slot: "browser_with_existing_login",
-    providers: {
-      "codex-browser-control": { status: "available", attempt: "failed" },
-    },
-  });
-
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.json.action, "blocked");
-  assert.equal(result.json.provider, null);
-  assert.deepEqual(result.json.priority, ["codex-browser-control"]);
-});
-
-test("用户明确允许外部后备后，Codex Browser Control 缺失才可使用 WebAccess", () => {
-  const result = runRouter({
-    slot: "browser_with_existing_login",
-    allowExternalFallback: true,
-    providers: {
-      "codex-browser-control": {
-        status: "missing",
-        attempt: "not_attempted",
-      },
-      "web-access": { status: "available", attempt: "not_attempted" },
+      "ego-ops": { status: "available", attempt: "not_attempted" },
     },
   });
 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.json.action, "use");
-  assert.equal(result.json.provider, "web-access");
+  assert.equal(result.json.provider, "ego-ops");
+  assert.equal(result.json.reason, "provider_available");
+  assert.deepEqual(result.json.priority, ["codex-browser-control", "ego-ops"]);
 });
 
-test("用户明确允许外部后备后，Codex Browser Control 调用失败才探测 WebAccess", () => {
+test("Codex Browser Control 调用失败时探测 Ego Ops", () => {
   const result = runRouter({
     slot: "browser_with_existing_login",
-    allowExternalFallback: true,
     providers: {
       "codex-browser-control": { status: "available", attempt: "failed" },
     },
@@ -159,19 +158,49 @@ test("用户明确允许外部后备后，Codex Browser Control 调用失败才�
 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.json.action, "probe");
-  assert.equal(result.json.provider, "web-access");
+  assert.equal(result.json.provider, "ego-ops");
+  assert.deepEqual(result.json.priority, ["codex-browser-control", "ego-ops"]);
 });
 
-test("所有登录态候选都不可用时明确阻断", () => {
+test("Codex Browser Control 缺失且 Ego Ops 已验证可用时直接使用 Ego Ops", () => {
   const result = runRouter({
     slot: "browser_with_existing_login",
-    allowExternalFallback: true,
     providers: {
       "codex-browser-control": {
         status: "missing",
         attempt: "not_attempted",
       },
-      "web-access": { status: "degraded", attempt: "not_attempted" },
+      "ego-ops": { status: "available", attempt: "not_attempted" },
+    },
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.json.action, "use");
+  assert.equal(result.json.provider, "ego-ops");
+});
+
+test("Codex Browser Control 调用失败后探测 Ego Ops", () => {
+  const result = runRouter({
+    slot: "browser_with_existing_login",
+    providers: {
+      "codex-browser-control": { status: "available", attempt: "failed" },
+    },
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.json.action, "probe");
+  assert.equal(result.json.provider, "ego-ops");
+});
+
+test("所有登录态候选都不可用时明确阻断", () => {
+  const result = runRouter({
+    slot: "browser_with_existing_login",
+    providers: {
+      "codex-browser-control": {
+        status: "missing",
+        attempt: "not_attempted",
+      },
+      "ego-ops": { status: "degraded", attempt: "not_attempted" },
     },
   });
 
@@ -184,13 +213,12 @@ test("所有登录态候选都不可用时明确阻断", () => {
 test("低优先级 provider 被提前调用时拒绝非法历史", () => {
   const result = runRouter({
     slot: "browser_with_existing_login",
-    allowExternalFallback: true,
     providers: {
       "codex-browser-control": {
         status: "not_checked",
         attempt: "not_attempted",
       },
-      "web-access": { status: "available", attempt: "passed" },
+      "ego-ops": { status: "available", attempt: "passed" },
     },
   });
 
@@ -198,31 +226,27 @@ test("低优先级 provider 被提前调用时拒绝非法历史", () => {
   assert.match(result.stderr, /低优先级.*提前/);
 });
 
-test("未经授权调用 WebAccess 时拒绝非法历史", () => {
+test("WebAccess 作为登录态 provider 时被直接拒绝", () => {
   const result = runRouter({
     slot: "browser_with_existing_login",
     providers: {
-      "codex-browser-control": {
-        status: "available",
-        attempt: "failed",
-      },
       "web-access": { status: "available", attempt: "passed" },
     },
   });
 
   assert.equal(result.status, 2);
-  assert.match(result.stderr, /外部后备.*未获授权/);
+  assert.match(result.stderr, /不属于能力槽位/);
 });
 
-test("外部后备授权必须是布尔值", () => {
+test("旧的外部后备授权字段被拒绝", () => {
   const result = runRouter({
     slot: "browser_with_existing_login",
-    allowExternalFallback: "yes",
+    allowExternalFallback: true,
     providers: {},
   });
 
   assert.equal(result.status, 2);
-  assert.match(result.stderr, /allowExternalFallback.*布尔值/);
+  assert.match(result.stderr, /allowExternalFallback.*已废弃/);
 });
 
 test("无登录态槽位保持 Chrome DevTools 优先", () => {
