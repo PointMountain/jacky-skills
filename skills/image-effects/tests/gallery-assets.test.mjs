@@ -7,12 +7,24 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { translations } from '../gallery/translations.js';
+import { PUBLIC_MEDIA_BASE_URL } from '../gallery/gallery-config.mjs';
 import { effectTitleId, readLocationFilters, syncLocationFilters } from '../gallery/gallery-runtime.mjs';
+import { buildGallerySite } from '../scripts/build-site.mjs';
 import { publicTemplatePath } from '../scripts/public-layout.mjs';
 import { HAPPY_SOURCE_REVISION, MIGRATED_EFFECT_IDS } from './catalog-fixture.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const GALLERY_ROOT = path.join(SKILL_ROOT, 'gallery');
+let BUILT_GALLERY_ROOT;
+
+test.before(async () => {
+  BUILT_GALLERY_ROOT = await mkdtemp(path.join(tmpdir(), 'image-effects-gallery-build-'));
+  await buildGallerySite({ outputRoot: BUILT_GALLERY_ROOT });
+});
+
+test.after(async () => {
+  if (BUILT_GALLERY_ROOT) await rm(BUILT_GALLERY_ROOT, { recursive: true, force: true });
+});
 const EXPECTED_PROVENANCE = {
   'healing-anime-scribble-v3@1.0.0': {
     repository: 'ConardLi/garden-skills',
@@ -151,19 +163,20 @@ async function crawlLocalAssets(baseUrl) {
   return visited;
 }
 
-test('静态站点通过真实 HTTP 提供页面、Library 及其全部相对资源', async (t) => {
-  const staticServer = await startStaticServer(GALLERY_ROOT);
+test('静态站点通过真实 HTTP 提供页面和源码，并将预览图指向 OSS', async (t) => {
+  const staticServer = await startStaticServer(BUILT_GALLERY_ROOT);
   t.after(() => staticServer.close());
 
   const localAssets = await crawlLocalAssets(staticServer.baseUrl);
-  assert.deepEqual([...localAssets.keys()].sort(), [
-    '/',
-    '/app.js',
-    '/gallery-model.mjs',
-    '/gallery-runtime.mjs',
-    '/styles.css',
-    '/translations.js',
-  ]);
+  assert.equal(localAssets.has('/'), true);
+  assert.equal(
+    [...localAssets.keys()].some((assetPath) => /^\/assets\/index-.+\.js$/.test(assetPath)),
+    true,
+  );
+  assert.equal(
+    [...localAssets.keys()].some((assetPath) => /^\/assets\/index-.+\.css$/.test(assetPath)),
+    true,
+  );
 
   const libraryUrl = new URL('api/library.json', staticServer.baseUrl);
   const libraryResponse = await expectOk(libraryUrl);
@@ -173,21 +186,36 @@ test('静态站点通过真实 HTTP 提供页面、Library 及其全部相对资
   assert.ok(library.effects.length > 0);
 
   for (const effect of library.effects) {
-    for (const field of ['previewUrl', 'sourceUrl']) {
-      assert.match(effect[field], /^\.\//, `${field} must remain gallery-relative`);
-      const assetUrl = new URL(effect[field], staticServer.baseUrl);
-      assert.equal(assetUrl.origin, new URL(staticServer.baseUrl).origin);
-      const assetResponse = await expectOk(assetUrl);
-      assert.equal(
-        (assetResponse.headers.get('content-type') ?? '').split(';')[0],
-        contentType(assetUrl.pathname).split(';')[0],
-      );
-    }
+    assert.match(
+      effect.previewUrl,
+      new RegExp(`^${PUBLIC_MEDIA_BASE_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${effect.ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.(?:jpe?g|png)$`),
+    );
+    assert.equal(new URL(effect.previewUrl).origin, new URL(PUBLIC_MEDIA_BASE_URL).origin);
+
+    assert.match(effect.sourceUrl, /^\.\/source\//);
+    const sourceUrl = new URL(effect.sourceUrl, staticServer.baseUrl);
+    assert.equal(sourceUrl.origin, new URL(staticServer.baseUrl).origin);
+    const sourceResponse = await expectOk(sourceUrl);
+    assert.equal(
+      (sourceResponse.headers.get('content-type') ?? '').split(';')[0],
+      'text/markdown',
+    );
+  }
+
+  await assert.rejects(stat(path.join(BUILT_GALLERY_ROOT, 'media')), { code: 'ENOENT' });
+});
+
+test('源码 Library 保持可移植的相对预览路径', async () => {
+  const sourceLibrary = JSON.parse(
+    await readFile(path.join(GALLERY_ROOT, 'api/library.json'), 'utf8'),
+  );
+  for (const effect of sourceLibrary.effects) {
+    assert.match(effect.previewUrl, new RegExp(`^\\./media/${effect.ref}\\.(?:jpe?g|png)$`));
   }
 });
 
 test('Library 固定公开来源、源码许可和预览署名契约', async (t) => {
-  const staticServer = await startStaticServer(GALLERY_ROOT);
+  const staticServer = await startStaticServer(BUILT_GALLERY_ROOT);
   t.after(() => staticServer.close());
 
   const library = await (await expectOk(new URL('api/library.json', staticServer.baseUrl))).json();
@@ -299,10 +327,10 @@ test('Library 的每个分类都有中英文展示标签', async () => {
 });
 
 test('Gallery 使用 Library 图片尺寸和 text-or-image 专用文案', async () => {
-  const appSource = await readFile(path.join(GALLERY_ROOT, 'app.js'), 'utf8');
+  const appSource = await readFile(path.join(GALLERY_ROOT, 'main.jsx'), 'utf8');
 
-  assert.match(appSource, /width:\s*effect\.previewWidth/);
-  assert.match(appSource, /height:\s*effect\.previewHeight/);
+  assert.match(appSource, /width=\{effect\.previewWidth\}/);
+  assert.match(appSource, /height=\{effect\.previewHeight\}/);
   assert.match(appSource, /t\.textOrImageInput/);
   assert.doesNotMatch(appSource, /width:\s*['"]1448['"]/);
   assert.doesNotMatch(appSource, /height:\s*['"]1086['"]/);

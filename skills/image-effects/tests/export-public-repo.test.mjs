@@ -1709,9 +1709,13 @@ test("公开仓库模板保留安装、调用、Gallery 与 Pages 机器契约",
   assert.match(workflow, /id-token:\s*write/);
   assert.match(workflow, /group:\s*pages/);
   assert.match(workflow, /actions\/checkout@v4/);
+  assert.match(workflow, /actions\/setup-node@v4/);
+  assert.match(workflow, /node-version:\s*22/);
+  assert.match(workflow, /npm ci/);
+  assert.match(workflow, /npm run build:site/);
   assert.match(workflow, /actions\/configure-pages@v5/);
   assert.match(workflow, /actions\/upload-pages-artifact@v3/);
-  assert.match(workflow, /path:\s*gallery/);
+  assert.match(workflow, /path:\s*site-dist/);
   assert.match(workflow, /actions\/deploy-pages@v4/);
   assert.match(workflow, /environment:\s*\n\s*name:\s*github-pages/);
   assert.match(
