@@ -24,12 +24,21 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build Gallery
+        run: npm run build:site
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload Gallery
         uses: actions/upload-pages-artifact@v3
         with:
-          path: gallery
+          path: site-dist
       - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@v4

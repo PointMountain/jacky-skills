@@ -29,6 +29,7 @@ content/
 
 # Node modules
 **/node_modules/
+skills/image-effects/site-dist/
 
 # Local TODO
 .todo.md

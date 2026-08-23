@@ -424,6 +424,8 @@ h1 {
 
 .effect-list {
   container-type: inline-size;
+  display: grid;
+  gap: clamp(22px, 4vw, 52px);
 }
 
 .effect-card {
@@ -441,7 +443,39 @@ h1 {
   background: color-mix(in srgb, var(--bg-elevated) 91%, transparent);
   box-shadow: 0 28px 90px var(--shadow);
   animation: card-enter 680ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--card-index, 0) * 42ms);
   transition: border-color 220ms ease, transform 220ms ease, box-shadow 220ms ease;
+}
+
+.card-spotlight {
+  --mouse-x: 50%;
+  --mouse-y: 50%;
+  --spotlight-color: rgba(0, 255, 136, 0.14);
+  isolation: isolate;
+}
+
+.card-spotlight::before {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  background: radial-gradient(
+    640px circle at var(--mouse-x) var(--mouse-y),
+    var(--spotlight-color),
+    transparent 58%
+  );
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card-spotlight:hover::before,
+.card-spotlight:focus-within::before {
+  opacity: 1;
+}
+
+.card-spotlight.is-motion-disabled::before {
+  display: none;
 }
 
 .effect-card:hover {
@@ -481,6 +515,15 @@ h1 {
   height: 100%;
   max-height: 620px;
   object-fit: contain;
+  transform: scale(1.001);
+  transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1), filter 420ms ease;
+  will-change: transform;
+}
+
+.effect-card:hover .preview-frame img,
+.effect-card:focus-within .preview-frame img {
+  filter: saturate(1.04) contrast(1.02);
+  transform: scale(1.025);
 }
 
 .preview-caption {
@@ -670,6 +713,8 @@ dd {
 }
 
 .selection-bar {
+  position: sticky;
+  bottom: 18px;
   z-index: 10;
   display: flex;
   min-height: 76px;
@@ -683,6 +728,49 @@ dd {
   background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
   box-shadow: 0 18px 50px var(--shadow);
   backdrop-filter: blur(20px);
+  transition: border-color 220ms ease, transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.selection-bar.has-selection {
+  border-color: color-mix(in srgb, var(--primary) 52%, var(--border-strong));
+  transform: translateY(-4px);
+}
+
+.blur-word {
+  display: inline-block;
+  will-change: transform, filter, opacity;
+}
+
+.magnet-shell,
+.magnet-content,
+.click-spark-shell {
+  display: inline-flex;
+}
+
+.magnet-shell,
+.click-spark-shell {
+  position: relative;
+}
+
+.magnet-content {
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.click-spark-canvas {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.click-spark-shell > button,
+.magnet-content > .click-spark-shell,
+.magnet-content > .click-spark-shell > button {
+  width: 100%;
 }
 
 .selection-summary {
@@ -830,6 +918,10 @@ dd {
     color: transparent;
     line-height: 1;
     white-space: nowrap;
+  }
+
+  .motion-button {
+    display: none;
   }
 
   .theme-button::after {
@@ -994,5 +1086,291 @@ dd {
   .loading-line::after,
   body::before {
     animation: none;
+  }
+}
+
+:root[data-motion='off'] *,
+:root[data-motion='off'] *::before,
+:root[data-motion='off'] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+}
+
+:root[data-motion='off'] .card-spotlight::before {
+  display: none;
+}
+
+/* Compact catalog layout: thumbnails first, full provenance on demand. */
+.effect-list {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.effect-card {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  contain-intrinsic-size: auto 470px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 16px 44px var(--shadow);
+}
+
+.effect-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 22px 58px var(--shadow), 0 0 28px var(--primary-dim);
+}
+
+.card-spotlight::before {
+  background: radial-gradient(
+    320px circle at var(--mouse-x) var(--mouse-y),
+    var(--spotlight-color),
+    transparent 62%
+  );
+}
+
+.preview-frame {
+  min-height: 0;
+  aspect-ratio: 4 / 3;
+  border-right: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.preview-frame::after {
+  inset: 8px;
+  border-radius: calc(var(--radius-md) - 7px);
+}
+
+.preview-frame img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: contain;
+}
+
+.preview-caption {
+  right: 10px;
+  bottom: 10px;
+  left: auto;
+  padding: 5px 7px;
+  border-radius: 5px;
+  font-size: 0.54rem;
+  line-height: 1.2;
+}
+
+.effect-content {
+  flex: 1;
+  padding: 16px;
+}
+
+.effect-topline {
+  align-items: center;
+  gap: 8px;
+}
+
+.category-chip {
+  max-width: calc(100% - 52px);
+  padding: 4px 7px;
+  overflow: hidden;
+  font-size: 0.56rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selection-control {
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: flex-end;
+  font-size: 0;
+}
+
+.effect-checkbox {
+  width: 22px;
+  height: 22px;
+}
+
+.effect-heading {
+  padding: 12px 0 14px;
+}
+
+.version-ref {
+  font-size: 0.56rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.effect-heading h2 {
+  min-height: 2.2em;
+  margin-top: 7px;
+  font-size: clamp(1.12rem, 1.5vw, 1.45rem);
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+}
+
+.effect-summary {
+  display: -webkit-box;
+  min-height: 2.8em;
+  margin-top: 9px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  text-wrap: pretty;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.card-facts {
+  grid-template-columns: minmax(0, 1fr) minmax(74px, 0.58fr);
+}
+
+.card-facts .fact {
+  padding: 8px;
+}
+
+.card-facts dt {
+  font-size: 0.52rem;
+}
+
+.card-facts dd {
+  margin-top: 3px;
+  font-size: 0.67rem;
+  line-height: 1.35;
+}
+
+.card-details {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.card-details summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+  list-style: none;
+}
+
+.card-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.card-details summary::after {
+  color: var(--primary);
+  content: '+';
+  font-family: var(--font-mono);
+  font-size: 1rem;
+}
+
+.card-details[open] summary::after {
+  content: '−';
+}
+
+.card-details-content {
+  padding-bottom: 4px;
+}
+
+.card-details .invocation {
+  padding-top: 2px;
+}
+
+.card-details .invocation code {
+  padding: 9px;
+  font-size: 0.62rem;
+}
+
+.card-details .source-block {
+  margin-top: 0;
+  padding-top: 16px;
+}
+
+.card-details .provenance-list .fact {
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.preview-origin {
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  line-height: 1.45;
+}
+
+.card-details .source-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 12px;
+}
+
+.card-details .text-link {
+  justify-content: center;
+  padding: 7px 8px;
+  font-size: 0.65rem;
+  text-align: center;
+}
+
+.selection-bar {
+  min-height: 62px;
+  padding-block: 9px;
+}
+
+@media (max-width: 1180px) {
+  .effect-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .effect-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .effect-content {
+    padding: 12px;
+  }
+
+  .preview-caption {
+    display: none;
+  }
+
+  .effect-heading h2 {
+    min-height: 2.35em;
+    font-size: 1rem;
+  }
+
+  .effect-summary {
+    font-size: 0.7rem;
+  }
+
+  .card-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .card-facts .fact:last-child {
+    display: none;
+  }
+
+  .card-details .source-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 360px) {
+  .effect-list {
+    grid-template-columns: 1fr;
+  }
+
+  .card-facts {
+    grid-template-columns: minmax(0, 1fr) minmax(72px, 0.58fr);
+  }
+
+  .card-facts .fact:last-child {
+    display: block;
   }
 }
