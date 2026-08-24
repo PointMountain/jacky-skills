@@ -395,6 +395,16 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - Notice: `references/licenses/conardli-garden-skills-mit.txt` (SHA-256: `1126322e2cc8d165adc4c792eeb195717de2bcc7b39be1ce77959d78e87ef685`)
 - Adaptation: Adapts the pinned GPT Image 2 template into a host-neutral self-contained effect card with explicit input and delivery contracts.
 
+## kinetic-graphite-character-study@1.0.0
+
+- Repository: `ConardLi/garden-skills`
+- Revision: `aaf9a82f5efd73e87cc0998edc398e75bfc35901`
+- Source: `skills/gpt-image-2/references/avatars-and-profile/style-transfer-selfie.md` (SHA-256: `67021faabdbd9e5d5db6851eb2e5bc6a650a76ef399a4f0949fdae0f93989461`)
+- Source: `LICENSE` (SHA-256: `1126322e2cc8d165adc4c792eeb195717de2bcc7b39be1ce77959d78e87ef685`)
+- License: [MIT](<https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE>)
+- Notice: `references/licenses/conardli-garden-skills-mit.txt` (SHA-256: `1126322e2cc8d165adc4c792eeb195717de2bcc7b39be1ce77959d78e87ef685`)
+- Adaptation: Adapts the pinned single-image style-transfer workflow into a monochrome graphite character study with pose preservation, gesture-aware framing, explicit mark hierarchy, private-input handling, and one targeted retry.
+
 ## kpi-dashboard-infographic@1.0.0
 
 - Repository: `ConardLi/garden-skills`

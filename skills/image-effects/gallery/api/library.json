@@ -1594,6 +1594,49 @@
       "invocation": "Use $image-effects effect illustrated-city-map@1.0.0 with this idea or my uploaded image."
     },
     {
+      "ref": "kinetic-graphite-character-study@1.0.0",
+      "id": "kinetic-graphite-character-study",
+      "version": "1.0.0",
+      "title": {
+        "en": "Kinetic Graphite Character Study",
+        "zh": "动势石墨人物速写"
+      },
+      "summary": {
+        "en": "Redraw one person as a loose monochrome graphite character study with recognizable identity, pressure-varied searching contours, irregular structural hatching, blocked-in hair masses, and purposeful unfinished paper.",
+        "zh": "将单人照片重绘为松散的黑白石墨人物速写，保留身份与姿态，以粗细压力变化明显的探索线、不规则结构排线、概括发块和有意识的未完成纸面表现手绘感。"
+      },
+      "category": "portrait",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1122,
+      "previewHeight": 1402,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/kinetic-graphite-character-study@1.0.0.png",
+      "sourceUrl": "./source/kinetic-graphite-character-study@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional adult urban courier in an original pose; not based on a real person, character, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect kinetic-graphite-character-study@1.0.0 on my uploaded image."
+    },
+    {
       "ref": "kpi-dashboard-infographic@1.0.0",
       "id": "kpi-dashboard-infographic",
       "version": "1.0.0",

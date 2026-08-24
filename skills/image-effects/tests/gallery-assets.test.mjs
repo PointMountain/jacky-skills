@@ -35,6 +35,11 @@ const EXPECTED_PROVENANCE = {
     revision: 'aaf9a82f5efd73e87cc0998edc398e75bfc35901',
     origin: 'Text-only image generation of a fictional young adult with glasses, not based on a real person.',
   },
+  'kinetic-graphite-character-study@1.0.0': {
+    repository: 'ConardLi/garden-skills',
+    revision: 'aaf9a82f5efd73e87cc0998edc398e75bfc35901',
+    origin: 'Text-only image generation of a fictional adult urban courier in an original pose; not based on a real person, character, brand, or third-party image.',
+  },
   'minimal-zine-poster@1.0.0': {
     repository: 'LiamGvchi/gc-minimal-zine-poster',
     revision: '4cb0396ad4e834019f753b37e1c4f415f5e02026',
