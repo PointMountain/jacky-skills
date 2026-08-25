@@ -91,6 +91,7 @@ export const EXPANDED_EFFECT_IDS = Object.freeze([
 
 const ORIGINAL_CATALOG = [
   ['healing-anime-scribble-v3@1.0.0', '.jpg'],
+  ['kinetic-graphite-character-study@1.0.0', '.png'],
   ['minimal-zine-poster@1.0.0', '.png'],
   ['photo-illustration-diptych@1.0.0', '.png'],
   ['photo-illustration-diptych-lakeside@1.0.0', '.png'],

@@ -23,6 +23,7 @@ const LICENSES_PATH = path.join(SKILL_ROOT, 'references/licenses');
 const EFFECTS_PATH = path.join(SKILL_ROOT, 'references/effects');
 const PREVIEW_SHA256 = '70a3c534832532faed62cb80816df56002382cb661b51d2077d7eab429760daf';
 const GENERATED_PREVIEWS = {
+  'kinetic-graphite-character-study.png': { width: 1122, height: 1402 },
   'photo-illustration-editorial-echo.png': { width: 1024, height: 768 },
   'photo-illustration-diptych-lakeside.png': { width: 1024, height: 1536 },
   'photo-illustration-diptych.png': { width: 1024, height: 1536 },
@@ -356,6 +357,22 @@ test('Scene Distillation 保留无预设的作者型 Typography Director', async
     effect.body,
     /at most one short title|large display type|pseudo-text|typography is authorial, correct, and subordinate|invalid text/i,
   );
+});
+
+test('动势石墨人物速写保留松散胸像的真实笔压、结构排线与概括发块', async () => {
+  const effects = await loadEffects(EFFECTS_PATH);
+  const effect = effects.find(
+    ({ ref }) => ref === 'kinetic-graphite-character-study@1.0.0',
+  );
+
+  assert.ok(effect, 'missing Kinetic Graphite Character Study card');
+  assert.match(effect.body, /four physically distinct mark levels/);
+  assert.match(effect.body, /roughly 3–5 times thicker/);
+  assert.match(effect.body, /Let contours appear, fade, and restart/);
+  assert.match(effect.body, /separated irregular hatch islands/);
+  assert.match(effect.body, /approximately 5–8 rapidly blocked-in masses/);
+  assert.match(effect.body, /long incomplete garment folds/);
+  assert.match(effect.body, /never as individually rendered strands/);
 });
 
 test('完整的固定来源许可证目录只包含已审核的 notice 字节', async () => {
@@ -798,7 +815,7 @@ test('授权预览具有固定 SHA、尺寸且不含被禁止的元数据', asyn
   assert.equal(info.height, 1086);
 });
 
-test('八张独立生成预览可完整解码、无禁止元数据且符合目标方向', async () => {
+test('九张独立生成预览可完整解码、无禁止元数据且符合目标方向', async () => {
   const { assertMetadataFreeImage } = await loadImageTools();
 
   for (const [fileName, expectedDimensions] of Object.entries(GENERATED_PREVIEWS)) {
