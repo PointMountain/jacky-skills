@@ -24,6 +24,7 @@ import { fileURLToPath } from "node:url";
 
 import { exportPublicRepository } from "../scripts/export-public-repo.mjs";
 import { publicTemplatePath } from "../scripts/public-layout.mjs";
+import { EXPECTED_CATALOG as FIXED_REFS } from "./catalog-fixture.mjs";
 
 const execFile = promisify(execFileCallback);
 const SKILL_ROOT = path.resolve(
@@ -32,16 +33,6 @@ const SKILL_ROOT = path.resolve(
 );
 const SCRIPT_PATH = path.join(SKILL_ROOT, "scripts/export-public-repo.mjs");
 const MANIFEST_NAME = ".image-effects-export.json";
-const FIXED_REFS = [
-  ["healing-anime-scribble-v3@1.0.0", ".jpg"],
-  ["minimal-zine-poster@1.0.0", ".png"],
-  ["photo-illustration-diptych@1.0.0", ".png"],
-  ["photo-illustration-diptych-lakeside@1.0.0", ".png"],
-  ["photo-illustration-editorial-echo@1.0.0", ".png"],
-  ["scene-distillation-zine@1.0.0", ".png"],
-  ["scenes-gathered-zine@1.0.0", ".png"],
-  ["scenes-gathered-zine-sea@1.0.0", ".png"],
-];
 const LICENSE_NOTICE_NAMES = [
   "conardli-garden-skills-mit.txt",
   "gathered-scenes-zine-contributors-mit.txt",
@@ -73,6 +64,7 @@ const EXPECTED_EXPORT_PATHS = [
   "package-lock.json",
   "package.json",
   "references/INDEX.md",
+  "references/release-sop.md",
   ...LICENSE_NOTICE_NAMES.map((name) => `references/licenses/${name}`),
   ...FIXED_REFS.flatMap(([ref, extension]) => [
     `gallery/media/${ref}${extension}`,
@@ -130,6 +122,7 @@ async function makeSourceFixture() {
     "skills/image-effects/agents/openai.yaml":
       "interface:\n  display_name: Image Effects\n",
     "skills/image-effects/references/INDEX.md": "# Index\n",
+    "skills/image-effects/references/release-sop.md": "# Release SOP\n",
     "skills/image-effects/assets/previews/example.png": Buffer.from([
       0x89, 0x50, 0x4e, 0x47,
     ]),
@@ -138,6 +131,8 @@ async function makeSourceFixture() {
     "skills/image-effects/scripts/run.mjs": "export const ok = true;\n",
     "skills/image-effects/tests/run.test.mjs":
       "import test from 'node:test';\ntest('ok', () => {});\n",
+    "skills/image-effects/tests/downstream-sync-workflow.test.mjs":
+      "throw new Error('source-only workflow test must not be exported');\n",
     "skills/image-effects/package.json": '{"name":"fixture","type":"module"}\n',
     "skills/image-effects/package-lock.json":
       '{"name":"fixture","lockfileVersion":3}\n',
@@ -1718,9 +1713,13 @@ test("公开仓库模板保留安装、调用、Gallery 与 Pages 机器契约",
   assert.match(workflow, /id-token:\s*write/);
   assert.match(workflow, /group:\s*pages/);
   assert.match(workflow, /actions\/checkout@v4/);
+  assert.match(workflow, /actions\/setup-node@v4/);
+  assert.match(workflow, /node-version:\s*22/);
+  assert.match(workflow, /npm ci/);
+  assert.match(workflow, /npm run build:site/);
   assert.match(workflow, /actions\/configure-pages@v5/);
   assert.match(workflow, /actions\/upload-pages-artifact@v3/);
-  assert.match(workflow, /path:\s*gallery/);
+  assert.match(workflow, /path:\s*site-dist/);
   assert.match(workflow, /actions\/deploy-pages@v4/);
   assert.match(workflow, /environment:\s*\n\s*name:\s*github-pages/);
   assert.match(

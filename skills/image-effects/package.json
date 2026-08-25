@@ -2,10 +2,20 @@
   "name": "@wangjs-jacky/image-effects",
   "private": true,
   "type": "module",
+  "scripts": {
+    "build:site": "node scripts/build-site.mjs"
+  },
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "motion": "13.1.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "sharp": "0.35.3"
+    "@vitejs/plugin-react": "6.1.0",
+    "sharp": "0.35.3",
+    "vite": "8.2.2"
   }
 }

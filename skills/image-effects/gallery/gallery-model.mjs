@@ -1,3 +1,5 @@
+import { PUBLIC_MEDIA_BASE_URL } from './gallery-config.mjs';
+
 const SUPPORTED_SCHEMA_VERSION = 2;
 const MAX_EFFECTS = 1000;
 const MAX_SELECTED_REFS = 1000;
@@ -5,7 +7,28 @@ const EXECUTION_KINDS = new Set([
   'host-image-generation',
   'host-image-generation-and-layout',
 ]);
-const CATEGORIES = new Set(['portrait', 'editorial', 'zine']);
+const CATEGORIES = new Set([
+  'academic-figures',
+  'assets-and-props',
+  'avatars-and-profile',
+  'branding-and-packaging',
+  'editing-workflows',
+  'editorial',
+  'grids-and-collages',
+  'infographics',
+  'maps',
+  'portrait',
+  'portraits-and-characters',
+  'poster-and-campaigns',
+  'product-visuals',
+  'scenes-and-illustrations',
+  'storyboards-and-sequences',
+  'slides-and-visual-docs',
+  'technical-diagrams',
+  'typography-and-text-layout',
+  'ui-mockups',
+  'zine',
+]);
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SEMVER_PATTERN =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
@@ -144,13 +167,16 @@ function assertProvenance(provenance, index) {
 function assertManagedUrls(effect, index) {
   const previewLabel = `effect ${index}.previewUrl`;
   const sourceLabel = `effect ${index}.sourceUrl`;
-  assertString(effect.previewUrl, previewLabel, 300);
+  assertString(effect.previewUrl, previewLabel, 512);
   assertString(effect.sourceUrl, sourceLabel, 300);
 
-  const previewPrefix = `./media/${effect.ref}.`;
-  const extension = effect.previewUrl.startsWith(previewPrefix)
-    ? effect.previewUrl.slice(previewPrefix.length)
-    : '';
+  const localPreviewPrefix = `./media/${effect.ref}.`;
+  const publicPreviewPrefix = `${PUBLIC_MEDIA_BASE_URL}${effect.ref}.`;
+  const extension = effect.previewUrl.startsWith(localPreviewPrefix)
+    ? effect.previewUrl.slice(localPreviewPrefix.length)
+    : effect.previewUrl.startsWith(publicPreviewPrefix)
+      ? effect.previewUrl.slice(publicPreviewPrefix.length)
+      : '';
   if (!['jpg', 'jpeg', 'png'].includes(extension)) {
     throw libraryError(`${previewLabel} is invalid.`);
   }

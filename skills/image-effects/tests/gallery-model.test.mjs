@@ -17,6 +17,7 @@ import {
   startLoading,
   toggleSelection,
 } from '../gallery/gallery-model.mjs';
+import { PUBLIC_MEDIA_BASE_URL } from '../gallery/gallery-config.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -253,6 +254,13 @@ test('assertLibrary 拒绝重复或不规范版本引用、非法本地化及超
 });
 
 test('assertLibrary 验证 input、outputCount、受管路径与 provenance', async (t) => {
+  await t.test('接受生产构建使用的固定 OSS 图片地址', () => {
+    const library = structuredClone(FIXTURE_LIBRARY);
+    const item = library.effects[0];
+    item.previewUrl = `${PUBLIC_MEDIA_BASE_URL}${item.ref}.jpg`;
+    assert.equal(assertLibrary(library), library);
+  });
+
   const missingNestedCases = [
     ['input.mode', (item) => delete item.input.mode],
     ['input.min', (item) => delete item.input.min],
@@ -291,6 +299,9 @@ test('assertLibrary 验证 input、outputCount、受管路径与 provenance', as
     ['previewUrl traversal', (item) => (item.previewUrl = './media/../secret.jpg')],
     ['previewUrl query', (item) => (item.previewUrl += '?token=secret')],
     ['previewUrl extension', (item) => (item.previewUrl = `./media/${item.ref}.gif`)],
+    ['previewUrl remote host', (item) => (item.previewUrl = `https://example.com/media/${item.ref}.jpg`)],
+    ['previewUrl remote query', (item) => (item.previewUrl = `${PUBLIC_MEDIA_BASE_URL}${item.ref}.jpg?token=secret`)],
+    ['previewUrl remote filename', (item) => (item.previewUrl = `${PUBLIC_MEDIA_BASE_URL}other@1.0.0.jpg`)],
     ['sourceUrl filename', (item) => (item.sourceUrl = './source/other@1.0.0.md')],
     ['sourceUrl fragment', (item) => (item.sourceUrl += '#private')],
     ['repository', (item) => (item.provenance.repository = '../private')],

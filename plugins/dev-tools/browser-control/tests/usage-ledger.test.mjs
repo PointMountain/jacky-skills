@@ -569,10 +569,10 @@ test("登录态、能力槽位与候选探测事实必须彼此一致", () => {
         "- 能力槽位：browser_with_existing_login",
       )
       .replace("- 需要已有登录态：否", "- 需要已有登录态：否"),
-    base.replace("- 检查候选：chrome-devtools", "- 检查候选：web-access"),
+    base.replace("- 检查候选：chrome-devtools", "- 检查候选：ego-ops"),
     base.replace(
       "- 检查候选：chrome-devtools",
-      "- 检查候选：chrome-devtools、web-access",
+      "- 检查候选：chrome-devtools、ego-ops",
     ),
     base.replace(
       "- 检查候选：chrome-devtools",
@@ -908,22 +908,20 @@ test("只有可验证探测状态才会首次创建 experience.local.md", async 
 
 test("finalize 保留多下游调用链与 fallback 事实", async (t) => {
   const runId = "fallback-chain";
-  const routeChain =
-    "browser-control → web-connect → web-access:web-access → agent-browser";
+  const routeChain = "browser-control → ego-ops → ego-browser";
   const markdown = validRun({
     runId,
     mode: "fallback",
     taskResult: "degraded",
     routeChain,
     usedSkills: [
-      { id: "web-connect", capability: "登录态适配", result: "passed", evidence: "E1" },
+      { id: "ego-ops", capability: "登录态治理", result: "passed", evidence: "E1" },
       {
-        id: "web-access:web-access",
-        capability: "当前页面控制",
-        result: "failed",
+        id: "ego-browser",
+        capability: "浏览器控制",
+        result: "degraded",
         evidence: "E2",
       },
-      { id: "agent-browser", capability: "降级浏览器控制", result: "passed", evidence: "E3" },
     ],
   });
   const skillRoot = await writeRunFixture(t, { runId, markdown });
@@ -933,9 +931,8 @@ test("finalize 保留多下游调用链与 fallback 事实", async (t) => {
   const after = await readFile(path.join(skillRoot, "runs.local", `${runId}.md`), "utf8");
   assert.match(after, new RegExp(`- 实际链路：${routeChain}`));
   assert.match(after, /- 模式：fallback/);
-  assert.match(after, /^### web-connect$/m);
-  assert.match(after, /^### web-access:web-access$/m);
-  assert.match(after, /^### agent-browser$/m);
+  assert.match(after, /^### ego-ops$/m);
+  assert.match(after, /^### ego-browser$/m);
 });
 
 test("resolveSkillRoot 仅依据模块 URL，不依赖当前工作目录", async (t) => {

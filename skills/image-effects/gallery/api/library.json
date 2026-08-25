@@ -3,6 +3,1468 @@
   "generatedAt": "2026-08-18T00:00:00.000Z",
   "effects": [
     {
+      "ref": "anime-key-visual@1.0.0",
+      "id": "anime-key-visual",
+      "version": "1.0.0",
+      "title": {
+        "en": "Anime Key Visual",
+        "zh": "动漫主视觉"
+      },
+      "summary": {
+        "en": "Elevate one original subject into a polished anime campaign key visual with cinematic staging, stable identity, and intentional negative space.",
+        "zh": "将一个原创主体提升为精致动漫活动主视觉，以电影化调度、稳定身份和有意留白为核心。"
+      },
+      "category": "storyboards-and-sequences",
+      "executionKind": "host-image-generation",
+      "previewWidth": 768,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/anime-key-visual@1.0.0.png",
+      "sourceUrl": "./source/anime-key-visual@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional young lighthouse mechanic and mechanical moths with no real person, franchise, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect anime-key-visual@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "anime-pitch-board@1.0.0",
+      "id": "anime-pitch-board",
+      "version": "1.0.0",
+      "title": {
+        "en": "Anime Pitch Board",
+        "zh": "动漫提案板"
+      },
+      "summary": {
+        "en": "Organize one concept into a dense but readable multi-panel board with stable subject identity and deliberate visual rhythm.",
+        "zh": "把一个概念组织为密集但易读的多面板画板，保持主体一致和清晰视觉节奏。"
+      },
+      "category": "grids-and-collages",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/anime-pitch-board@1.0.0.png",
+      "sourceUrl": "./source/anime-pitch-board@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect anime-pitch-board@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "background-replacement@1.0.0",
+      "id": "background-replacement",
+      "version": "1.0.0",
+      "title": {
+        "en": "Background Replacement",
+        "zh": "背景替换"
+      },
+      "summary": {
+        "en": "Edit one supplied image with a tightly scoped change while preserving all unaffected identity, geometry, text, and material cues.",
+        "zh": "对一张输入图片执行严格限定的编辑，同时保留所有未指定的身份、几何、文字和材质线索。"
+      },
+      "category": "editing-workflows",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/background-replacement@1.0.0.png",
+      "sourceUrl": "./source/background-replacement@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect background-replacement@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "banner-grid-2x2@1.0.0",
+      "id": "banner-grid-2x2",
+      "version": "1.0.0",
+      "title": {
+        "en": "Banner Grid 2x2",
+        "zh": "2×2 横幅套装"
+      },
+      "summary": {
+        "en": "Create four independently usable campaign panels that share one visual system, product scale, and copy-safe layout.",
+        "zh": "创建四张可独立使用的活动面板，共享统一视觉系统、主体尺度和文案安全区。"
+      },
+      "category": "grids-and-collages",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/banner-grid-2x2@1.0.0.png",
+      "sourceUrl": "./source/banner-grid-2x2@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect banner-grid-2x2@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "banner-hero@1.0.0",
+      "id": "banner-hero",
+      "version": "1.0.0",
+      "title": {
+        "en": "Banner Hero",
+        "zh": "Web Hero 横幅"
+      },
+      "summary": {
+        "en": "Compose a wide hero image with one grounded subject, generous copy space, and robust desktop and mobile crop safety.",
+        "zh": "构建一张宽幅主视觉，以一个真实落地的主体、充足文案区和稳定的桌面移动端裁切安全为核心。"
+      },
+      "category": "poster-and-campaigns",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 576,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/banner-hero@1.0.0.png",
+      "sourceUrl": "./source/banner-hero@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect banner-hero@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "bento-grid-infographic@1.0.0",
+      "id": "bento-grid-infographic",
+      "version": "1.0.0",
+      "title": {
+        "en": "Bento Grid Infographic",
+        "zh": "Bento 网格信息图"
+      },
+      "summary": {
+        "en": "Organize one topic or image into an asymmetric modular explainer with one dominant block and concise supporting facts.",
+        "zh": "将一个主题或一张图片组织成非对称模块化解说图，以一个主模块和精简辅助信息构成清晰层级。"
+      },
+      "category": "infographics",
+      "executionKind": "host-image-generation",
+      "previewWidth": 655,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/bento-grid-infographic@1.0.0.png",
+      "sourceUrl": "./source/bento-grid-infographic@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect bento-grid-infographic@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "bento-memory-card@1.0.0",
+      "id": "bento-memory-card",
+      "version": "1.0.0",
+      "title": {
+        "en": "Bento Memory Card",
+        "zh": "Bento 记忆卡"
+      },
+      "summary": {
+        "en": "Preserve one moment as a warm seven-to-eight-module memory card built from a hero scene, details, palette, and quiet notes.",
+        "zh": "将一个瞬间保存为温暖的七至八模块记忆卡，由主场景、细节、色板和克制记录共同构成。"
+      },
+      "category": "grids-and-collages",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/bento-memory-card@1.0.0.png",
+      "sourceUrl": "./source/bento-memory-card@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect bento-memory-card@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "beverage-label-design@1.0.0",
+      "id": "beverage-label-design",
+      "version": "1.0.0",
+      "title": {
+        "en": "Beverage Label Design",
+        "zh": "饮品标签设计"
+      },
+      "summary": {
+        "en": "Turn a product or concept into a coherent branding presentation with disciplined hierarchy, materials, and identity cues.",
+        "zh": "将产品或概念转为统一的品牌展示，严格控制层级、材质和识别线索。"
+      },
+      "category": "branding-and-packaging",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/beverage-label-design@1.0.0.png",
+      "sourceUrl": "./source/beverage-label-design@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect beverage-label-design@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "bilingual-layout-visual@1.0.0",
+      "id": "bilingual-layout-visual",
+      "version": "1.0.0",
+      "title": {
+        "en": "Bilingual Layout Visual",
+        "zh": "双语版式视觉"
+      },
+      "summary": {
+        "en": "Build a type-led composition with protected reading zones, clear language hierarchy, and restrained supporting imagery.",
+        "zh": "构建以文字为核心的版式，保护阅读区域、语言层级和克制的辅助图像。"
+      },
+      "category": "typography-and-text-layout",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/bilingual-layout-visual@1.0.0.png",
+      "sourceUrl": "./source/bilingual-layout-visual@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect bilingual-layout-visual@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "brand-identity-board@1.0.0",
+      "id": "brand-identity-board",
+      "version": "1.0.0",
+      "title": {
+        "en": "Brand Identity Board",
+        "zh": "品牌识别板"
+      },
+      "summary": {
+        "en": "Turn a product or concept into a coherent branding presentation with disciplined hierarchy, materials, and identity cues.",
+        "zh": "将产品或概念转为统一的品牌展示，严格控制层级、材质和识别线索。"
+      },
+      "category": "branding-and-packaging",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/brand-identity-board@1.0.0.png",
+      "sourceUrl": "./source/brand-identity-board@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect brand-identity-board@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "brand-poster@1.0.0",
+      "id": "brand-poster",
+      "version": "1.0.0",
+      "title": {
+        "en": "Brand Poster",
+        "zh": "品牌主视觉海报"
+      },
+      "summary": {
+        "en": "Distill one subject into a bold poster with a single hero, disciplined identity cues, and a copy-safe brand block.",
+        "zh": "将一个主体提炼成醒目的品牌海报，以单一主视觉、克制识别线索和文案安全区构建冲击力。"
+      },
+      "category": "poster-and-campaigns",
+      "executionKind": "host-image-generation",
+      "previewWidth": 819,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/brand-poster@1.0.0.png",
+      "sourceUrl": "./source/brand-poster@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect brand-poster@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "campaign-kv@1.0.0",
+      "id": "campaign-kv",
+      "version": "1.0.0",
+      "title": {
+        "en": "Campaign Key Visual",
+        "zh": "活动主视觉"
+      },
+      "summary": {
+        "en": "Build one scalable campaign symbol and cinematic key art with disciplined hierarchy and crop-safe extensions.",
+        "zh": "构建一个可扩展的活动核心符号和电影感主视觉，以严格层级与安全裁切支持系列延展。"
+      },
+      "category": "poster-and-campaigns",
+      "executionKind": "host-image-generation",
+      "previewWidth": 819,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/campaign-kv@1.0.0.png",
+      "sourceUrl": "./source/campaign-kv@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect campaign-kv@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "character-grid-portrait@1.0.0",
+      "id": "character-grid-portrait",
+      "version": "1.0.0",
+      "title": {
+        "en": "Character Grid Portrait",
+        "zh": "角色肖像网格"
+      },
+      "summary": {
+        "en": "Show one consistent fictional identity across a controlled grid of expressions, actions, eras, or styling variations.",
+        "zh": "在受控网格中呈现同一虚构角色的表情、动作、时代或造型变化，同时保持身份一致。"
+      },
+      "category": "avatars-and-profile",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/character-grid-portrait@1.0.0.png",
+      "sourceUrl": "./source/character-grid-portrait@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of one fictional adult not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect character-grid-portrait@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "character-merch-board@1.0.0",
+      "id": "character-merch-board",
+      "version": "1.0.0",
+      "title": {
+        "en": "Character Merchandise Board",
+        "zh": "角色周边商品板"
+      },
+      "summary": {
+        "en": "Apply one consistent original character across a balanced editorial board of practical merchandise mockups.",
+        "zh": "将一个原创角色稳定应用到一组实用周边商品，并组织为清晰平衡的编辑商品板。"
+      },
+      "category": "branding-and-packaging",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 683,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/character-merch-board@1.0.0.png",
+      "sourceUrl": "./source/character-merch-board@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of an original fictional character and generic products not based on a real brand, known character, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect character-merch-board@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "character-relationship-diagram@1.0.0",
+      "id": "character-relationship-diagram",
+      "version": "1.0.0",
+      "title": {
+        "en": "Character Relationship Diagram",
+        "zh": "角色关系图"
+      },
+      "summary": {
+        "en": "Explain a narrative or relationship through a controlled sequence with consistent entities, labels, and visual grammar.",
+        "zh": "用受控序列解释叙事或关系，保持实体、标注和视觉语法一致。"
+      },
+      "category": "storyboards-and-sequences",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/character-relationship-diagram@1.0.0.png",
+      "sourceUrl": "./source/character-relationship-diagram@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect character-relationship-diagram@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "character-sheet@1.0.0",
+      "id": "character-sheet",
+      "version": "1.0.0",
+      "title": {
+        "en": "Character Sheet",
+        "zh": "角色综合设定表"
+      },
+      "summary": {
+        "en": "Compile one original character into a coherent turnaround, expression, outfit, prop, and palette sheet.",
+        "zh": "将一个原创角色编译为三视、表情、服装、道具与色板结构一致的综合设定表。"
+      },
+      "category": "portraits-and-characters",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 683,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/character-sheet@1.0.0.png",
+      "sourceUrl": "./source/character-sheet@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of one original fictional character not based on a real person, brand, known character, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect character-sheet@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "chat-interface-scene@1.0.0",
+      "id": "chat-interface-scene",
+      "version": "1.0.0",
+      "title": {
+        "en": "Chat Interface Scene",
+        "zh": "聊天界面场景"
+      },
+      "summary": {
+        "en": "Create a convincing interface scene with a clear product state, stable component hierarchy, and legible interaction focus.",
+        "zh": "生成可信的界面场景，保持产品状态、组件层级和交互焦点清楚。"
+      },
+      "category": "ui-mockups",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/chat-interface-scene@1.0.0.png",
+      "sourceUrl": "./source/chat-interface-scene@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect chat-interface-scene@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "cinematic-storyboard@1.0.0",
+      "id": "cinematic-storyboard",
+      "version": "1.0.0",
+      "title": {
+        "en": "Cinematic Storyboard",
+        "zh": "电影短片分镜"
+      },
+      "summary": {
+        "en": "Distill one quiet narrative premise into a coherent 3x3 cinematic sequence with clear shot progression and visual continuity.",
+        "zh": "将一个安静叙事命题蒸馏为连贯的 3×3 电影序列，具有清楚的镜头推进与视觉连续性。"
+      },
+      "category": "storyboards-and-sequences",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/cinematic-storyboard@1.0.0.png",
+      "sourceUrl": "./source/cinematic-storyboard@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional night watchkeeper finding a paper lantern in an invented greenhouse with no real person or place.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect cinematic-storyboard@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "comparison-infographic@1.0.0",
+      "id": "comparison-infographic",
+      "version": "1.0.0",
+      "title": {
+        "en": "Comparison Infographic",
+        "zh": "对比信息图"
+      },
+      "summary": {
+        "en": "Translate structured information into a compact infographic with truthful comparisons, legible labels, and a single reading path.",
+        "zh": "把结构化信息转为紧凑信息图，保证对比诚实、标注清楚且阅读路径单一。"
+      },
+      "category": "infographics",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/comparison-infographic@1.0.0.png",
+      "sourceUrl": "./source/comparison-infographic@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect comparison-infographic@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "concept-scene@1.0.0",
+      "id": "concept-scene",
+      "version": "1.0.0",
+      "title": {
+        "en": "Cinematic Concept Scene",
+        "zh": "电影感概念场景"
+      },
+      "summary": {
+        "en": "Expand one idea or reference into an original cinematic world with strong scale, atmosphere, and spatial hierarchy.",
+        "zh": "将一个想法或参考图扩展为尺度鲜明、氛围完整且空间层级清楚的原创电影感世界。"
+      },
+      "category": "scenes-and-illustrations",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 512,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/concept-scene@1.0.0.png",
+      "sourceUrl": "./source/concept-scene@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional world and fictional people not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect concept-scene@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "cosmetic-packaging@1.0.0",
+      "id": "cosmetic-packaging",
+      "version": "1.0.0",
+      "title": {
+        "en": "Cosmetic Packaging",
+        "zh": "美妆包装设计"
+      },
+      "summary": {
+        "en": "Turn a product or concept into a coherent branding presentation with disciplined hierarchy, materials, and identity cues.",
+        "zh": "将产品或概念转为统一的品牌展示，严格控制层级、材质和识别线索。"
+      },
+      "category": "branding-and-packaging",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/cosmetic-packaging@1.0.0.png",
+      "sourceUrl": "./source/cosmetic-packaging@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect cosmetic-packaging@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "cultural-portrait-series@1.0.0",
+      "id": "cultural-portrait-series",
+      "version": "1.0.0",
+      "title": {
+        "en": "Cultural Portrait Series",
+        "zh": "文化主题肖像组"
+      },
+      "summary": {
+        "en": "Create a coherent profile visual that preserves subject cues while applying a controlled, original art direction.",
+        "zh": "生成连贯的人设视觉，在保留主体线索的同时应用克制且原创的美术方向。"
+      },
+      "category": "avatars-and-profile",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/cultural-portrait-series@1.0.0.png",
+      "sourceUrl": "./source/cultural-portrait-series@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect cultural-portrait-series@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "dense-explainer-slides@1.0.0",
+      "id": "dense-explainer-slides",
+      "version": "1.0.0",
+      "title": {
+        "en": "Dense Explainer Slides",
+        "zh": "高密度讲解幻灯片"
+      },
+      "summary": {
+        "en": "Compose dense material into a polished visual document page with strict hierarchy, readable text zones, and editorial rhythm.",
+        "zh": "把密集材料编排为精致视觉文档页，保持严格层级、可读文字区和编辑节奏。"
+      },
+      "category": "slides-and-visual-docs",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/dense-explainer-slides@1.0.0.png",
+      "sourceUrl": "./source/dense-explainer-slides@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect dense-explainer-slides@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "editorial-cover@1.0.0",
+      "id": "editorial-cover",
+      "version": "1.0.0",
+      "title": {
+        "en": "Editorial Cover",
+        "zh": "编辑杂志封面"
+      },
+      "summary": {
+        "en": "Turn one subject into a restrained magazine cover with a dominant image, disciplined masthead, and minimal accurate cover lines.",
+        "zh": "将一个主体转为克制的杂志封面，以主图、严格刊头和少量准确封面线构成编辑层级。"
+      },
+      "category": "poster-and-campaigns",
+      "executionKind": "host-image-generation",
+      "previewWidth": 768,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/editorial-cover@1.0.0.png",
+      "sourceUrl": "./source/editorial-cover@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect editorial-cover@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "educational-diagram-slide@1.0.0",
+      "id": "educational-diagram-slide",
+      "version": "1.0.0",
+      "title": {
+        "en": "Educational Diagram Slide",
+        "zh": "教学图解幻灯片"
+      },
+      "summary": {
+        "en": "Compose dense material into a polished visual document page with strict hierarchy, readable text zones, and editorial rhythm.",
+        "zh": "把密集材料编排为精致视觉文档页，保持严格层级、可读文字区和编辑节奏。"
+      },
+      "category": "slides-and-visual-docs",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/educational-diagram-slide@1.0.0.png",
+      "sourceUrl": "./source/educational-diagram-slide@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect educational-diagram-slide@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "er-diagram@1.0.0",
+      "id": "er-diagram",
+      "version": "1.0.0",
+      "title": {
+        "en": "ER Diagram",
+        "zh": "实体关系图"
+      },
+      "summary": {
+        "en": "Compile a system into a precise technical diagram with explicit nodes, connectors, boundaries, and unambiguous flow.",
+        "zh": "把系统编译为精确技术图，明确节点、连线、边界和无歧义流程。"
+      },
+      "category": "technical-diagrams",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/er-diagram@1.0.0.png",
+      "sourceUrl": "./source/er-diagram@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect er-diagram@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "exploded-view-poster@1.0.0",
+      "id": "exploded-view-poster",
+      "version": "1.0.0",
+      "title": {
+        "en": "Exploded View Poster",
+        "zh": "产品爆炸图海报"
+      },
+      "summary": {
+        "en": "Present a product with precise geometry, material separation, and a commercial composition free of unsupported claims.",
+        "zh": "以精确几何、清晰材质分离和商业构图展示产品，避免未经支持的宣称。"
+      },
+      "category": "product-visuals",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/exploded-view-poster@1.0.0.png",
+      "sourceUrl": "./source/exploded-view-poster@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect exploded-view-poster@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "flowchart-decision@1.0.0",
+      "id": "flowchart-decision",
+      "version": "1.0.0",
+      "title": {
+        "en": "Flowchart Decision",
+        "zh": "决策流程图"
+      },
+      "summary": {
+        "en": "Compile a system into a precise technical diagram with explicit nodes, connectors, boundaries, and unambiguous flow.",
+        "zh": "把系统编译为精确技术图，明确节点、连线、边界和无歧义流程。"
+      },
+      "category": "technical-diagrams",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/flowchart-decision@1.0.0.png",
+      "sourceUrl": "./source/flowchart-decision@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect flowchart-decision@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "food-map@1.0.0",
+      "id": "food-map",
+      "version": "1.0.0",
+      "title": {
+        "en": "Food Map",
+        "zh": "手绘食物地图"
+      },
+      "summary": {
+        "en": "Reframe one food theme or image as a navigable illustrated world with a central dish, distinct ingredient landmarks, and a compact legend.",
+        "zh": "将一个食物主题或图片重构为可游览的插画世界，以中央主食、清晰食材地标和紧凑图例组成。"
+      },
+      "category": "maps",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/food-map@1.0.0.png",
+      "sourceUrl": "./source/food-map@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect food-map@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "founder-portrait@1.0.0",
+      "id": "founder-portrait",
+      "version": "1.0.0",
+      "title": {
+        "en": "Founder Portrait",
+        "zh": "创始人肖像"
+      },
+      "summary": {
+        "en": "Create a polished original character portrait with stable identity anchors, intentional staging, and professional finish.",
+        "zh": "生成完成度高的原创人物肖像，保持身份锚点、明确调度和专业质感。"
+      },
+      "category": "portraits-and-characters",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/founder-portrait@1.0.0.png",
+      "sourceUrl": "./source/founder-portrait@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect founder-portrait@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "four-panel-comic@1.0.0",
+      "id": "four-panel-comic",
+      "version": "1.0.0",
+      "title": {
+        "en": "Four Panel Comic",
+        "zh": "四格反转漫画"
+      },
+      "summary": {
+        "en": "Tell one compact setup-to-payoff story in a consistent 2x2 comic with readable action and a clear final turn.",
+        "zh": "用一致的 2×2 四格漫画讲述从铺垫到回收的紧凑故事，并在末格形成清楚转折。"
+      },
+      "category": "storyboards-and-sequences",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/four-panel-comic@1.0.0.png",
+      "sourceUrl": "./source/four-panel-comic@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional repair apprentice and a wind-up bird with no real person, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect four-panel-comic@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "game-screenshot-mockup@1.0.0",
+      "id": "game-screenshot-mockup",
+      "version": "1.0.0",
+      "title": {
+        "en": "Game Screenshot Mockup",
+        "zh": "游戏截图样机"
+      },
+      "summary": {
+        "en": "Create a presentation-ready visual asset with a clear focal object, credible framing, and reusable composition.",
+        "zh": "生成可直接展示的视觉素材，保持焦点对象清楚、画面可信且构图可复用。"
+      },
+      "category": "assets-and-props",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/game-screenshot-mockup@1.0.0.png",
+      "sourceUrl": "./source/game-screenshot-mockup@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect game-screenshot-mockup@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "graphical-abstract@1.0.0",
+      "id": "graphical-abstract",
+      "version": "1.0.0",
+      "title": {
+        "en": "Graphical Abstract",
+        "zh": "论文图形摘要"
+      },
+      "summary": {
+        "en": "Compile research content into a publication-ready academic figure with explicit hierarchy, restrained color, and honest labels.",
+        "zh": "将研究内容编译为可发表的学术图示，强调明确层级、克制配色和诚实标注。"
+      },
+      "category": "academic-figures",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/graphical-abstract@1.0.0.png",
+      "sourceUrl": "./source/graphical-abstract@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect graphical-abstract@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "hand-drawn-infographic@1.0.0",
+      "id": "hand-drawn-infographic",
+      "version": "1.0.0",
+      "title": {
+        "en": "Hand-Drawn Infographic",
+        "zh": "手绘信息图"
+      },
+      "summary": {
+        "en": "Turn one topic or image into a clear hand-drawn explainer with a single visual flow, restrained labels, and tactile paper character.",
+        "zh": "将一个主题或一张图片整理为清晰的手绘解说图，用单一视觉流、克制标签和纸面质感传达重点。"
+      },
+      "category": "infographics",
+      "executionKind": "host-image-generation",
+      "previewWidth": 655,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/hand-drawn-infographic@1.0.0.png",
+      "sourceUrl": "./source/hand-drawn-infographic@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect hand-drawn-infographic@1.0.0 with this idea or my uploaded image."
+    },
+    {
       "ref": "healing-anime-scribble-v3@1.0.0",
       "id": "healing-anime-scribble-v3",
       "version": "1.0.0",
@@ -46,6 +1508,608 @@
       "invocation": "Use $image-effects effect healing-anime-scribble-v3@1.0.0 on my uploaded image."
     },
     {
+      "ref": "healing-scene@1.0.0",
+      "id": "healing-scene",
+      "version": "1.0.0",
+      "title": {
+        "en": "Healing Scene",
+        "zh": "治愈系日常场景"
+      },
+      "summary": {
+        "en": "Reframe one idea or reference as a quiet restorative moment with soft natural light and breathable illustration detail.",
+        "zh": "将一个想法或参考图转化为自然柔光、细节克制且留白舒展的治愈日常场景。"
+      },
+      "category": "scenes-and-illustrations",
+      "executionKind": "host-image-generation",
+      "previewWidth": 683,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/healing-scene@1.0.0.png",
+      "sourceUrl": "./source/healing-scene@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional person and place not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect healing-scene@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "illustrated-city-map@1.0.0",
+      "id": "illustrated-city-map",
+      "version": "1.0.0",
+      "title": {
+        "en": "Illustrated City Map",
+        "zh": "城市插画地图"
+      },
+      "summary": {
+        "en": "Turn place information into an illustrated map with a legible route or spatial hierarchy and no invented geographic claims.",
+        "zh": "把地点信息转为插画地图，路线或空间层级清楚，并避免虚构地理事实。"
+      },
+      "category": "maps",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/illustrated-city-map@1.0.0.png",
+      "sourceUrl": "./source/illustrated-city-map@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect illustrated-city-map@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "kinetic-graphite-character-study@1.0.0",
+      "id": "kinetic-graphite-character-study",
+      "version": "1.0.0",
+      "title": {
+        "en": "Kinetic Graphite Character Study",
+        "zh": "动势石墨人物速写"
+      },
+      "summary": {
+        "en": "Redraw one person as a loose monochrome graphite character study with recognizable identity, pressure-varied searching contours, irregular structural hatching, blocked-in hair masses, and purposeful unfinished paper.",
+        "zh": "将单人照片重绘为松散的黑白石墨人物速写，保留身份与姿态，以粗细压力变化明显的探索线、不规则结构排线、概括发块和有意识的未完成纸面表现手绘感。"
+      },
+      "category": "portrait",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1122,
+      "previewHeight": 1402,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/kinetic-graphite-character-study@1.0.0.png",
+      "sourceUrl": "./source/kinetic-graphite-character-study@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional adult urban courier in an original pose; not based on a real person, character, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect kinetic-graphite-character-study@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "kpi-dashboard-infographic@1.0.0",
+      "id": "kpi-dashboard-infographic",
+      "version": "1.0.0",
+      "title": {
+        "en": "KPI Dashboard Infographic",
+        "zh": "关键指标看板信息图"
+      },
+      "summary": {
+        "en": "Translate structured information into a compact infographic with truthful comparisons, legible labels, and a single reading path.",
+        "zh": "把结构化信息转为紧凑信息图，保证对比诚实、标注清楚且阅读路径单一。"
+      },
+      "category": "infographics",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/kpi-dashboard-infographic@1.0.0.png",
+      "sourceUrl": "./source/kpi-dashboard-infographic@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect kpi-dashboard-infographic@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "legend-heavy-infographic@1.0.0",
+      "id": "legend-heavy-infographic",
+      "version": "1.0.0",
+      "title": {
+        "en": "Legend Heavy Infographic",
+        "zh": "多图例信息图"
+      },
+      "summary": {
+        "en": "Translate structured information into a compact infographic with truthful comparisons, legible labels, and a single reading path.",
+        "zh": "把结构化信息转为紧凑信息图，保证对比诚实、标注清楚且阅读路径单一。"
+      },
+      "category": "infographics",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/legend-heavy-infographic@1.0.0.png",
+      "sourceUrl": "./source/legend-heavy-infographic@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect legend-heavy-infographic@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "lifestyle-product-scene@1.0.0",
+      "id": "lifestyle-product-scene",
+      "version": "1.0.0",
+      "title": {
+        "en": "Lifestyle Product Scene",
+        "zh": "生活方式产品场景"
+      },
+      "summary": {
+        "en": "Place one product in a believable everyday setting where light, props, and use context support the hero without overpowering it.",
+        "zh": "将一个产品置于可信日常场景，让光线、道具与使用语境共同支持主体而不喧宾夺主。"
+      },
+      "category": "product-visuals",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 768,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/lifestyle-product-scene@1.0.0.png",
+      "sourceUrl": "./source/lifestyle-product-scene@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional linen-bound portable radio in an invented quiet reading nook with no real brand or place.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect lifestyle-product-scene@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "live-commerce-ui@1.0.0",
+      "id": "live-commerce-ui",
+      "version": "1.0.0",
+      "title": {
+        "en": "Live Commerce UI",
+        "zh": "直播电商界面"
+      },
+      "summary": {
+        "en": "Create a convincing interface scene with a clear product state, stable component hierarchy, and legible interaction focus.",
+        "zh": "生成可信的界面场景，保持产品状态、组件层级和交互焦点清楚。"
+      },
+      "category": "ui-mockups",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/live-commerce-ui@1.0.0.png",
+      "sourceUrl": "./source/live-commerce-ui@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect live-commerce-ui@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "local-object-replacement@1.0.0",
+      "id": "local-object-replacement",
+      "version": "1.0.0",
+      "title": {
+        "en": "Local Object Replacement",
+        "zh": "局部物体替换"
+      },
+      "summary": {
+        "en": "Edit one supplied image with a tightly scoped change while preserving all unaffected identity, geometry, text, and material cues.",
+        "zh": "对一张输入图片执行严格限定的编辑，同时保留所有未指定的身份、几何、文字和材质线索。"
+      },
+      "category": "editing-workflows",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/local-object-replacement@1.0.0.png",
+      "sourceUrl": "./source/local-object-replacement@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect local-object-replacement@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "lookbook-grid@1.0.0",
+      "id": "lookbook-grid",
+      "version": "1.0.0",
+      "title": {
+        "en": "Lookbook Grid",
+        "zh": "Lookbook 造型网格"
+      },
+      "summary": {
+        "en": "Build a coherent six-to-nine-panel lookbook with a stable subject, distinct looks, and disciplined editorial spacing.",
+        "zh": "构建六至九格的连贯造型册，以稳定主体、清晰差异和克制的编辑间距呈现系列。"
+      },
+      "category": "grids-and-collages",
+      "executionKind": "host-image-generation",
+      "previewWidth": 768,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/lookbook-grid@1.0.0.png",
+      "sourceUrl": "./source/lookbook-grid@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect lookbook-grid@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "manga-spread-page@1.0.0",
+      "id": "manga-spread-page",
+      "version": "1.0.0",
+      "title": {
+        "en": "Manga Spread Page",
+        "zh": "漫画跨页"
+      },
+      "summary": {
+        "en": "Compose one story beat as a rhythmic multi-panel manga spread with consistent characters, controlled gutters, and legible action flow.",
+        "zh": "将一个故事节拍编排为富有节奏的多分镜漫画跨页，保持角色一致、装订安全和动作流清楚。"
+      },
+      "category": "storyboards-and-sequences",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 703,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/manga-spread-page@1.0.0.png",
+      "sourceUrl": "./source/manga-spread-page@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of fictional bicycle couriers crossing an invented floating market with no real people, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect manga-spread-page@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "mascot-brand-kit@1.0.0",
+      "id": "mascot-brand-kit",
+      "version": "1.0.0",
+      "title": {
+        "en": "Mascot Brand Kit",
+        "zh": "吉祥物品牌套装"
+      },
+      "summary": {
+        "en": "Develop one original mascot into a coherent hero, turnaround, expression, and application system.",
+        "zh": "将一个原创吉祥物发展为主视觉、三视、表情与应用物料一致的完整品牌套装。"
+      },
+      "category": "branding-and-packaging",
+      "executionKind": "host-image-generation",
+      "previewWidth": 683,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/mascot-brand-kit@1.0.0.png",
+      "sourceUrl": "./source/mascot-brand-kit@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of an original fictional mascot and generic products not based on a real brand, known character, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect mascot-brand-kit@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "mechanism-diagram@1.0.0",
+      "id": "mechanism-diagram",
+      "version": "1.0.0",
+      "title": {
+        "en": "Mechanism Diagram",
+        "zh": "机理示意图"
+      },
+      "summary": {
+        "en": "Compile research content into a publication-ready academic figure with explicit hierarchy, restrained color, and honest labels.",
+        "zh": "将研究内容编译为可发表的学术图示，强调明确层级、克制配色和诚实标注。"
+      },
+      "category": "academic-figures",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/mechanism-diagram@1.0.0.png",
+      "sourceUrl": "./source/mechanism-diagram@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect mechanism-diagram@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "method-pipeline-overview@1.0.0",
+      "id": "method-pipeline-overview",
+      "version": "1.0.0",
+      "title": {
+        "en": "Method Pipeline Overview",
+        "zh": "方法管线总览"
+      },
+      "summary": {
+        "en": "Compile research content into a publication-ready academic figure with explicit hierarchy, restrained color, and honest labels.",
+        "zh": "将研究内容编译为可发表的学术图示，强调明确层级、克制配色和诚实标注。"
+      },
+      "category": "academic-figures",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/method-pipeline-overview@1.0.0.png",
+      "sourceUrl": "./source/method-pipeline-overview@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect method-pipeline-overview@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "mind-map-tech@1.0.0",
+      "id": "mind-map-tech",
+      "version": "1.0.0",
+      "title": {
+        "en": "Mind Map Tech",
+        "zh": "技术思维导图"
+      },
+      "summary": {
+        "en": "Compile a system into a precise technical diagram with explicit nodes, connectors, boundaries, and unambiguous flow.",
+        "zh": "把系统编译为精确技术图，明确节点、连线、边界和无歧义流程。"
+      },
+      "category": "technical-diagrams",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/mind-map-tech@1.0.0.png",
+      "sourceUrl": "./source/mind-map-tech@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect mind-map-tech@1.0.0 with this idea or my uploaded image."
+    },
+    {
       "ref": "minimal-zine-poster@1.0.0",
       "id": "minimal-zine-poster",
       "version": "1.0.0",
@@ -87,6 +2151,307 @@
         }
       },
       "invocation": "Use $image-effects effect minimal-zine-poster@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "minimalist-mood-scene@1.0.0",
+      "id": "minimalist-mood-scene",
+      "version": "1.0.0",
+      "title": {
+        "en": "Minimalist Mood Scene",
+        "zh": "极简留白氛围图"
+      },
+      "summary": {
+        "en": "Reduce one idea or reference to a single quiet motif, broad negative space, and a restrained emotional palette.",
+        "zh": "将一个想法或参考图提炼为单一安静母题、大面积留白与克制情绪色板。"
+      },
+      "category": "scenes-and-illustrations",
+      "executionKind": "host-image-generation",
+      "previewWidth": 683,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/minimalist-mood-scene@1.0.0.png",
+      "sourceUrl": "./source/minimalist-mood-scene@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of fictional still-life objects not based on a real brand, place, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect minimalist-mood-scene@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "mixed-style-multi-panel@1.0.0",
+      "id": "mixed-style-multi-panel",
+      "version": "1.0.0",
+      "title": {
+        "en": "Mixed-Style Multi-Panel",
+        "zh": "多媒介混合风格拼贴"
+      },
+      "summary": {
+        "en": "Render one stable subject across five coordinated media while preserving identity, pose, geometry, and palette anchors.",
+        "zh": "将同一稳定主体以五种协调媒介呈现，同时守住身份、姿态、几何和配色锚点。"
+      },
+      "category": "grids-and-collages",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/mixed-style-multi-panel@1.0.0.png",
+      "sourceUrl": "./source/mixed-style-multi-panel@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect mixed-style-multi-panel@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "multi-condition-comparison@1.0.0",
+      "id": "multi-condition-comparison",
+      "version": "1.0.0",
+      "title": {
+        "en": "Multi Condition Comparison",
+        "zh": "多工况对比图"
+      },
+      "summary": {
+        "en": "Compile research content into a publication-ready academic figure with explicit hierarchy, restrained color, and honest labels.",
+        "zh": "将研究内容编译为可发表的学术图示，强调明确层级、克制配色和诚实标注。"
+      },
+      "category": "academic-figures",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/multi-condition-comparison@1.0.0.png",
+      "sourceUrl": "./source/multi-condition-comparison@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect multi-condition-comparison@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "network-topology@1.0.0",
+      "id": "network-topology",
+      "version": "1.0.0",
+      "title": {
+        "en": "Network Topology",
+        "zh": "网络拓扑图"
+      },
+      "summary": {
+        "en": "Compile a system into a precise technical diagram with explicit nodes, connectors, boundaries, and unambiguous flow.",
+        "zh": "把系统编译为精确技术图，明确节点、连线、边界和无歧义流程。"
+      },
+      "category": "technical-diagrams",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/network-topology@1.0.0.png",
+      "sourceUrl": "./source/network-topology@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect network-topology@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "neural-network-architecture@1.0.0",
+      "id": "neural-network-architecture",
+      "version": "1.0.0",
+      "title": {
+        "en": "Neural Network Architecture",
+        "zh": "神经网络架构图"
+      },
+      "summary": {
+        "en": "Compile research content into a publication-ready academic figure with explicit hierarchy, restrained color, and honest labels.",
+        "zh": "将研究内容编译为可发表的学术图示，强调明确层级、克制配色和诚实标注。"
+      },
+      "category": "academic-figures",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/neural-network-architecture@1.0.0.png",
+      "sourceUrl": "./source/neural-network-architecture@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect neural-network-architecture@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "object-removal@1.0.0",
+      "id": "object-removal",
+      "version": "1.0.0",
+      "title": {
+        "en": "Object Removal",
+        "zh": "物体移除"
+      },
+      "summary": {
+        "en": "Edit one supplied image with a tightly scoped change while preserving all unaffected identity, geometry, text, and material cues.",
+        "zh": "对一张输入图片执行严格限定的编辑，同时保留所有未指定的身份、几何、文字和材质线索。"
+      },
+      "category": "editing-workflows",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/object-removal@1.0.0.png",
+      "sourceUrl": "./source/object-removal@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect object-removal@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "packaging-showcase@1.0.0",
+      "id": "packaging-showcase",
+      "version": "1.0.0",
+      "title": {
+        "en": "Packaging Showcase",
+        "zh": "包装展示图"
+      },
+      "summary": {
+        "en": "Stage a coherent unbranded packaging family with one hero pack, supporting views, and commercially credible materials.",
+        "zh": "展示一套连贯的无品牌包装，以一个英雄包装、少量辅助视图和可信商业材质为核心。"
+      },
+      "category": "product-visuals",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 768,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/packaging-showcase@1.0.0.png",
+      "sourceUrl": "./source/packaging-showcase@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of fictional seed-paper soap packaging with invented geometric marks and no real brand or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect packaging-showcase@1.0.0 with this idea or my uploaded image."
     },
     {
       "ref": "photo-illustration-diptych@1.0.0",
@@ -189,7 +2554,7 @@
       "category": "editorial",
       "executionKind": "host-image-generation-and-layout",
       "previewWidth": 1024,
-      "previewHeight": 1536,
+      "previewHeight": 768,
       "input": {
         "mode": "image",
         "min": 1,
@@ -210,12 +2575,571 @@
           "url": "https://github.com/wangjs-jacky/happy/blob/e8716a0a0c949f8e2b45e1e3d7c8d36ad7bba17c/LICENSE"
         },
         "preview": {
-          "origin": "Locally composed from two text-only generated fictional assets; not based on a real person, place, brand, or third-party image.",
+          "origin": "Text-only image generation of a fictional rainy storefront and bicycle; not based on a real person, place, brand, or third-party image.",
           "author": "wangjs-jacky",
           "licenseSpdx": "CC-BY-4.0"
         }
       },
       "invocation": "Use $image-effects effect photo-illustration-editorial-echo@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "picture-book-scene@1.0.0",
+      "id": "picture-book-scene",
+      "version": "1.0.0",
+      "title": {
+        "en": "Picture Book Scene",
+        "zh": "绘本叙事场景"
+      },
+      "summary": {
+        "en": "Turn one idea or reference into a warm picture-book scene with a clear story beat and original character language.",
+        "zh": "将一个想法或参考图编译为叙事动作清晰、角色原创且具有温暖纸本质感的绘本场景。"
+      },
+      "category": "scenes-and-illustrations",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 683,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/picture-book-scene@1.0.0.png",
+      "sourceUrl": "./source/picture-book-scene@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of fictional characters and a fictional place not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect picture-book-scene@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "policy-style-slide@1.0.0",
+      "id": "policy-style-slide",
+      "version": "1.0.0",
+      "title": {
+        "en": "Policy Style Slide",
+        "zh": "政策风格幻灯片"
+      },
+      "summary": {
+        "en": "Compose dense material into a polished visual document page with strict hierarchy, readable text zones, and editorial rhythm.",
+        "zh": "把密集材料编排为精致视觉文档页，保持严格层级、可读文字区和编辑节奏。"
+      },
+      "category": "slides-and-visual-docs",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/policy-style-slide@1.0.0.png",
+      "sourceUrl": "./source/policy-style-slide@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect policy-style-slide@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "portrait-local-edit@1.0.0",
+      "id": "portrait-local-edit",
+      "version": "1.0.0",
+      "title": {
+        "en": "Portrait Local Edit",
+        "zh": "人像局部编辑"
+      },
+      "summary": {
+        "en": "Edit one supplied image with a tightly scoped change while preserving all unaffected identity, geometry, text, and material cues.",
+        "zh": "对一张输入图片执行严格限定的编辑，同时保留所有未指定的身份、几何、文字和材质线索。"
+      },
+      "category": "editing-workflows",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/portrait-local-edit@1.0.0.png",
+      "sourceUrl": "./source/portrait-local-edit@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect portrait-local-edit@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "premium-studio-product@1.0.0",
+      "id": "premium-studio-product",
+      "version": "1.0.0",
+      "title": {
+        "en": "Premium Studio Product",
+        "zh": "高级影棚产品摄影"
+      },
+      "summary": {
+        "en": "Present one product as a premium advertising hero with controlled studio light, refined materials, and a disciplined palette.",
+        "zh": "将一个产品呈现为高级广告主视觉，以可控影棚光、精致材质和克制色板为核心。"
+      },
+      "category": "product-visuals",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 768,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/premium-studio-product@1.0.0.png",
+      "sourceUrl": "./source/premium-studio-product@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional amber glass desk lamp with no real brand or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect premium-studio-product@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "product-card-overlay@1.0.0",
+      "id": "product-card-overlay",
+      "version": "1.0.0",
+      "title": {
+        "en": "Product Card Overlay",
+        "zh": "商品卡片叠层"
+      },
+      "summary": {
+        "en": "Create a convincing interface scene with a clear product state, stable component hierarchy, and legible interaction focus.",
+        "zh": "生成可信的界面场景，保持产品状态、组件层级和交互焦点清楚。"
+      },
+      "category": "ui-mockups",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/product-card-overlay@1.0.0.png",
+      "sourceUrl": "./source/product-card-overlay@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect product-card-overlay@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "product-retouching@1.0.0",
+      "id": "product-retouching",
+      "version": "1.0.0",
+      "title": {
+        "en": "Product Retouching",
+        "zh": "产品精修"
+      },
+      "summary": {
+        "en": "Edit one supplied image with a tightly scoped change while preserving all unaffected identity, geometry, text, and material cues.",
+        "zh": "对一张输入图片执行严格限定的编辑，同时保留所有未指定的身份、几何、文字和材质线索。"
+      },
+      "category": "editing-workflows",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/product-retouching@1.0.0.png",
+      "sourceUrl": "./source/product-retouching@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect product-retouching@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "product-tvc-storyboard@1.0.0",
+      "id": "product-tvc-storyboard",
+      "version": "1.0.0",
+      "title": {
+        "en": "Product TVC Storyboard",
+        "zh": "产品 TVC 分镜"
+      },
+      "summary": {
+        "en": "Turn one product proposition into a consistent 3x3 advertising storyboard from context and tactile detail to the final hero reveal.",
+        "zh": "将一个产品命题转为一致的 3×3 广告分镜，从场景与触感细节推进到最终英雄展示。"
+      },
+      "category": "storyboards-and-sequences",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 683,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/product-tvc-storyboard@1.0.0.png",
+      "sourceUrl": "./source/product-tvc-storyboard@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional compact tabletop radio campaign with no real brand, person, place, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect product-tvc-storyboard@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "professional-portrait@1.0.0",
+      "id": "professional-portrait",
+      "version": "1.0.0",
+      "title": {
+        "en": "Professional Portrait",
+        "zh": "职业肖像"
+      },
+      "summary": {
+        "en": "Create a polished original character portrait with stable identity anchors, intentional staging, and professional finish.",
+        "zh": "生成完成度高的原创人物肖像，保持身份锚点、明确调度和专业质感。"
+      },
+      "category": "portraits-and-characters",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/professional-portrait@1.0.0.png",
+      "sourceUrl": "./source/professional-portrait@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect professional-portrait@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "publication-chart@1.0.0",
+      "id": "publication-chart",
+      "version": "1.0.0",
+      "title": {
+        "en": "Publication Chart",
+        "zh": "出版级图表"
+      },
+      "summary": {
+        "en": "Compile research content into a publication-ready academic figure with explicit hierarchy, restrained color, and honest labels.",
+        "zh": "将研究内容编译为可发表的学术图示，强调明确层级、克制配色和诚实标注。"
+      },
+      "category": "academic-figures",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/publication-chart@1.0.0.png",
+      "sourceUrl": "./source/publication-chart@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect publication-chart@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "qualitative-comparison-grid@1.0.0",
+      "id": "qualitative-comparison-grid",
+      "version": "1.0.0",
+      "title": {
+        "en": "Qualitative Comparison Grid",
+        "zh": "定性对比网格"
+      },
+      "summary": {
+        "en": "Compile research content into a publication-ready academic figure with explicit hierarchy, restrained color, and honest labels.",
+        "zh": "将研究内容编译为可发表的学术图示，强调明确层级、克制配色和诚实标注。"
+      },
+      "category": "academic-figures",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/qualitative-comparison-grid@1.0.0.png",
+      "sourceUrl": "./source/qualitative-comparison-grid@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect qualitative-comparison-grid@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "recipe-process-flowchart@1.0.0",
+      "id": "recipe-process-flowchart",
+      "version": "1.0.0",
+      "title": {
+        "en": "Recipe Process Flowchart",
+        "zh": "食谱流程图"
+      },
+      "summary": {
+        "en": "Compile one recipe into an illustrated, ordered cooking flow with ingredients, concise steps, and a clear finished dish.",
+        "zh": "将一道食谱编译为有序的插画烹饪流程，包含食材、简洁步骤和清楚的成品。"
+      },
+      "category": "storyboards-and-sequences",
+      "executionKind": "host-image-generation",
+      "previewWidth": 683,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/recipe-process-flowchart@1.0.0.png",
+      "sourceUrl": "./source/recipe-process-flowchart@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional six-step roasted pear recipe using generic ingredients and no third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect recipe-process-flowchart@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "research-overview-poster@1.0.0",
+      "id": "research-overview-poster",
+      "version": "1.0.0",
+      "title": {
+        "en": "Research Overview Poster",
+        "zh": "研究总览海报"
+      },
+      "summary": {
+        "en": "Compile research content into a publication-ready academic figure with explicit hierarchy, restrained color, and honest labels.",
+        "zh": "将研究内容编译为可发表的学术图示，强调明确层级、克制配色和诚实标注。"
+      },
+      "category": "academic-figures",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/research-overview-poster@1.0.0.png",
+      "sourceUrl": "./source/research-overview-poster@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect research-overview-poster@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "retro-skeuomorphic-icons@1.0.0",
+      "id": "retro-skeuomorphic-icons",
+      "version": "1.0.0",
+      "title": {
+        "en": "Retro Skeuomorphic Icons",
+        "zh": "复古拟物图标集"
+      },
+      "summary": {
+        "en": "Turn one idea or reference into a coherent grid of tactile glass, metal, paper, and leather icons.",
+        "zh": "将一个想法或参考图编译为玻璃、金属、纸张与皮革质感统一的复古拟物图标集。"
+      },
+      "category": "assets-and-props",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/retro-skeuomorphic-icons@1.0.0.png",
+      "sourceUrl": "./source/retro-skeuomorphic-icons@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of fictional utility objects not based on a real brand or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect retro-skeuomorphic-icons@1.0.0 with this idea or my uploaded image."
     },
     {
       "ref": "scene-distillation-zine@1.0.0",
@@ -345,6 +3269,823 @@
         }
       },
       "invocation": "Use $image-effects effect scenes-gathered-zine-sea@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "scientific-schematic@1.0.0",
+      "id": "scientific-schematic",
+      "version": "1.0.0",
+      "title": {
+        "en": "Scientific Schematic",
+        "zh": "科学示意图"
+      },
+      "summary": {
+        "en": "Compile research content into a publication-ready academic figure with explicit hierarchy, restrained color, and honest labels.",
+        "zh": "将研究内容编译为可发表的学术图示，强调明确层级、克制配色和诚实标注。"
+      },
+      "category": "academic-figures",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/scientific-schematic@1.0.0.png",
+      "sourceUrl": "./source/scientific-schematic@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect scientific-schematic@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "sequence-diagram@1.0.0",
+      "id": "sequence-diagram",
+      "version": "1.0.0",
+      "title": {
+        "en": "Sequence Diagram",
+        "zh": "时序图"
+      },
+      "summary": {
+        "en": "Compile a system into a precise technical diagram with explicit nodes, connectors, boundaries, and unambiguous flow.",
+        "zh": "把系统编译为精确技术图，明确节点、连线、边界和无歧义流程。"
+      },
+      "category": "technical-diagrams",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/sequence-diagram@1.0.0.png",
+      "sourceUrl": "./source/sequence-diagram@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect sequence-diagram@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "short-video-cover-ui@1.0.0",
+      "id": "short-video-cover-ui",
+      "version": "1.0.0",
+      "title": {
+        "en": "Short Video Cover UI",
+        "zh": "短视频封面界面"
+      },
+      "summary": {
+        "en": "Create a convincing interface scene with a clear product state, stable component hierarchy, and legible interaction focus.",
+        "zh": "生成可信的界面场景，保持产品状态、组件层级和交互焦点清楚。"
+      },
+      "category": "ui-mockups",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/short-video-cover-ui@1.0.0.png",
+      "sourceUrl": "./source/short-video-cover-ui@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect short-video-cover-ui@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "social-interface-mockup@1.0.0",
+      "id": "social-interface-mockup",
+      "version": "1.0.0",
+      "title": {
+        "en": "Social Interface Mockup",
+        "zh": "社交界面样机"
+      },
+      "summary": {
+        "en": "Create a convincing interface scene with a clear product state, stable component hierarchy, and legible interaction focus.",
+        "zh": "生成可信的界面场景，保持产品状态、组件层级和交互焦点清楚。"
+      },
+      "category": "ui-mockups",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/social-interface-mockup@1.0.0.png",
+      "sourceUrl": "./source/social-interface-mockup@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect social-interface-mockup@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "state-machine@1.0.0",
+      "id": "state-machine",
+      "version": "1.0.0",
+      "title": {
+        "en": "State Machine",
+        "zh": "状态机图"
+      },
+      "summary": {
+        "en": "Compile a system into a precise technical diagram with explicit nodes, connectors, boundaries, and unambiguous flow.",
+        "zh": "把系统编译为精确技术图，明确节点、连线、边界和无歧义流程。"
+      },
+      "category": "technical-diagrams",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/state-machine@1.0.0.png",
+      "sourceUrl": "./source/state-machine@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect state-machine@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "step-by-step-infographic@1.0.0",
+      "id": "step-by-step-infographic",
+      "version": "1.0.0",
+      "title": {
+        "en": "Step by Step Infographic",
+        "zh": "步骤教程信息图"
+      },
+      "summary": {
+        "en": "Turn one practical process into a visual-first ordered infographic with concise stages, clear connectors, and a strong final outcome.",
+        "zh": "将一个实用流程转为视觉优先的有序信息图，以简洁阶段、清楚连接和突出结果为核心。"
+      },
+      "category": "infographics",
+      "executionKind": "host-image-generation",
+      "previewWidth": 683,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/step-by-step-infographic@1.0.0.png",
+      "sourceUrl": "./source/step-by-step-infographic@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional five-step desk terrarium assembly using generic materials and no third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect step-by-step-infographic@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "sticker-set@1.0.0",
+      "id": "sticker-set",
+      "version": "1.0.0",
+      "title": {
+        "en": "Sticker Set",
+        "zh": "角色贴纸套组"
+      },
+      "summary": {
+        "en": "Expand one idea or reference into a cohesive sheet of separately cuttable character stickers with consistent identity.",
+        "zh": "将一个想法或参考图扩展为角色身份一致、姿态多样且可独立裁切的完整贴纸套组。"
+      },
+      "category": "avatars-and-profile",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 683,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/sticker-set@1.0.0.png",
+      "sourceUrl": "./source/sticker-set@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of an original fictional character not based on a real person, brand, known character, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect sticker-set@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "store-distribution-map@1.0.0",
+      "id": "store-distribution-map",
+      "version": "1.0.0",
+      "title": {
+        "en": "Store Distribution Map",
+        "zh": "门店分布地图"
+      },
+      "summary": {
+        "en": "Turn place information into an illustrated map with a legible route or spatial hierarchy and no invented geographic claims.",
+        "zh": "把地点信息转为插画地图，路线或空间层级清楚，并避免虚构地理事实。"
+      },
+      "category": "maps",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/store-distribution-map@1.0.0.png",
+      "sourceUrl": "./source/store-distribution-map@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect store-distribution-map@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "style-transfer-selfie@1.0.0",
+      "id": "style-transfer-selfie",
+      "version": "1.0.0",
+      "title": {
+        "en": "Style Transfer Selfie",
+        "zh": "自拍风格转绘"
+      },
+      "summary": {
+        "en": "Create a coherent profile visual that preserves subject cues while applying a controlled, original art direction.",
+        "zh": "生成连贯的人设视觉，在保留主体线索的同时应用克制且原创的美术方向。"
+      },
+      "category": "avatars-and-profile",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/style-transfer-selfie@1.0.0.png",
+      "sourceUrl": "./source/style-transfer-selfie@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect style-transfer-selfie@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "system-architecture@1.0.0",
+      "id": "system-architecture",
+      "version": "1.0.0",
+      "title": {
+        "en": "System Architecture",
+        "zh": "系统架构图"
+      },
+      "summary": {
+        "en": "Compile a system into a precise technical diagram with explicit nodes, connectors, boundaries, and unambiguous flow.",
+        "zh": "把系统编译为精确技术图，明确节点、连线、边界和无歧义流程。"
+      },
+      "category": "technical-diagrams",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/system-architecture@1.0.0.png",
+      "sourceUrl": "./source/system-architecture@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect system-architecture@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "themed-3d-icon@1.0.0",
+      "id": "themed-3d-icon",
+      "version": "1.0.0",
+      "title": {
+        "en": "Themed 3D Icon",
+        "zh": "主题 3D 头像图标"
+      },
+      "summary": {
+        "en": "Turn one idea or reference into an original single-subject 3D icon with a strong silhouette and compact theme cues.",
+        "zh": "将一个想法或参考图转化为主体单一、轮廓鲜明且主题线索克制的原创 3D 头像图标。"
+      },
+      "category": "avatars-and-profile",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/themed-3d-icon@1.0.0.png",
+      "sourceUrl": "./source/themed-3d-icon@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional non-human character not based on a real person, brand, known character, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect themed-3d-icon@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "title-safe-poster@1.0.0",
+      "id": "title-safe-poster",
+      "version": "1.0.0",
+      "title": {
+        "en": "Title Safe Poster",
+        "zh": "标题安全区海报"
+      },
+      "summary": {
+        "en": "Build a type-led composition with protected reading zones, clear language hierarchy, and restrained supporting imagery.",
+        "zh": "构建以文字为核心的版式，保护阅读区域、语言层级和克制的辅助图像。"
+      },
+      "category": "typography-and-text-layout",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/title-safe-poster@1.0.0.png",
+      "sourceUrl": "./source/title-safe-poster@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect title-safe-poster@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "torn-paper-editorial-photo-collage@1.0.0",
+      "id": "torn-paper-editorial-photo-collage",
+      "version": "1.0.0",
+      "title": {
+        "en": "Torn Paper Editorial Photo Collage",
+        "zh": "撕纸编辑影像拼贴"
+      },
+      "summary": {
+        "en": "Embed one truthful color photo in a fibrous torn opening with a source-derived monochrome echo, one dry-brush color field, and quiet aged paper.",
+        "zh": "将一张真实彩色照片嵌入纤维撕口，以来源环境的黑白网点回声、一道干刷色块和留白旧纸完成编辑拼贴。"
+      },
+      "category": "editorial",
+      "executionKind": "host-image-generation",
+      "previewWidth": 615,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/torn-paper-editorial-photo-collage@1.0.0.jpg",
+      "sourceUrl": "./source/torn-paper-editorial-photo-collage@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "d1259c69fdc5494553f31b6736b640d597a89bfb",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/d1259c69fdc5494553f31b6736b640d597a89bfb/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional rainy stair scene with an unattended umbrella; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect torn-paper-editorial-photo-collage@1.0.0 on my uploaded image."
+    },
+    {
+      "ref": "travel-route-map@1.0.0",
+      "id": "travel-route-map",
+      "version": "1.0.0",
+      "title": {
+        "en": "Travel Route Map",
+        "zh": "旅行路线地图"
+      },
+      "summary": {
+        "en": "Turn place information into an illustrated map with a legible route or spatial hierarchy and no invented geographic claims.",
+        "zh": "把地点信息转为插画地图，路线或空间层级清楚，并避免虚构地理事实。"
+      },
+      "category": "maps",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/travel-route-map@1.0.0.png",
+      "sourceUrl": "./source/travel-route-map@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect travel-route-map@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "vintage-editorial-infographic@1.0.0",
+      "id": "vintage-editorial-infographic",
+      "version": "1.0.0",
+      "title": {
+        "en": "Vintage Editorial Infographic",
+        "zh": "复古编辑信息图"
+      },
+      "summary": {
+        "en": "Compile a topic or image into a sparse archival infographic with engraved motifs, disciplined ink, and evidence-safe diagrams.",
+        "zh": "将主题或图片编译成稀疏的档案式信息图，以雕版母题、克制油墨和不虚构依据的图解构成。"
+      },
+      "category": "infographics",
+      "executionKind": "host-image-generation",
+      "previewWidth": 683,
+      "previewHeight": 1024,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/vintage-editorial-infographic@1.0.0.png",
+      "sourceUrl": "./source/vintage-editorial-infographic@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect vintage-editorial-infographic@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "vintage-film-editorial@1.0.0",
+      "id": "vintage-film-editorial",
+      "version": "1.0.0",
+      "title": {
+        "en": "Vintage Film Editorial",
+        "zh": "复古胶片编辑影像"
+      },
+      "summary": {
+        "en": "Reframe one idea or reference image as a restrained 35mm editorial still with warm halation, tactile grain, and natural atmosphere.",
+        "zh": "将一个主题或一张参考图重构为克制的 35mm 编辑影像，以暖色晕光、可感颗粒和自然氛围为核心。"
+      },
+      "category": "editing-workflows",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 768,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/vintage-film-editorial@1.0.0.png",
+      "sourceUrl": "./source/vintage-film-editorial@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional neighborhood flower shop at dusk with no real place, person, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect vintage-film-editorial@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "virtual-host@1.0.0",
+      "id": "virtual-host",
+      "version": "1.0.0",
+      "title": {
+        "en": "Virtual Host",
+        "zh": "虚拟主播形象"
+      },
+      "summary": {
+        "en": "Create a polished original character portrait with stable identity anchors, intentional staging, and professional finish.",
+        "zh": "生成完成度高的原创人物肖像，保持身份锚点、明确调度和专业质感。"
+      },
+      "category": "portraits-and-characters",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/virtual-host@1.0.0.png",
+      "sourceUrl": "./source/virtual-host@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect virtual-host@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "visual-report-page@1.0.0",
+      "id": "visual-report-page",
+      "version": "1.0.0",
+      "title": {
+        "en": "Visual Report Page",
+        "zh": "可视化报告页"
+      },
+      "summary": {
+        "en": "Compose dense material into a polished visual document page with strict hierarchy, readable text zones, and editorial rhythm.",
+        "zh": "把密集材料编排为精致视觉文档页，保持严格层级、可读文字区和编辑节奏。"
+      },
+      "category": "slides-and-visual-docs",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1440,
+      "previewHeight": 900,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/visual-report-page@1.0.0.png",
+      "sourceUrl": "./source/visual-report-page@1.0.0.md",
+      "provenance": {
+        "repository": "ConardLi/garden-skills",
+        "revision": "aaf9a82f5efd73e87cc0998edc398e75bfc35901",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/ConardLi/garden-skills/blob/aaf9a82f5efd73e87cc0998edc398e75bfc35901/LICENSE"
+        },
+        "preview": {
+          "origin": "Original procedural vector preview created for this catalog and not derived from an upstream case image or third-party artwork.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect visual-report-page@1.0.0 with this idea or my uploaded image."
+    },
+    {
+      "ref": "white-background-product@1.0.0",
+      "id": "white-background-product",
+      "version": "1.0.0",
+      "title": {
+        "en": "White Background Product",
+        "zh": "白底电商产品图"
+      },
+      "summary": {
+        "en": "Isolate one product on clean white with truthful geometry, crisp edges, and a soft physically plausible grounding shadow.",
+        "zh": "将一个产品置于干净白底，以真实结构、清晰边缘和符合物理的柔和落地阴影为核心。"
+      },
+      "category": "product-visuals",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1024,
+      "previewHeight": 768,
+      "input": {
+        "mode": "text-or-image",
+        "min": 0,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/white-background-product@1.0.0.png",
+      "sourceUrl": "./source/white-background-product@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/9fe4b5d0fc893b9dfe2713dd43e3cd324fb6744f/LICENSE"
+        },
+        "preview": {
+          "origin": "Text-only image generation of a fictional cobalt travel kettle with no real brand or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect white-background-product@1.0.0 with this idea or my uploaded image."
     }
   ]
 }

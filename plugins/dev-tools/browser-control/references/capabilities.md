@@ -8,7 +8,7 @@
 
 - 主候选：Chrome DevTools。
 - 同槽位 fallback：`browser:control-in-app-browser`，用于 Codex 环境中等价的隔离浏览器控制。
-- 禁止降级：Chrome DevTools 不可用时不得回退到 WebAccess，也不得借用已有登录态槽位。
+- 禁止降级：Chrome DevTools 不可用时不得借用已有登录态槽位。
 - 最小 probe：确认候选能够创建或连接一个无需登录态的页面，并返回页面标题或结构快照；不要用真实目标页面做安装探测。
 - 输入契约：非敏感目标引用、意图、允许动作和所需证据类型。
 - 输出契约：实际页面状态、动作结果、失败原因和可登记的非敏感证据引用。
@@ -22,12 +22,12 @@
 - 唯一默认候选：Codex Browser Control（路由 ID `codex-browser-control`，执行 Skill `chrome:control-chrome`，需要明确锁定 Chrome 时使用 `@Chrome`）。这是 Codex 自带的 Chrome 控制能力，复用用户当前 Chrome Profile、现有登录态和标签页。默认保持“完整 CDP”关闭；普通模式已验证能够执行页面交互并读取增量 Console 与 Network。
 - 主候选前提：必须在当前会话中真正暴露 `@Chrome`，且目标 Chrome Profile 已安装并启用扩展。仅发现本机安装文件、桌面端插件或其他会话曾成功，不代表本轮 `available`。
 - 主候选最小 probe：确认 `@Chrome` 可调用，并以只读方式取得目标登录会话才成立的页面状态。E2E 任务还要在交互前建立 Console 与 Network 基线。
-- 降级解释：页面主路径可完成、但局部 Console、Network、键盘或其他证据接口降级时，Codex Browser Control 仍然完成本轮；记录证据缺口和置信度，不得自动切换 WebAccess。
-- 可选外部后备：`web-access:web-access`（WebAccess），通过外部 CDP 复用用户现有浏览器会话。它不属于默认依赖；只有 Codex Browser Control 真正 `missing`、整体 `degraded`、被权限阻断或主路径调用 `failed`，并且用户明确允许外部后备后才能启用。
-- fallback 最小 probe：检查 WebAccess 健康状态和现有浏览器连接；本地代理请求必须绕过终端全局网络代理。只有用户明确要求当前页时才以只读方式定位当前 tab。
-- 专用适配：用户授权并切换到 WebAccess 后，讲解当前 tab、当前页或功能密集的配置页时，可经 `dev-tools:web-connect` 组织目标页锁定、结构读取和配置讲解；实际浏览器能力仍由 WebAccess 提供。
+- 降级解释：页面主路径可完成、但局部 Console、Network、键盘或其他证据接口降级时，Codex Browser Control 仍然完成本轮；记录证据缺口和置信度，不自动切换其他能力。
+- 同槽位 fallback：`ego-ops`。它负责授权边界、站点 operation 路由、Ego 浏览器任务空间、结果验证与成功后的知识写回；只有 Codex Browser Control 真正 `missing`、整体 `degraded`、被权限阻断或主路径调用 `failed` 时才进入。
+- fallback 最小 probe：确认当前会话能够加载 `ego-ops` 与 Ego 浏览器，并以只读方式复核目标登录态和入口。不得仅凭安装路径存在判定可用。
+- WebAccess 禁用：`web-access` 不属于本槽位候选，不得探测、加载、调用或通过 `web-connect` 间接进入。用户单独明确要求 WebAccess 时应退出本路由，按该 Skill 自身的人工调试确认流程另行处理。
 - 输入契约：登录态需求、非敏感目标描述、意图、允许动作和所需证据类型；不得把 Cookie 或凭据写入输入记录。
-- 输出契约：实际链路、页面状态、动作结果、失败原因和脱敏证据引用。经适配层时分别记录 `web-connect` 与 WebAccess；不得把扩展内部使用调试器能力误写成已开启“完整 CDP”。
+- 输出契约：实际链路、页面状态、动作结果、失败原因和脱敏证据引用。进入 Ego Ops 时分别记录治理层与实际 Ego 浏览器操作；不得把扩展内部使用调试器能力误写成已开启“完整 CDP”。
 - 禁止降级：只能使用能明确复用同一已有会话的候选；没有经过验证的同槽位候选时报告阻断，不得改用隔离浏览器假装完成。
 - 普通交互验收：取得只有目标会话下才成立的页面状态或用户确认，同时不得记录内部 URL、页面正文或身份信息。
 - E2E 验收：操作前记录 Console 与 Network 基线；操作后分别报告页面状态、新增 Console、新增 Network 和失败 XHR/Fetch。新增 Console error 或失败 XHR/Fetch 默认使 E2E 失败，既有 warning 只记入基线。

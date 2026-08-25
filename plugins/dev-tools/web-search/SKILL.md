@@ -21,9 +21,13 @@ description: |
 ```
 拿到信息获取请求
   │
-  ├─ 有 URL？─────────────→ Layer 1（OpenCLI 路由）
+  ├─ GitHub URL？────────→ 原生 `gh` 结构化获取
+  │                          ↓ `gh` 确实无法获取所需内容
+  │                         Layer 3 / Layer 4 网页降级
+  │
+  ├─ 其他 URL？──────────→ Layer 1（OpenCLI 路由）
   │                          ├─ 内置 100+ 站点
-  │                          ├─ External CLI 桥接（gh/lark/notion/...）
+  │                          ├─ External CLI 桥接（lark/notion/...）
   │                          └─ 本机扩展 CLI（yuque-cli/linear/...）
   │                          ↓ 全部未命中
   │                         Layer 3（已知 URL 读取）
@@ -44,9 +48,20 @@ description: |
 
 跑过一次后，setup 命令会在 experience.local.md 顶部写入 `setup-completed: {ISO 时间}`，从此不再提示。
 
+## 1.5 GitHub 特殊路由：原生 `gh` 绝对优先
+
+当 URL 为 `github.com` 或任务明确涉及 GitHub 仓库、文件、PR、Issue、Release、Actions 等信息时：
+
+1. **必须首先使用本机原生 `gh` CLI**，优先调用 `gh api`，或使用 `gh repo` / `gh pr` / `gh issue` / `gh release` / `gh run` 等结构化命令。
+2. 需要阅读仓库源码时，优先用 `gh api repos/<owner>/<repo>/contents/<path>` 、Git Trees API 或临时 clone，不先抓 GitHub HTML 页面。
+3. 只有在 `gh` 已证明无法取得目标内容时（例如 GitHub 之外的嵌入页面、必须渲染的视觉内容），才降级到 Layer 3 网页读取，再必要时进入 Layer 4 浏览器。
+4. 不得因为 OpenCLI 未安装、daemon 异常或 Extension 未连接而跳过 `gh`；GitHub 路由不依赖 OpenCLI。
+
 ## 2. Layer 1：OpenCLI 站点路由（URL 已知）
 
 ### 2.1 依赖检查
+
+> GitHub 任务不执行本节的 OpenCLI 前置检查，直接按 1.5 节调用原生 `gh`。
 
 ```bash
 which opencli >/dev/null && opencli doctor 2>&1 | head -3
@@ -119,7 +134,6 @@ OpenCLI 主命令下挂载了第三方工具，与内置站点同等优先级：
 
 | 命令 | 适用域名 / 用途 |
 |------|----------------|
-| `opencli gh` | github.com（repo/PR/issue/release/gist）|
 | `opencli lark-cli` | feishu.cn / larksuite.com（消息/文档/表格/日历，200+ 命令）|
 | `opencli dws` | dingtalk.com（钉钉 Workspace）|
 | `opencli wecom-cli` | wecom.com（企业微信）|
@@ -396,6 +410,7 @@ fi
 - 禁止用 `mcp__web_reader` 读已知 SPA（按 Layer 3 选择支持 JS 的读取器；需交互再委派 Layer 4）
 - 一个工具失败立即升级，不在同一工具反复重试
 - Layer 1 命中 OpenCLI 时禁止跳 Layer 3（domain-specific 永远更准）
+- GitHub 信息必须先用原生 `gh`；只有 `gh` 确实无法获取所需内容时，才能降级到网页读取或浏览器
 - 子 Agent 任务分发用「获取/了解/调研」等中性词，避免暗示特定工具
 - Tavily 注册引导**仅本会话提示一次**
 - 本机扩展站点表必须先读、后探测（已记录的域名直接用，不重复探测）

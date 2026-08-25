@@ -7,6 +7,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { loadEffects, parseEffect } from '../scripts/effect-library.mjs';
+import { EXPECTED_CATALOG_REFS, MIGRATED_EFFECT_IDS } from './catalog-fixture.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SKILL_PATH = path.join(SKILL_ROOT, 'SKILL.md');
@@ -22,13 +23,15 @@ const LICENSES_PATH = path.join(SKILL_ROOT, 'references/licenses');
 const EFFECTS_PATH = path.join(SKILL_ROOT, 'references/effects');
 const PREVIEW_SHA256 = '70a3c534832532faed62cb80816df56002382cb661b51d2077d7eab429760daf';
 const GENERATED_PREVIEWS = {
-  'photo-illustration-editorial-echo.png': { width: 1024, height: 1536 },
+  'kinetic-graphite-character-study.png': { width: 1122, height: 1402 },
+  'photo-illustration-editorial-echo.png': { width: 1024, height: 768 },
   'photo-illustration-diptych-lakeside.png': { width: 1024, height: 1536 },
   'photo-illustration-diptych.png': { width: 1024, height: 1536 },
   'scenes-gathered-zine-sea.png': { width: 1536, height: 1024 },
   'scenes-gathered-zine.png': { width: 1024, height: 1536 },
   'scene-distillation-zine.png': { width: 1024, height: 1536 },
   'minimal-zine-poster.png': { width: 1024, height: 1536 },
+  'torn-paper-editorial-photo-collage.jpg': { width: 615, height: 1024 },
 };
 const SOURCE_LICENSE_NOTICE_SHA256 =
   '1126322e2cc8d165adc4c792eeb195717de2bcc7b39be1ce77959d78e87ef685';
@@ -93,17 +96,6 @@ const EXPECTED_SECTIONS = [
   '硬性禁止项',
   '质量检查',
   '交付要求',
-];
-
-const EXPECTED_CATALOG_REFS = [
-  'healing-anime-scribble-v3@1.0.0',
-  'minimal-zine-poster@1.0.0',
-  'photo-illustration-diptych@1.0.0',
-  'photo-illustration-diptych-lakeside@1.0.0',
-  'photo-illustration-editorial-echo@1.0.0',
-  'scene-distillation-zine@1.0.0',
-  'scenes-gathered-zine@1.0.0',
-  'scenes-gathered-zine-sea@1.0.0',
 ];
 
 async function loadImageTools() {
@@ -315,6 +307,10 @@ test('完整目录的协议、来源许可证和预览字节均可独立验证',
   for (const effect of effects) {
     assert.doesNotMatch(effect.ref, /grade-images/i);
     assert.doesNotMatch(effect.body, /grade-images/i);
+    if (MIGRATED_EFFECT_IDS.includes(effect.id)) {
+      assert.doesNotMatch(effect.body, /dog|tiramisu|狗狗|提拉米苏/i);
+      assert.doesNotMatch(effect.previewProvenance.origin, /dog|tiramisu|狗狗|提拉米苏/i);
+    }
     assert.deepEqual(
       [...effect.body.matchAll(/^## (.+)$/gm)].map((match) => match[1]),
       EXPECTED_SECTIONS,
@@ -361,6 +357,22 @@ test('Scene Distillation 保留无预设的作者型 Typography Director', async
     effect.body,
     /at most one short title|large display type|pseudo-text|typography is authorial, correct, and subordinate|invalid text/i,
   );
+});
+
+test('动势石墨人物速写保留松散胸像的真实笔压、结构排线与概括发块', async () => {
+  const effects = await loadEffects(EFFECTS_PATH);
+  const effect = effects.find(
+    ({ ref }) => ref === 'kinetic-graphite-character-study@1.0.0',
+  );
+
+  assert.ok(effect, 'missing Kinetic Graphite Character Study card');
+  assert.match(effect.body, /four physically distinct mark levels/);
+  assert.match(effect.body, /roughly 3–5 times thicker/);
+  assert.match(effect.body, /Let contours appear, fade, and restart/);
+  assert.match(effect.body, /separated irregular hatch islands/);
+  assert.match(effect.body, /approximately 5–8 rapidly blocked-in masses/);
+  assert.match(effect.body, /long incomplete garment folds/);
+  assert.match(effect.body, /never as individually rendered strands/);
 });
 
 test('完整的固定来源许可证目录只包含已审核的 notice 字节', async () => {
@@ -425,6 +437,24 @@ test('Minimal Zine 保留固定来源的版式与字体变化能力', async () =
   assert.doesNotMatch(effect.body, /Keep it subordinate, legible/);
   assert.doesNotMatch(effect.body, /Add no metadata[\s\S]+second text block/);
   assert.doesNotMatch(effect.body, /large display copy|pseudo-text|signatures, watermarks/i);
+});
+
+test('撕纸编辑影像拼贴保留单图输入、核心构图与拟像检查', async () => {
+  const effects = await loadEffects(EFFECTS_PATH);
+  const effect = effects.find(
+    ({ ref }) => ref === 'torn-paper-editorial-photo-collage@1.0.0',
+  );
+
+  assert.ok(effect, 'missing Torn Paper Editorial Photo Collage card');
+  assert.equal(effect.executionKind, 'host-image-generation');
+  assert.deepEqual(effect.input, { mode: 'image', min: 1, max: 1, formats: ['jpeg', 'png'] });
+  assert.equal(effect.sourceRepository, 'wangjs-jacky/happy');
+  assert.equal(effect.sourceRevision, 'd1259c69fdc5494553f31b6736b640d597a89bfb');
+  assert.equal(effect.preview, 'assets/previews/torn-paper-editorial-photo-collage.jpg');
+  assert.match(effect.body, /45% to 65%/);
+  assert.match(effect.body, /exactly one broad opaque dry-brush swash/i);
+  assert.match(effect.body, /face-like pareidolia/i);
+  assert.match(effect.body, /host's native image-delivery path/i);
 });
 
 test('真实编码的干净 JPEG 和 PNG 可完整解码并通过元数据检查', async () => {
@@ -785,17 +815,18 @@ test('授权预览具有固定 SHA、尺寸且不含被禁止的元数据', asyn
   assert.equal(info.height, 1086);
 });
 
-test('七张独立生成预览可完整解码、无禁止元数据且符合目标方向', async () => {
+test('九张独立生成预览可完整解码、无禁止元数据且符合目标方向', async () => {
   const { assertMetadataFreeImage } = await loadImageTools();
 
   for (const [fileName, expectedDimensions] of Object.entries(GENERATED_PREVIEWS)) {
     const previewPath = path.join(SKILL_ROOT, 'assets/previews', fileName);
     const buffer = await readFile(previewPath);
     const digest = createHash('sha256').update(buffer).digest('hex');
-    const image = await assertMetadataFreeImage(buffer, 'png');
+    const expectedFormat = path.extname(fileName) === '.jpg' ? 'jpeg' : 'png';
+    const image = await assertMetadataFreeImage(buffer, expectedFormat);
 
     assert.match(digest, /^[0-9a-f]{64}$/, fileName);
-    assert.equal(image.format, 'png', fileName);
+    assert.equal(image.format, expectedFormat, fileName);
     assert.deepEqual(
       { width: image.width, height: image.height },
       expectedDimensions,
