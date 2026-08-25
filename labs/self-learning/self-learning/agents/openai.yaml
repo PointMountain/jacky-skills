@@ -1,0 +1,4 @@
+interface:
+  display_name: "Self Learning"
+  short_description: "从视频、文章与链接中自主学习，并生成可运行、可复核的最小产物"
+  default_prompt: "Use $self-learning to study this source, research the techniques, and create the smallest useful verified artifacts."

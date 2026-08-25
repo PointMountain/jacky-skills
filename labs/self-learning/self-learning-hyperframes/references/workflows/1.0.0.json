@@ -1,0 +1,93 @@
+{
+  "schema_version": "1.0.0",
+  "workflow_version": "1.0.0",
+  "stages": [
+    {
+      "id": "preflight",
+      "inputs": ["source_locator", "target_repo", "execution_mode"],
+      "outputs": ["run.json", "preflight.json"],
+      "capability_ids": ["environment_probe"],
+      "next": "ingest"
+    },
+    {
+      "id": "ingest",
+      "inputs": ["source_locator", "preflight.json"],
+      "outputs": ["local_media", "actual_media_sha256", "ingest.json"],
+      "capability_ids": ["local_media_ingest"],
+      "conditional_capabilities": [
+        {"when": "source.kind == 'url'", "before": "local_media_ingest", "capability_id": "link_ingest"}
+      ],
+      "next": "transcript"
+    },
+    {
+      "id": "transcript",
+      "inputs": ["local_media", "actual_media_sha256"],
+      "outputs": ["private_transcript", "transcript.json"],
+      "capability_ids": ["local_transcription"],
+      "next": "learn_method"
+    },
+    {
+      "id": "learn_method",
+      "inputs": ["private_transcript", "local_media"],
+      "outputs": ["method-spec.json"],
+      "capability_ids": ["tutorial_reasoning"],
+      "next": "observe_motion"
+    },
+    {
+      "id": "observe_motion",
+      "inputs": ["local_media", "method-spec.json"],
+      "outputs": ["dense_keyframes", "motion-spec.json"],
+      "capability_ids": ["motion_observation"],
+      "next": "plan_demo"
+    },
+    {
+      "id": "plan_demo",
+      "inputs": ["method-spec.json", "motion-spec.json", "repo_inventory"],
+      "outputs": ["asset-plan.json", "demo_scope", "demo_slug"],
+      "capability_ids": ["asset_selection", "hyperframes_routing"],
+      "next": "build"
+    },
+    {
+      "id": "build",
+      "inputs": ["bound_demo_dir", "method-spec.json", "motion-spec.json", "asset-plan.json"],
+      "outputs": ["demo_source", "draft_mp4", "build.json"],
+      "capability_ids": ["hyperframes_routing", "asset_selection"],
+      "next": "verify"
+    },
+    {
+      "id": "verify",
+      "inputs": ["demo_source", "draft_mp4"],
+      "outputs": ["check_logs", "snapshots", "verification.json"],
+      "capability_ids": ["hyperframes_validation", "video_render"],
+      "next": "review_r1"
+    },
+    {
+      "id": "review_r1",
+      "inputs": ["draft_mp4", "source_evidence", "rubric.json"],
+      "outputs": ["score-r1.json"],
+      "capability_ids": ["continuous_video_review"],
+      "next": "revise"
+    },
+    {
+      "id": "revise",
+      "inputs": ["score-r1.json", "frozen_correct_dimensions", "demo_source"],
+      "outputs": ["revised_mp4", "revision.json"],
+      "capability_ids": ["hyperframes_routing", "video_render"],
+      "next": "review_r2"
+    },
+    {
+      "id": "review_r2",
+      "inputs": ["revised_mp4", "source_evidence", "rubric.json"],
+      "outputs": ["score-r2.json"],
+      "capability_ids": ["continuous_video_review"],
+      "next": "finalize"
+    },
+    {
+      "id": "finalize",
+      "inputs": ["score-r2.json", "revised_mp4", "verification.json"],
+      "outputs": ["final.json", "repo_index_update", "experience_candidate"],
+      "capability_ids": ["staged_privacy_audit"],
+      "next": null
+    }
+  ]
+}

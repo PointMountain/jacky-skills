@@ -32,7 +32,7 @@ CLAUDE_PROJECTS_DIR = Path.home() / ".claude" / "projects"
 
 
 def encode_path(path):
-    """将路径编码为 Claude 项目目录名。/Users/jiashengwang → -Users-jiashengwang"""
+    """将路径编码为 Claude 项目目录名。/Users/example → -Users-example"""
     return path.replace("/", "-")
 
 

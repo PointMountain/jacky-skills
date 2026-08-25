@@ -1,8 +1,22 @@
 # 忽略仓库根目录下的 m3u8-dl 目录（不影响 plugin skill 目录）
 /m3u8-dl/
 
+# 独立项目 checkout，不属于 jacky-skills 仓库内容
+/rss-aggregator/
+
 # 忽略用户词汇库数据文件
 plugins/language-skills/**/vocabulary.json
+plugins/language-skills/**/self-introduction.local.md
+
+# macOS 与本地部署状态
+.DS_Store
+**/.DS_Store
+docs/.wrangler/
+
+# 本地 Agent 运行状态
+.agent-tasks/
+.superpowers/
+.claude/settings.local.json
 
 # 忽略 .harness 运行时数据（保留 planning 产物）
 .harness/memory/
@@ -15,9 +29,15 @@ content/
 
 # Node modules
 **/node_modules/
+skills/image-effects/site-dist/
 
 # Local TODO
 .todo.md
+
+# Skill local memory and private machine-specific notes
+**/experience.local.md
+**/local/
+*.local.*
 
 # Python cache artifacts
 **/__pycache__/

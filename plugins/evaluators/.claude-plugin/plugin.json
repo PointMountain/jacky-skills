@@ -1,7 +1,7 @@
 {
   "name": "evaluators",
-  "version": "1.0.0",
-  "description": "评估器合集 - 多维度任务目标达成度评估工具集，基于生成器-评估器分离架构，支持前端设计、全栈开发等场景的质量评判",
+  "version": "1.1.0",
+  "description": "评估器合集——对任务产出和 Agent Skill 设计做证据化、多维度质量评估",
   "author": {
     "name": "Jacky Wang",
     "email": "wangjs.jacky@gmail.com",
@@ -18,9 +18,12 @@
     "design-review",
     "harness",
     "multi-agent",
-    "generator-evaluator"
+    "generator-evaluator",
+    "skill-design",
+    "benchmark"
   ],
   "skills": [
-    "./harness-evaluator/"
+    "./harness-benchmark/",
+    "./skill-design-benchmark/"
   ]
 }

@@ -1,7 +1,7 @@
 {
   "name": "skill-tooling",
-  "version": "1.1.0",
-  "description": "Skill 工具链 - Skill 创建、优化、调研的生命周期管理工具",
+  "version": "1.1.1",
+  "description": "Skill 工具链 - Skill 优化与调研工具",
   "author": {
     "name": "Jacky Wang",
     "email": "wangjs.jacky@gmail.com",
@@ -13,12 +13,10 @@
   "keywords": [
     "claude-code",
     "skills",
-    "create",
     "optimize",
     "research"
   ],
   "skills": [
-    "./skills/gsd-creator-skills/",
     "./skills/skill-optimizer/",
     "./skills/skill-researcher/"
   ]

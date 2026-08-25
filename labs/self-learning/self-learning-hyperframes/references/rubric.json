@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0.0",
+  "threshold": 80,
+  "review_rounds": 2,
+  "revision_rounds": 1,
+  "top_fix_in_r1": 1,
+  "must_pass_policy": "All must-pass checks must be true before R1. Repair mechanical failures without consuming a subjective round; otherwise mark blocked.",
+  "must_pass": [
+    {"id": "source_readable", "evidence": "preflight source probe"},
+    {"id": "transcript_nonempty", "evidence": "timestamped transcript hash and positive cue count"},
+    {"id": "keyframes_covered", "evidence": "start, transition, stable, and exit frame evidence"},
+    {"id": "demo_complete", "evidence": "declared Demo files and default fixture assets"},
+    {"id": "tests_passed", "evidence": "project math or contract test log"},
+    {"id": "check_passed", "evidence": "lint, validate, and inspect exit zero"},
+    {"id": "render_verified", "evidence": "nonempty MP4, SHA-256, ffprobe stream metadata"},
+    {"id": "clean_checkout_smoke", "evidence": "fixture-only check and smoke render"},
+    {"id": "private_assets_untracked", "evidence": "Git status and staged-files audit"},
+    {"id": "single_final_pointer", "evidence": "one final candidate and R2/final hash equality"}
+  ],
+  "subjective_dimensions": [
+    {
+      "id": "method_fidelity",
+      "weight": 25,
+      "anchors": {
+        "1": "Only resembles the surface style; taught causal mechanism is absent.",
+        "3": "Core mechanism exists but one important causal relation is weak or ambiguous.",
+        "5": "Every claimed tutorial mechanism is visible and tied to located evidence."
+      }
+    },
+    {
+      "id": "motion_timing_fidelity",
+      "weight": 20,
+      "anchors": {
+        "1": "Transitions, staggering, or settling contradict the observed timing.",
+        "3": "Main phases are recognizable but pacing or easing differs materially.",
+        "5": "Entry, transition, settle, hold, and exit relationships match the motion evidence."
+      }
+    },
+    {
+      "id": "visual_hierarchy",
+      "weight": 15,
+      "anchors": {
+        "1": "Focus is unclear and layers compete.",
+        "3": "Primary focus reads, with minor depth or contrast issues.",
+        "5": "Hierarchy, depth, typography, and framing guide attention intentionally."
+      }
+    },
+    {
+      "id": "asset_fit",
+      "weight": 10,
+      "anchors": {
+        "1": "Aspect ratio, crop, or rights do not fit the composition.",
+        "3": "Assets are usable but selection or crop is generic.",
+        "5": "Authorized assets reinforce the composition and remain safe across motion."
+      }
+    },
+    {
+      "id": "continuous_watch_rhythm",
+      "weight": 15,
+      "anchors": {
+        "1": "Full playback exposes dead time, collisions, or abrupt discontinuities.",
+        "3": "The piece is coherent with one noticeable rhythm problem.",
+        "5": "The entire MP4 holds attention and every phase has a deliberate duration."
+      }
+    },
+    {
+      "id": "reproducibility",
+      "weight": 15,
+      "anchors": {
+        "1": "Depends on private files or undeclared machine state.",
+        "3": "Build is mostly reproducible with minor undocumented assumptions.",
+        "5": "A clean checkout checks and renders with fixtures; private overrides are optional and ignored."
+      }
+    }
+  ],
+  "learning_candidate_policy": {
+    "candidate_only_inputs": ["low_score", "r2_residual", "aesthetic_opinion", "single_failure"],
+    "default_destination": "backlog",
+    "never_activate_memory_directly": true,
+    "promotion_requires": ["evidence_refs", "revalidation"]
+  },
+  "round_rules": {
+    "r1": "Review the entire draft MP4 hash, identify timestamped issues, and choose exactly one highest-impact subjective top_fix.",
+    "revise": "Change only top_fix.dimension and freeze already-correct dimensions; render a new MP4 hash.",
+    "r2": "Independently review the new MP4 hash, record timestamped residuals, set top_fix to null, and stop.",
+    "finalize": "If must-pass is green, use completed at score >= 80, otherwise completed_with_residuals. Point final.json at exactly the R2-reviewed hash and never rerender afterward."
+  }
+}

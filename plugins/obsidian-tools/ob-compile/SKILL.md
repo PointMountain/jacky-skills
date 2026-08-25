@@ -1,7 +1,6 @@
 ---
 name: ob-compile
 description: "将 raw/ 层已有的资料编译到 wiki/{theme}/，支持增量更新和按主题合并编译"
-argument-hint: '[--author <作者名>] [--mode incremental|full|thematic] [--theme <主题目录>]'
 ---
 
 <role>

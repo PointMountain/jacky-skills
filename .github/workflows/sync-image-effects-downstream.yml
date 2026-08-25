@@ -1,0 +1,273 @@
+name: Sync image-effects downstream repositories
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'skills/image-effects/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-effects-downstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.IMAGE_EFFECTS_DOWNSTREAM_TOKEN }}
+      PUBLIC_REPOSITORY: wangjs-jacky/image-effects
+      PUBLIC_BRANCH: automation/sync-image-effects
+      APP_REPOSITORY: wangjs-jacky/happy
+      APP_BRANCH: automation/sync-image-effects
+    steps:
+      - name: Check out canonical source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          path: canonical
+
+      - name: Verify downstream token
+        run: |
+          test -n "$GH_TOKEN" || { echo '::error::Missing IMAGE_EFFECTS_DOWNSTREAM_TOKEN secret.'; exit 1; }
+          gh auth status
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: canonical/skills/image-effects/package-lock.json
+
+      - name: Install and validate canonical Skill
+        working-directory: canonical/skills/image-effects
+        run: |
+          npm ci
+          npm run build:site
+          node --test \
+            tests/build-gallery.test.mjs \
+            tests/catalog-metadata.test.mjs \
+            tests/downstream-sync-workflow.test.mjs \
+            tests/effect-assets.test.mjs \
+            tests/effect-library.test.mjs \
+            tests/gallery-assets.test.mjs \
+            tests/gallery-model.test.mjs \
+            tests/publish-gallery-media.test.mjs
+          node --test --test-name-pattern='从 HEAD Git 对象导出精确白名单' \
+            tests/export-public-repo.test.mjs
+          node scripts/validate-effects.mjs
+
+      - name: Check out public repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PUBLIC_REPOSITORY }}
+          ref: main
+          token: ${{ secrets.IMAGE_EFFECTS_DOWNSTREAM_TOKEN }}
+          fetch-depth: 0
+          path: image-effects
+
+      - name: Export and validate public repository
+        working-directory: canonical
+        run: |
+          git -C ../image-effects fetch origin "$PUBLIC_BRANCH" || true
+          git -C ../image-effects switch -C "$PUBLIC_BRANCH" origin/main
+          node skills/image-effects/scripts/export-public-repo.mjs \
+            --target "$GITHUB_WORKSPACE/image-effects"
+          npm --prefix ../image-effects ci
+          npm --prefix ../image-effects run build:site
+          node --test \
+            ../image-effects/tests/build-gallery.test.mjs \
+            ../image-effects/tests/catalog-metadata.test.mjs \
+            ../image-effects/tests/effect-assets.test.mjs \
+            ../image-effects/tests/effect-library.test.mjs \
+            ../image-effects/tests/gallery-assets.test.mjs \
+            ../image-effects/tests/gallery-model.test.mjs \
+            ../image-effects/tests/publish-gallery-media.test.mjs
+          node ../image-effects/scripts/validate-effects.mjs
+
+      - name: Commit public snapshot
+        id: public
+        working-directory: image-effects
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          if git diff --quiet && test -z "$(git status --short)"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git add --all
+          git commit -m "chore: sync image-effects from jacky-skills"
+          git push --force-with-lease origin "HEAD:$PUBLIC_BRANCH"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update public repository PR
+        if: steps.public.outputs.changed == 'true'
+        id: public-pr
+        run: |
+          existing_url="$(gh pr list --repo "$PUBLIC_REPOSITORY" --head "$PUBLIC_BRANCH" --base main --state open --json url --jq '.[0].url // ""')"
+          body="$(printf 'Canonical source: wangjs-jacky/jacky-skills@%s\n\nThis PR is generated from skills/image-effects. Do not edit generated files here; update the canonical source instead.' "$GITHUB_SHA")"
+          if test -n "$existing_url"; then
+            gh pr edit "$existing_url" --repo "$PUBLIC_REPOSITORY" --title "chore: sync image-effects from canonical source" --body "$body"
+            pr_url="$existing_url"
+          else
+            pr_url="$(gh pr create --repo "$PUBLIC_REPOSITORY" --base main --head "$PUBLIC_BRANCH" --title "chore: sync image-effects from canonical source" --body "$body")"
+          fi
+          echo "url=$pr_url" >> "$GITHUB_OUTPUT"
+
+      - name: Merge public repository PR
+        if: steps.public.outputs.changed == 'true'
+        id: public-merge
+        run: |
+          public_pr="${{ steps.public-pr.outputs.url }}"
+          gh pr merge "$public_pr" --repo "$PUBLIC_REPOSITORY" \
+            --squash --delete-branch \
+            --match-head-commit "${{ steps.public.outputs.commit }}" \
+            --subject "chore: sync image-effects from canonical source" \
+            --body ""
+          merge_commit="$(gh pr view "$public_pr" --repo "$PUBLIC_REPOSITORY" --json mergeCommit --jq '.mergeCommit.oid')"
+          test -n "$merge_commit"
+          echo "commit=$merge_commit" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for Gallery deployment
+        if: steps.public.outputs.changed == 'true'
+        run: |
+          gallery_run_id=""
+          for attempt in {1..30}; do
+            gallery_run_id="$(gh run list --repo "$PUBLIC_REPOSITORY" \
+              --workflow pages.yml --commit "${{ steps.public-merge.outputs.commit }}" \
+              --limit 1 --json databaseId --jq '.[0].databaseId // ""')"
+            if test -n "$gallery_run_id"; then break; fi
+            echo "Waiting for Gallery deployment run ($attempt/30)..."
+            sleep 10
+          done
+          test -n "$gallery_run_id" || { echo '::error::Gallery deployment run was not created.'; exit 1; }
+          gh run watch "$gallery_run_id" --repo "$PUBLIC_REPOSITORY" --exit-status
+          git -C image-effects fetch origin main
+          git -C image-effects switch --detach origin/main
+
+      - name: Check out Paws repository
+        if: steps.public.outputs.changed == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.APP_REPOSITORY }}
+          ref: main
+          token: ${{ secrets.IMAGE_EFFECTS_DOWNSTREAM_TOKEN }}
+          fetch-depth: 0
+          path: happy
+
+      - name: Generate Paws snapshot
+        if: steps.public.outputs.changed == 'true'
+        run: |
+          git -C happy fetch origin "$APP_BRANCH" || true
+          git -C happy switch -C "$APP_BRANCH" origin/main
+          node happy/packages/happy-app/scripts/sync-image-effects-catalog.mjs \
+            --source "$GITHUB_WORKSPACE/image-effects"
+
+      - name: Set up pnpm
+        if: steps.public.outputs.changed == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+
+      - name: Validate Paws snapshot
+        if: steps.public.outputs.changed == 'true'
+        working-directory: happy
+        run: |
+          pnpm install --frozen-lockfile
+          node --test packages/happy-app/scripts/sync-image-effects-catalog.test.mjs
+          pnpm --filter happy-app exec vitest run \
+            sources/components/agents/imageEffectsCatalogAdapter.test.ts \
+            sources/components/agents/imageStylePreviewManifest.test.ts
+          pnpm --filter happy-app run typecheck
+
+      - name: Commit Paws snapshot
+        if: steps.public.outputs.changed == 'true'
+        id: app
+        working-directory: happy
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          if git diff --quiet && test -z "$(git status --short)"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git add packages/happy-app/assets/images/image-effects \
+            packages/happy-app/scripts/sync-image-effects-catalog.mjs \
+            packages/happy-app/sources/components/agents/imageEffectsCatalogAdapter.ts \
+            packages/happy-app/sources/components/agents/imageEffectsCatalogSnapshot.json \
+            packages/happy-app/sources/components/agents/imageStylePreviewAssets.ts \
+            packages/happy-app/sources/components/agents/imageStylePreviewManifest.ts
+          git commit -m "chore(app): sync image-effects catalog snapshot"
+          git push --force-with-lease origin "HEAD:$APP_BRANCH"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update Paws PR
+        if: steps.app.outputs.changed == 'true'
+        id: app-pr
+        run: |
+          existing_url="$(gh pr list --repo "$APP_REPOSITORY" --head "$APP_BRANCH" --base main --state open --json url --jq '.[0].url // ""')"
+          public_pr="${{ steps.public-pr.outputs.url }}"
+          body="$(printf 'Canonical source: wangjs-jacky/jacky-skills@%s\nMerged public snapshot: %s\n\nThis generated PR keeps Paws offline-safe by pinning the validated catalog and preview assets. The canonical workflow will merge it automatically.' "$GITHUB_SHA" "$public_pr")"
+          if test -n "$existing_url"; then
+            gh pr edit "$existing_url" --repo "$APP_REPOSITORY" --title "chore(app): sync image-effects catalog snapshot" --body "$body"
+            pr_url="$existing_url"
+          else
+            pr_url="$(gh pr create --repo "$APP_REPOSITORY" --base main --head "$APP_BRANCH" --title "chore(app): sync image-effects catalog snapshot" --body "$body")"
+          fi
+          echo "url=$pr_url" >> "$GITHUB_OUTPUT"
+
+      - name: Merge Paws PR
+        if: steps.app.outputs.changed == 'true'
+        id: app-merge
+        run: |
+          app_pr="${{ steps.app-pr.outputs.url }}"
+          gh pr merge "$app_pr" --repo "$APP_REPOSITORY" \
+            --squash --delete-branch \
+            --match-head-commit "$(git -C happy rev-parse HEAD)" \
+            --subject "chore(app): sync image-effects catalog snapshot" \
+            --body ""
+          merge_commit="$(gh pr view "$app_pr" --repo "$APP_REPOSITORY" --json mergeCommit --jq '.mergeCommit.oid')"
+          test -n "$merge_commit"
+          echo "commit=$merge_commit" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for Paws production delivery
+        if: steps.app.outputs.changed == 'true'
+        run: |
+          ota_run_id=""
+          web_run_id=""
+          for attempt in {1..30}; do
+            ota_run_id="$(gh run list --repo "$APP_REPOSITORY" \
+              --workflow ota-production.yml --commit "${{ steps.app-merge.outputs.commit }}" \
+              --limit 1 --json databaseId --jq '.[0].databaseId // ""')"
+            web_run_id="$(gh run list --repo "$APP_REPOSITORY" \
+              --workflow web-production-deploy.yml --commit "${{ steps.app-merge.outputs.commit }}" \
+              --limit 1 --json databaseId --jq '.[0].databaseId // ""')"
+            if test -n "$ota_run_id" && test -n "$web_run_id"; then break; fi
+            echo "Waiting for Paws production runs ($attempt/30)..."
+            sleep 10
+          done
+          test -n "$ota_run_id" || { echo '::error::Paws production OTA run was not created.'; exit 1; }
+          test -n "$web_run_id" || { echo '::error::Paws Web deployment run was not created.'; exit 1; }
+          gh run watch "$ota_run_id" --repo "$APP_REPOSITORY" --exit-status
+          gh run watch "$web_run_id" --repo "$APP_REPOSITORY" --exit-status
+
+      - name: Summarize automatic downstream release
+        if: steps.app.outputs.changed == 'true'
+        run: |
+          {
+            echo '### image-effects downstream release'
+            echo
+            echo "- Canonical source: wangjs-jacky/jacky-skills@$GITHUB_SHA"
+            echo "- Gallery PR: ${{ steps.public-pr.outputs.url }}"
+            echo "- Gallery merge: ${{ steps.public-merge.outputs.commit }}"
+            echo "- Paws PR: ${{ steps.app-pr.outputs.url }}"
+            echo "- Paws merge: ${{ steps.app-merge.outputs.commit }}"
+            echo '- Gallery Pages/OSS, Paws production OTA, and Paws Web all completed successfully.'
+          } >> "$GITHUB_STEP_SUMMARY"

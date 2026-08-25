@@ -1,0 +1,23 @@
+{
+  "name": "media-toolkit",
+  "version": "1.0.0",
+  "description": "媒体工具箱 - 视频流下载与格式修复工具",
+  "author": {
+    "name": "Jacky Wang",
+    "email": "wangjs.jacky@gmail.com",
+    "url": "https://github.com/wangjs-jacky"
+  },
+  "homepage": "https://github.com/wangjs-jacky/jacky-skills/tree/main/plugins/media-toolkit",
+  "repository": "https://github.com/wangjs-jacky/jacky-skills",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "m3u8",
+    "download",
+    "video-fix"
+  ],
+  "skills": [
+    "./skills/m3u8-dl/",
+    "./skills/fix-neat-video/"
+  ]
+}

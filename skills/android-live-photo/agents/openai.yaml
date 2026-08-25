@@ -1,0 +1,4 @@
+interface:
+  display_name: "Android Live Photo"
+  short_description: "Convert MP4 videos into Android Motion Photos."
+  default_prompt: "Use $android-live-photo to convert this video into a verified Android Motion Photo."

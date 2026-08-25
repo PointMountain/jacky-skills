@@ -46,8 +46,8 @@ description: "Obsidian 多仓库路由管理。当用户有多个 Obsidian 仓�
 {
   "active": "personal",
   "repos": {
-    "personal": "/Users/jacky/Documents/personal-vault",
-    "work": "/Users/jacky/Documents/work-vault"
+    "personal": "/path/to/personal-vault",
+    "work": "/path/to/work-vault"
   }
 }
 ```
@@ -65,11 +65,11 @@ description: "Obsidian 多仓库路由管理。当用户有多个 Obsidian 仓�
 
 ```
 当前激活仓库：personal
-路径：/Users/jacky/Documents/personal-vault
+路径：/path/to/personal-vault
 
 已注册仓库（2 个）：
-  ★ personal  /Users/jacky/Documents/personal-vault
-    work      /Users/jacky/Documents/work-vault
+  ★ personal  /path/to/personal-vault
+    work      /path/to/work-vault
 ```
 
 若配置文件不存在，提示用户运行 `ob-router init` 初始化。
@@ -80,8 +80,8 @@ description: "Obsidian 多仓库路由管理。当用户有多个 Obsidian 仓�
 
 ```
 已注册仓库（2 个）：
-  ★ personal  /Users/jacky/Documents/personal-vault  (128 篇文章)
-    work      /Users/jacky/Documents/work-vault      (43 篇文章)
+  ★ personal  /path/to/personal-vault  (128 篇文章)
+    work      /path/to/work-vault      (43 篇文章)
 ```
 
 ### `ob-router use <name>` — 切换激活仓库
@@ -93,7 +93,7 @@ description: "Obsidian 多仓库路由管理。当用户有多个 Obsidian 仓�
 
 ```
 ✅ 已切换至：work
-路径：/Users/jacky/Documents/work-vault
+路径：/path/to/work-vault
 
 所有 ob-* skills 现在将使用此仓库。
 ```
@@ -106,7 +106,7 @@ description: "Obsidian 多仓库路由管理。当用户有多个 Obsidian 仓�
 4. 询问用户是否立即切换到新仓库
 
 ```
-✅ 已注册仓库：research → /Users/jacky/Documents/research-vault
+✅ 已注册仓库：research → /path/to/research-vault
 是否立即切换到 research？
 ```
 
@@ -129,7 +129,7 @@ description: "Obsidian 多仓库路由管理。当用户有多个 Obsidian 仓�
 ```
 ✅ 初始化完成
 已将 CLAUDE.md 中的 OBSIDIAN_REPO 导入：
-  ★ main  /Users/jacky/Documents/my-vault
+  ★ main  /path/to/my-vault
 
 还有其他 Obsidian 仓库需要注册吗？（可继续添加）
 ```

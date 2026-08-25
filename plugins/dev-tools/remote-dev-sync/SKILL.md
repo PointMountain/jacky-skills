@@ -1,7 +1,6 @@
 ---
 name: remote-dev-sync
 description: "在算力更强的远端机器改代码、本地机器 git pull 后运行的同步工作流。覆盖首次环境配置（探测网络/配代理/对齐三端）与日常同步循环（远端 commit→push→本地 pull→run）。触发词：远端开发、远端改代码本地运行、远端机器开发本地跑、remote dev sync、本地拉远端代码跑、用远端算力开发。"
-argument-hint: '[--setup|--sync] (默认自动判断：无本机配置走 setup，有则走 sync)'
 ---
 
 <role>

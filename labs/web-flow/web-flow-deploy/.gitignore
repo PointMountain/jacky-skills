@@ -1,0 +1,4 @@
+# 本 Skill 独立维护的本机错误记忆
+memory/
+config.local.*
+*.local.yaml

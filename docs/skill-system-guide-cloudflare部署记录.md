@@ -3,7 +3,7 @@
 > 一句话：把 `docs/skill-system-guide.html` 这一个静态 HTML，用 Cloudflare 官方 CLI `wrangler` 一条命令发布成公网可访问的网页，并记录用到的 CLI 工具与可借鉴的 Skills。
 
 - **部署日期**：2026-06-22
-- **被部署文件**：`~/jacky-github/jacky-skills/docs/skill-system-guide.html`（34.2 KB，自包含单文件，无本地外链）
+- **被部署文件**：`$JACKY_SKILLS_DIR/docs/skill-system-guide.html`（自包含单文件，无本地外链）
 - **页面标题**：工程开发 Skill 流水线 + 沉淀底座
 - **托管方式**：Cloudflare Pages（Direct Upload，非 Git 集成）
 - **Cloudflare 账号**：`2409277719@qq.com`（Account ID `6388c4205d34261a324d0bf02a6f0584`）

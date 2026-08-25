@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI 浏览器操控"
+  short_description: "登录态任务使用 Codex Browser Control，并以 Ego Ops 安全回退"
+  default_prompt: "使用 $browser-control 完成这个网页任务；需要已有登录态时按 Codex Browser Control → Ego Ops 路由，禁止调用 WebAccess。"

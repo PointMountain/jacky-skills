@@ -1,6 +1,6 @@
 {
   "name": "troubleshooting",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "故障排查工具集 - CLI 工具、agent-browser、Tauri 故障排查",
   "author": {
     "name": "Jacky Wang",

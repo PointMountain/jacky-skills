@@ -1,84 +1,98 @@
-# Setup 和 Hooks 配置指南
+# Todo CLI 安装与启动
 
-## 快速开始
+## 前置条件
 
-### 1. 安装 Skill
+- Node.js 22 或更高版本
+- npm
+
+Apple Silicon 设备应使用原生 `arm64` Node：
 
 ```bash
-# 链接到全局
-cd ~/jacky-github/jacky-skills
-j-skills link todo
-
-# 安装到全局
-j-skills install todo -g
+node -p "process.arch"
 ```
 
-> 如果 j-skills 命令不可用，参考 jacky-skills-package 项目安装 CLI
+期望输出：
 
-### 2. 在项目中启用
-
-在项目根目录创建 `todo.md` 文件即可：
-
-```markdown
-# TODO
-
-最后更新: 2026-04-27
-
-## 📋 Todo
-（无）
-
-## 💡 Ideas
-（无）
+```text
+arm64
 ```
 
-> hooks 通过检测 `todo.md` 是否存在来决定是否激活。删除 `todo.md` 即可禁用。
+## 安装依赖
 
-## Hooks 配置详情
+进入 Todo Skill 目录：
 
-### 事件类型
-
-| 事件 | 脚本 | 触发时机 | 用途 |
-|------|------|----------|------|
-| SessionStart | session-start.sh | 会话启动 | 注入 TODO 统计提醒 |
-| Stop | stop-check.sh | AI 响应结束 | 检查未处理条目 |
-| PreCompact | pre-compact.sh | 上下文压缩前 | 提醒执行 resolve 或 add |
-
-### 手动配置 hooks
-
-如果需要手动配置，在 `~/.claude/settings.json` 的 `hooks` 中添加：
-
-```json
-{
-  "SessionStart": [{
-    "matcher": "",
-    "hooks": [{
-      "type": "command",
-      "command": "bash /path/to/todo/hooks/session-start.sh # skill: todo"
-    }]
-  }]
-}
+```bash
+npm install
 ```
 
-## 安全规则
+## 注册全局命令
 
-1. resolve 前必须经用户确认
-2. checkpoint 文件路径必须在项目目录内
-3. 清理 checkpoint 前确认任务已完成
-
-## .gitignore 建议
-
-根据团队偏好选择：
-
-**加入 .gitignore（推荐）**：
-```
-todo.md
-todo-*.md
-cp-*.md
+```bash
+npm link
 ```
 
-适合：个人项目，不想把 TODO 追踪提交到仓库
+验证：
 
-**提交到仓库**：
-不做任何 gitignore 配置。
+```bash
+todo --version
+todo doctor
+```
 
-适合：团队项目，希望所有成员看到待办事项
+Agent 不依赖全局命令，可以直接运行：
+
+```bash
+node /path/to/todo-skill/bin/todo.mjs list
+```
+
+## 启动 Web
+
+全局任务：
+
+```bash
+todo web
+```
+
+当前项目：
+
+```bash
+todo web --current-project
+```
+
+默认地址：
+
+```text
+http://127.0.0.1:4187
+```
+
+端口被占用时：
+
+```bash
+todo web --port 4190
+```
+
+## 常见问题
+
+### 缺少依赖
+
+如果提示找不到 `yaml`、`cac` 或 `@clack/prompts`，在 Skill 目录重新运行：
+
+```bash
+npm install
+```
+
+### 当前项目无法识别
+
+`--current-project` 只能在 Git 仓库内使用。检查：
+
+```bash
+git rev-parse --show-toplevel
+```
+
+### 数据异常
+
+```bash
+todo doctor
+todo index
+```
+
+`doctor` 负责发现问题，`index` 负责重建生成视图。

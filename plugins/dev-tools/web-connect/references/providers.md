@@ -1,6 +1,6 @@
 # Provider 接入参考
 
-web-connect 是**能力层**，不绑定具体工具。本文件定义"能用 CDP 读/控网页"的**能力契约**，并给出各 provider 的精确接入命令。SKILL.md 主流程默认走 web-access；用别的 provider 或需要一次性配置/安装引导时读这里。
+web-connect 是 `browser-control` 登录态槽位下的当前页/配置讲解适配层。本文件定义它所需的 CDP **能力契约**，并给出 provider 的精确接入命令。主流程默认走 WebAccess；需要接入细节或一次性配置时读这里。
 
 ---
 
@@ -36,9 +36,26 @@ web-connect 是**能力层**，不绑定具体工具。本文件定义"能用 CD
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
 #   b) 已运行的 Chrome：地址栏打开 chrome://inspect/#remote-debugging，勾选 Allow，按需重启
 
-# ② 起 cdp-proxy（脚本路径按实际安装位置，存在哪个用哪个）
-node "${CLAUDE_SKILL_DIR}/scripts/check-deps.mjs"            # skill 框架管理时
-node ~/.claude/skills/web-access/scripts/check-deps.mjs       # 装到用户目录时
+# ② 定位外部 web-access Skill，再启动 cdp-proxy
+WEB_ACCESS_SKILL_DIR="${WEB_ACCESS_SKILL_DIR:-}"
+if [ -z "$WEB_ACCESS_SKILL_DIR" ]; then
+  for candidate in \
+    "$HOME/.j-skills/linked/web-access" \
+    "$HOME/.claude/skills/web-access" \
+    "$HOME/.codex/skills/web-access" \
+    "$HOME/.agents/skills/web-access"; do
+    if [ -f "$candidate/scripts/check-deps.mjs" ]; then
+      WEB_ACCESS_SKILL_DIR="$candidate"
+      break
+    fi
+  done
+fi
+
+[ -n "$WEB_ACCESS_SKILL_DIR" ] || {
+  echo "未找到 web-access；请先安装该 Skill，或设置 WEB_ACCESS_SKILL_DIR" >&2
+  exit 1
+}
+node "$WEB_ACCESS_SKILL_DIR/scripts/check-deps.mjs"
 ```
 - proxy 监听 `3456`（可用环境变量 `CDP_PROXY_PORT` 改）；Chrome 端口经 `DevToolsActivePort` 文件自动发现，回退扫描 `9222/9229/9333`。
 - 需 **Node ≥ 22**（原生 WebSocket）；低于 22 需 `npm i -g ws`。
@@ -50,8 +67,8 @@ node ~/.claude/skills/web-access/scripts/check-deps.mjs       # 装到用户目�
 |------|------|-------------|------|
 | `/health` | GET | — | `{status,connected,sessions,chromePort}` |
 | `/targets` | GET | — | `[{targetId,title,url,type}]`（**无 active 字段**）|
-| `/new` | GET | `?url=` | `{targetId}` |
-| `/navigate` | GET | `?target=&url=` | `{frameId,loaderId}` |
+| `/new` | POST | body=URL | `{targetId}` |
+| `/navigate` | POST | `?target=` + body=URL | `{frameId,loaderId}` |
 | `/back` | GET | `?target=` | `{ok}` |
 | `/info` | GET | `?target=` | `{title,url,ready}` |
 | `/eval` | POST | `?target=` + body=JS | `{value}` / `{error}` |

@@ -91,7 +91,7 @@ Plan Agent 完成后：
 
 ### 3. Generate 完成 → 自动进入 Score
 
-Generator Agent 完成后，直接调用 Score Evaluator：使用 Skill tool 调用 `agent-pipeline-score`
+Generator Agent 完成后，直接调用 Benchmark Evaluator：使用 Skill tool 调用 `agent-pipeline-benchmark`
 
 ### 4. Score 完成 → 判断下一步
 
@@ -119,7 +119,7 @@ Generator Agent 完成后，直接调用 Score Evaluator：使用 Skill tool 调
 |----------|----------|----------|
 | Plan Agent | `Skill("agent-pipeline-plan")` | 新任务或 Plan 重试 |
 | Generator Agent | `Skill("agent-pipeline-generate")` | Plan 确认后或 Generate 重试 |
-| Score Evaluator | `Skill("agent-pipeline-score")` | Generate 完成后 |
+| Benchmark Evaluator | `Skill("agent-pipeline-benchmark")` | Generate 完成后 |
 
 **重要**：调用子 Skill 前确保 `pipeline.json` 中 currentAgent 和对应 agent status 已正确设置。子 Skill 会自行读取 pipeline.json 确定上下文。
 

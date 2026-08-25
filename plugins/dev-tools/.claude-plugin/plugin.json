@@ -1,7 +1,7 @@
 {
   "name": "dev-tools",
-  "version": "2.5.1",
-  "description": "核心开发工具集 - 任务工作流、发布工具、效率审计",
+  "version": "2.8.6",
+  "description": "核心开发工具集 - 发布、任务管理、Durable 长任务、联网、浏览器操控、效率审计",
   "author": {
     "name": "Jacky Wang",
     "email": "wangjs.jacky@gmail.com",
@@ -12,21 +12,20 @@
   "license": "MIT",
   "keywords": [
     "claude-code",
-    "task-workflow",
+    "automation",
     "publish",
     "development"
   ],
   "skills": [
-    "./task-workflow/",
-    "./task-memory/",
-    "./task-harness/",
-    "./feature-tracker/",
     "./github-repo-publish/",
     "./efficiency-audit/",
     "./todo/",
+    "./durable/",
     "./web-search/",
+    "./browser-control/",
     "./animate-prompt/",
     "./web-connect/",
-    "./remote-dev-sync/"
+    "./remote-dev-sync/",
+    "./ssh-connect/"
   ]
 }

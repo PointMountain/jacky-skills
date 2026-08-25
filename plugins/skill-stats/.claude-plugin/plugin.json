@@ -1,0 +1,24 @@
+{
+  "name": "skill-stats",
+  "version": "0.1.2",
+  "description": "Skill 使用频率统计 - 自动采集 skill 调用（AI 自动调用 + 用户手输 /命令），输出使用排行榜、近 7 天热度与超 30 天未用的僵尸 skill 提示。装上即用，hook 自动注册，无需手动改 settings。",
+  "author": {
+    "name": "Jacky Wang",
+    "email": "wangjs.jacky@gmail.com",
+    "url": "https://github.com/wangjs-jacky"
+  },
+  "homepage": "https://github.com/wangjs-jacky/jacky-skills/tree/main/plugins/skill-stats",
+  "repository": "https://github.com/wangjs-jacky/jacky-skills",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "skill",
+    "usage",
+    "statistics",
+    "hooks",
+    "analytics"
+  ],
+  "skills": [
+    "./skill-stats/"
+  ]
+}

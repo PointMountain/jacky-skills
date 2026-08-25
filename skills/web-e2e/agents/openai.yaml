@@ -1,0 +1,4 @@
+interface:
+  display_name: "Web E2E"
+  short_description: "复用 Web E2E，并交付截图与可播放验收视频"
+  default_prompt: "Use $web-e2e to map this UI requirement to one minimal browser case, pass it normally, capture comparable screenshots, record and validate an MP4, and send the available media through Happy."

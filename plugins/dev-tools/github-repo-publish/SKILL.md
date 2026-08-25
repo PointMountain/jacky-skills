@@ -191,7 +191,7 @@ setup npm auto publish
    git config --global --unset https.proxy
    ```
 
-> **注意**：代理配置应使用全局 CLAUDE.md 中定义的端口（HTTP: 10802），而非在此硬编码。
+> **代理注意**：本机可用代理端口与排查细节见同目录 `experience.local.md`（本地私有）。**沙箱/后台 agent 环境会注入连不上外网的 `HTTP_PROXY`/`HTTPS_PROXY` 环境变量，git 自动读取后 push 会 502（CONNECT tunnel failed）——此时「不指定代理」并非直连，而是走了坏代理。** 改用 `git -c http.proxy=<可用代理> -c https.proxy=<可用代理> push ...` 一步到位（端口见 experience.local.md），别反复直连重试。
 
 **Checkpoint**：仓库已创建，代码已推送，About 已设置
 
@@ -201,7 +201,8 @@ setup npm auto publish
 
 **步骤**：
 ```bash
-# 如需代理，使用全局 CLAUDE.md 中定义的端口
+# push 失败(502 / CONNECT tunnel failed)多半是 env 注入了坏代理被 git 自动读取，详见同目录 experience.local.md
+# 沙箱/后台 agent 环境一步到位：git -c http.proxy=<可用代理> -c https.proxy=<可用代理> push origin <branch>
 git push origin $(git branch --show-current)
 ```
 
@@ -424,7 +425,7 @@ echo "$PKG_NAME" | grep -q '^@' && npm publish --access public || npm publish
 | `gh: command not found` | `brew install gh` |
 | 未登录 gh | `gh auth login` |
 | 仓库已存在 | 直接推送更新 |
-| 代理连接失败 | 使用正确端口（HTTP: 10802）或直连 |
+| 代理连接失败 / push 502 (CONNECT tunnel failed) | env 注入了连不上外网的坏代理、被 git 自动读取所致；用 `git -c http.proxy=<可用代理> -c https.proxy=<可用代理>` 注入可用代理。具体端口见 experience.local.md |
 | `.vsix already exists` | 删除旧文件重新打包 |
 | npm 403/未登录 | `npm login` |
 | npm 版本已存在 | 更新 package.json 版本号后重试 |
