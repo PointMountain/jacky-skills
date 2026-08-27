@@ -1,0 +1,4 @@
+interface:
+  display_name: "Show Me 可视化解释"
+  short_description: "用最小合适视图清晰呈现比较、流程、关系、结构与交互内容"
+  default_prompt: "使用 $show-me 把当前主题用最合适且最精简的可视化形式讲清楚。"
