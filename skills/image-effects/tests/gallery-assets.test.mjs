@@ -50,6 +50,11 @@ const EXPECTED_PROVENANCE = {
     revision: '532e49bb711283cbe2738439039298f9cea1ef7b',
     origin: 'Text-only image generation of a fictional scene; not based on a real person, place, brand, or third-party image.',
   },
+  'photo-illustration-diptych-coastline@1.0.0': {
+    repository: 'wangjs-jacky/happy',
+    revision: '532e49bb711283cbe2738439039298f9cea1ef7b',
+    origin: 'Adapted from a project-owned, text-only image generation of a fictional waterside scene; not based on a real person, place, brand, or third-party image.',
+  },
   'photo-illustration-diptych-lakeside@1.0.0': {
     repository: 'wangjs-jacky/happy',
     revision: 'fa6c30497d01b077d7d4d58e1a4c00bca4c38fcd',

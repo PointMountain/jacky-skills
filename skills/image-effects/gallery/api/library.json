@@ -2497,6 +2497,49 @@
       "invocation": "Use $image-effects effect photo-illustration-diptych@1.0.0 on my uploaded image."
     },
     {
+      "ref": "photo-illustration-diptych-coastline@1.0.0",
+      "id": "photo-illustration-diptych-coastline",
+      "version": "1.0.0",
+      "title": {
+        "en": "Coastline Watercolor Diptych",
+        "zh": "海岸水彩双联画"
+      },
+      "summary": {
+        "en": "Pair one truthful coastal photograph with a viewpoint-matched ink-and-watercolor study that preserves the shoreline, horizon, landmark order, and wave rhythm.",
+        "zh": "将一张真实海岸照片与同视角墨线水彩习作配对，保留海岸线、地平线、地标顺序与浪带节奏。"
+      },
+      "category": "editorial",
+      "executionKind": "host-image-generation",
+      "previewWidth": 1448,
+      "previewHeight": 1086,
+      "input": {
+        "mode": "image",
+        "min": 1,
+        "max": 1,
+        "formats": [
+          "jpeg",
+          "png"
+        ]
+      },
+      "outputCount": 1,
+      "previewUrl": "./media/photo-illustration-diptych-coastline@1.0.0.jpg",
+      "sourceUrl": "./source/photo-illustration-diptych-coastline@1.0.0.md",
+      "provenance": {
+        "repository": "wangjs-jacky/happy",
+        "revision": "532e49bb711283cbe2738439039298f9cea1ef7b",
+        "license": {
+          "spdx": "MIT",
+          "url": "https://github.com/wangjs-jacky/happy/blob/532e49bb711283cbe2738439039298f9cea1ef7b/LICENSE"
+        },
+        "preview": {
+          "origin": "Adapted from a project-owned, text-only image generation of a fictional waterside scene; not based on a real person, place, brand, or third-party image.",
+          "author": "wangjs-jacky",
+          "licenseSpdx": "CC-BY-4.0"
+        }
+      },
+      "invocation": "Use $image-effects effect photo-illustration-diptych-coastline@1.0.0 on my uploaded image."
+    },
+    {
       "ref": "photo-illustration-diptych-lakeside@1.0.0",
       "id": "photo-illustration-diptych-lakeside",
       "version": "1.0.0",
