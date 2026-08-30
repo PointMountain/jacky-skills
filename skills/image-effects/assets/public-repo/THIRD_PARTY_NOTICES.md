@@ -605,6 +605,16 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - Notice: `references/licenses/happy-coder-contributors-mit.txt` (SHA-256: `e251d0448ef3ce023c20ebac9b90a7d8642b1434825838247d6e457668eb3e00`)
 - Adaptation: Preserves the original two-panel visual compiler and source-driven medium choice while making privacy, native delivery, and targeted correction host-neutral.
 
+## photo-illustration-diptych-coastline@1.0.0
+
+- Repository: `wangjs-jacky/happy`
+- Revision: `532e49bb711283cbe2738439039298f9cea1ef7b`
+- Source: `packages/happy-app/sources/components/agents/photoIllustrationDiptychPrompt.ts` (SHA-256: `fd78d07b3b36446e88c4b073e38d948642e40c4ffd3c8954b29b704f44909934`)
+- Source: `LICENSE` (SHA-256: `e251d0448ef3ce023c20ebac9b90a7d8642b1434825838247d6e457668eb3e00`)
+- License: [MIT](<https://github.com/wangjs-jacky/happy/blob/532e49bb711283cbe2738439039298f9cea1ef7b/LICENSE>)
+- Notice: `references/licenses/happy-coder-contributors-mit.txt` (SHA-256: `e251d0448ef3ce023c20ebac9b90a7d8642b1434825838247d6e457668eb3e00`)
+- Adaptation: Specializes the original two-panel compiler for coastlines, sea caves, bridges, harbors, and open beaches while preserving its one-photo privacy boundary, scene correspondence, and host-native delivery.
+
 ## photo-illustration-diptych-lakeside@1.0.0
 
 - Repository: `wangjs-jacky/happy`

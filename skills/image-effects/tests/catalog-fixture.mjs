@@ -94,6 +94,7 @@ const ORIGINAL_CATALOG = [
   ['kinetic-graphite-character-study@1.0.0', '.png'],
   ['minimal-zine-poster@1.0.0', '.png'],
   ['photo-illustration-diptych@1.0.0', '.png'],
+  ['photo-illustration-diptych-coastline@1.0.0', '.jpg'],
   ['photo-illustration-diptych-lakeside@1.0.0', '.png'],
   ['photo-illustration-editorial-echo@1.0.0', '.png'],
   ['scene-distillation-zine@1.0.0', '.png'],
