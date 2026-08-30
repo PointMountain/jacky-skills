@@ -1,6 +1,6 @@
 {
   "name": "distiller-tools",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "资源蒸馏工具集 - 从代码、技术栈、文章等资源中提炼可复用的核心知识",
   "author": {
     "name": "Jacky Wang",
@@ -16,6 +16,7 @@
     "knowledge-extraction"
   ],
   "skills": [
-    "./distiller/"
+    "./distiller/",
+    "./distilled/math-curve-loading-reference/"
   ]
 }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Math Curve Loading Reference"
+  short_description: "数学曲线 Loading 动效选型、实现与兼容性参考"
+  default_prompt: "Use $math-curve-loading-reference to select and adapt a robust loading animation for Paws."

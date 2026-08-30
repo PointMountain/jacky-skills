@@ -28,7 +28,7 @@ description: "编排 Happy/Paws 用户可见功能从开发到 PR 的交付流�
 | 独立验收 | 独立 reviewer；App 可用 `app-flow-reviewer`，其他代码按 metadata 选择 code review | `pass / fail / blocked`、证据、需修项 |
 | Web E2E | `web-e2e` | Case 对应关系、结果、最短复跑入口、截图、MP4 与发送状态 |
 | PC 交互评审 | `pc-web-interaction-reviewer` 的回归模式 | 逐 Case 交互 verdict 与证据 |
-| 移动端交互评审 | `app-flow-reviewer` 的设计/体验量规，结合真实渲染或录屏 | 逐 Case 体验 verdict 与证据 |
+| 移动端交互评审 | `mobile-app-interaction-reviewer` 的回归模式，结合真实设备渲染或录屏 | 逐 Case 交互 verdict 与证据 |
 | 视频 | 当前平台已有 E2E/录屏能力；Web 可由 `web-e2e` 录制 | 稳定 MP4 路径、媒体校验、对应 Case |
 
 表里的 Skill 是默认实现，不是硬编码依赖。出现更匹配的平台 Skill 时可以替换，只要遵守 [delivery-contract.md](references/delivery-contract.md) 的返回契约。编排层负责 gate 转换；被委派 Skill 不自行创建 PR、等待 CI 或合并。
@@ -66,8 +66,10 @@ description: "编排 Happy/Paws 用户可见功能从开发到 PR 的交付流�
 在功能验收和必要 E2E 通过后，再评审最终交互：
 
 - PC Web 使用 `pc-web-interaction-reviewer`；
-- 移动端使用独立 App 体验 reviewer；
+- 原生移动端与窄屏 Mobile Web 使用 `mobile-app-interaction-reviewer`；
 - 跨端功能分别检查受影响平台，但共享同一业务 Case ID。
+
+PC 与 Mobile reviewer 不互相替代：PC 可用 Hover/Tooltip、锚定 Popover 和多栏承载次要信息；Mobile 必须在没有 hover 的小屏触控条件下重新安排可见入口、渐进披露、Bottom sheet/全屏流程、键盘和安全区。
 
 评审聚焦本次 Case 的发现性、反馈、状态、布局和可访问性，不重新做无边界产品探索。任一 Case 不通过就返回开发，并重新运行被改动影响的下游 gate。
 

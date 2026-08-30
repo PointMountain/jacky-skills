@@ -9,7 +9,7 @@
 ## 指定页面评审
 
 ```text
-使用 $pc-web-interaction-reviewer 评审这个 PC 页面：{URL 或页面路径}。重点检查信息层级、空间利用、操作入口、弹窗/下拉框、状态反馈、滚动、键盘与焦点。输出可复现问题和修复优先级，不要直接改代码。
+使用 $pc-web-interaction-reviewer 评审这个 PC 页面：{URL 或页面路径}。重点检查信息层级、空间利用、操作入口、Hover/Tooltip 的键盘等价、弹窗/下拉框、状态反馈、滚动、键盘与焦点。关键动作和状态不能只藏在 hover 中。若实际输入是原生手机或窄屏 Mobile Web，停止并路由到 $mobile-app-interaction-reviewer。输出可复现问题和修复优先级，不要直接改代码。
 ```
 
 ## 全站交互走查

@@ -24,7 +24,7 @@
       "name": "distiller-tools",
       "source": "./plugins/distiller-tools",
       "description": "资源蒸馏与知识提炼工具",
-      "version": "1.1.0"
+      "version": "1.2.0"
     },
     {
       "name": "evaluators",

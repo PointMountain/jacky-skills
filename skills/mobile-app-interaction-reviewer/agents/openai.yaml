@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mobile App 交互评审专家"
+  short_description: "独立评审小屏触控、键盘、安全区、弹层、手势与系统返回体验"
+  default_prompt: "使用 $mobile-app-interaction-reviewer 只读评审这个移动端界面，按影响输出有证据的问题与待实测项。"

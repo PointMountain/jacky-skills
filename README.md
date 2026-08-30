@@ -15,7 +15,7 @@
 |--------|------|------|--------|
 | [claude-config](./plugins/claude-config) | 0.3.0 | Claude Code 配置 | statusline-setup |
 | [dev-tools](./plugins/dev-tools) | 2.8.7 | 发布、任务管理、Durable 长任务、联网、浏览器操控与效率审计 | github-repo-publish, efficiency-audit, todo, durable, web-search, browser-control, animate-prompt, remote-dev-sync, ssh-connect |
-| [distiller-tools](./plugins/distiller-tools) | 1.1.0 | 资源蒸馏与知识提炼 | distiller |
+| [distiller-tools](./plugins/distiller-tools) | 1.2.0 | 资源蒸馏与知识提炼 | distiller, math-curve-loading-reference |
 | [evaluators](./plugins/evaluators) | 1.1.0 | 任务目标与 Skill 设计质量评估 | harness-benchmark, skill-design-benchmark |
 | [image-effects](./plugins/image-effects) | 1.0.0 | 可版本化图像效果、参考图生成与静态画廊 | image-effects |
 | [knowledge-base](./plugins/knowledge-base) | 1.3.0 | 开发教程、经验与参考方案 | npm-publish, vsix-publish, vscode-extension-dev, gh-workflow-generator, github-profile-coolify, chrome-ext-ai-script, web-to-tauri-migration-loop, llm-wiki, codex-env-config |
@@ -42,7 +42,7 @@
 | codex-harness | crafted-web | spec-debate |
 | topic-debate | [happy-app-experience](./skills/happy-app-experience) | grilling |
 | [skill-usage-audit](./skills/skill-usage-audit) | [web-e2e](./skills/web-e2e) | [pc-web-interaction-reviewer](./skills/pc-web-interaction-reviewer) |
-| [clear-and-brief-output](./skills/clear-and-brief-output) | [happy-visual-workflow](./skills/happy-visual-workflow) | |
+| [clear-and-brief-output](./skills/clear-and-brief-output) | [happy-visual-workflow](./skills/happy-visual-workflow) | [mobile-app-interaction-reviewer](./skills/mobile-app-interaction-reviewer) |
 | [android-live-photo](./skills/android-live-photo) | [show-me](./skills/show-me) |  |
 | [photo-to-styled-motion](./skills/photo-to-styled-motion) |  |  |
 
