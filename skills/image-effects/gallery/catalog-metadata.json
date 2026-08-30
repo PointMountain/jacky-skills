@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "2026-08-24.95",
+  "catalogVersion": "2026-08-30.96",
   "categories": {
     "academic-figures": { "title": { "en": "Academic Figures", "zh": "学术配图" }, "accent": "#1A4E8A" },
     "assets-and-props": { "title": { "en": "Assets and Props", "zh": "素材资产" }, "accent": "#6B5B95" },
