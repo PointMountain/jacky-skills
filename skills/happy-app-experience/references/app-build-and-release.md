@@ -53,15 +53,16 @@ runtime 是互不相通的独立通道。
 
 ## 内测 OTA 版本切换（preview-only 悬浮球）
 
-内测回归常见痛点：真机上不知道当前跑的是哪个 commit 的 OTA，也无法单机切到某个历史版本。一套可迁移的解法（preview 与 production **都有 OTA**，差别只在"切换器"）：
+内测回归常见痛点：真机上不知道当前跑的是哪个 commit 的 OTA，也无法单机切到某个历史版本。对于**启用自托管 OTA 的新 App**，这套 preview 版本切换体验应作为默认交付内容；只有用户明确不需要内测 OTA，或技术栈不支持等价能力时才不实现。preview 与 production **都有 OTA**，差别只在"切换器"：
 
 - **双频道语义决定切换能力**：preview 包（内测）要"知道当前是哪个版本 + 自由切历史版本"；production 包（正式）永远跟随 latest、**不提供**定向切换、也**不显示**任何开发浮层。频道由构建期写死的 channel 映射决定。
-- **preview-only 悬浮球**：只在 preview / dev 包挂一个可拖拽、贴边吸附的浮动入口，打开"OTA 版本"列表。用**运行期门控**判定是否显示（channel === 'preview'、或 dev/preview 的 applicationId、或本地 devMode 开），production 判定为 false 就不挂载——浮层永不进正式包。
+- **preview-only 悬浮球**：只在 preview / dev 包挂一个全局可见、可拖拽、贴边吸附的圆形浮动入口（清晰标示 `OTA`，置于不遮挡主操作的安全区域），点击打开"OTA 版本"页；入口随主 Tab / 页面持续可达。用**运行期门控**判定是否显示（channel === 'preview'、或 dev/preview 的 applicationId、或本地 devMode 开），production 判定为 false 就不挂载——浮层永不进正式包。
+- **版本页是可验证的回退界面**：顶部先展示当前设备正在运行的 channel、版本标题/说明、commit 与发布时间；下方以最新在上的时间线列出可选版本，并清楚标出"当前运行"。每项可进入详情或直接选中，提供"跟随 latest"以清除定向版本。界面信息要来自发布时保存的 meta，而不是让测试者从日志猜版本。
 - **单机定向切换、不影响他人**：机制 = expo-updates 的 `setExtraParamAsync('<target-key>', '<version-stamp>')` 持久化目标版本 + `reloadApp()`；清空该 param 即回到跟随 latest。更新服务端读 `Expo-Extra-Params` 头，命中定向版本返回该 stamp 的 manifest，否则返回 latest。**切换只对本设备生效**。
 - **版本可发现**：发布 OTA 时除 `latest.json` 外，按 stamp 各留一份历史 manifest（永不删，可回滚）+ 一份轻量 meta（stamp / id / git commit / 时间）。可再配一个同桶静态站列出 preview 所有版本 + 二维码（deep link 带 channel+stamp），扫码即切。
 - **边界**：只解决"浏览 + 定向切换"，不做删除/管理后台；production 频道不接入。只改 JS/资产走 OTA，原生/权限/runtime 变化仍要重打包。
 
-> 是否给某个 App 上这套（新建或复用 FC + OSS、preview 包带浮层、production 不带）属于启动时**授权信封**该前置问清的一项——它牵涉"部署 FC"这类外部动作与"preview 包要不要加浮层功能"的范围决定，别等打完包才发现要返工补 OTA。
+> 创建启用自托管 OTA 的新 App 时，默认把这套（新建或复用 FC + OSS、preview 包带浮层与版本页、production 不带）写进 scope 和实现计划；启动时仍应在**授权信封**中一次确认 OTA/FC 部署等外部动作与 CI 凭据。不要等打完包才发现要返工补 OTA。
 
 ## OTA CI 流水线（PR 发 preview / 合并发 production）
 
