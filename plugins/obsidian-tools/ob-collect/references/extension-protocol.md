@@ -88,6 +88,6 @@
 | 场景 | 处理 |
 |------|------|
 | 新平台的字幕命令不存在 | 走 web-search Layer 1 兜底（`opencli list \| grep`），失败再写到本 skill 的「解析陷阱」表 |
-| 已知 URL 但 web-search 多次失败 | 本 skill 不重试，回到上层让用户决定（如换登录态、用 web-access）|
+| 已知 URL 但 web-search 多次失败 | 本 skill 不重试，回到上层让用户决定（如确认登录态、交由 Ego Lite）|
 | 用户说「采集这个话题」 | 先调 web-search Layer 2 搜索 → 列出候选 URL → 用户选定 → 本 skill 采集 |
 | 内容包含视频又包含文字（如带视频的微信文章）| 文字走通用流程，视频部分按视频范式（只存字幕）|

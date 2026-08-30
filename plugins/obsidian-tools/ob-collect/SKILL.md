@@ -111,8 +111,8 @@ $OBSIDIAN_REPO/.kb/
 2. **掘金小册 URL（`juejin.cn/book/*`）** → 跳过 web-search，使用本 skill 的[掘金小册采集模式](#掘金小册采集模式)
 3. **其他 URL** → 委托 web-search：
    - web-search Layer 1（OpenCLI 路由 / External CLI 桥接 / 本机扩展 CLI）拿内容
-   - Layer 1 未命中 → web-search 自动走 Layer 3（opencli web read / web_reader / WebFetch）
-   - 登录或反爬失败 → web-search 自动走 Layer 4（opencli browser / web-access CDP）
+   - Layer 1 未命中 → web-search 自动走 Layer 3（web_reader / WebFetch）
+   - 登录、反爬、SPA 或交互失败 → web-search 自动走 Layer 4（Browser Control → Ego Ops → Ego Lite）
 4. **无 URL（如「采集 RLHF 这个话题」）** → 先调 web-search Layer 2（WebSearch → Tavily → DDG）拿候选列表，用户选定后回到步骤 3
 5. **视频/音频专用**：URL 命中 YouTube/B站/小宇宙/播客等时，仍由 web-search 调 OpenCLI subtitle/transcript；**无字幕时**回到本 skill 的 [ASR 回退流程](#asr-回退流程)
 

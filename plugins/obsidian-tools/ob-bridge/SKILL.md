@@ -13,7 +13,7 @@ description: "终端 Claude Code ⇄ Obsidian 的上下文桥。① 卸货：把
 - 接手：从 obsidian 恢复、继续之前的工作、接手 inbox、ob-bridge list、ob-bridge resume、读桥接
 
 示例：
-- "ob-bridge web-access-vs-opencli"（卸货）
+- "ob-bridge browser-automation-migration"（卸货）
 - "把刚才的工作连完整上下文带过去"（卸货 + 桥接 transcript）
 - "从 obsidian 恢复之前的工作"（接手）
 - "ob-bridge list"（列出 _inbox 里可恢复的会话）

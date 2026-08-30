@@ -18,7 +18,7 @@
       "name": "dev-tools",
       "source": "./plugins/dev-tools",
       "description": "发布、任务管理、Durable 长任务、联网、浏览器操控与效率审计工具",
-      "version": "2.8.6"
+      "version": "2.8.7"
     },
     {
       "name": "distiller-tools",
@@ -113,8 +113,8 @@
     {
       "name": "troubleshooting",
       "source": "./plugins/troubleshooting",
-      "description": "CLI、浏览器自动化与 Tauri 故障排查工具",
-      "version": "1.1.1"
+      "description": "CLI 与 Tauri 故障排查工具",
+      "version": "1.1.2"
     },
     {
       "name": "video-processing",

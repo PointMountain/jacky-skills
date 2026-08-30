@@ -107,7 +107,6 @@ which opencli >/dev/null && opencli doctor 2>&1 | head -3
 | | gemini.google.com | `gemini ...` | 🔐 |
 | | doubao.com | `doubao ...` | 🔐 |
 | | deepseek.com | `deepseek ...` | 🔐 |
-| **通用兜底** | 任意 HTTP URL（含 SPA） | `opencli web read <url>` | — |
 | | Google 搜索（无登录）| `opencli google search "<keyword>"` | 🌐 |
 
 **认证标识**：🌐 public（无需登录） / 🔐 cookie（需本机 Chrome 已登录该站点） / 🔧 ui（需本机已装对应桌面应用）
@@ -271,14 +270,12 @@ python3 -c "from ddgs import DDGS; [print(r['title'], r['date']) for r in DDGS()
 
 | 工具 | JS 渲染 | 速度 | 适合 |
 |------|--------|-----|------|
-| `opencli web read <url>` | ✅ | 中 | SPA 但无需登录的公开页 |
 | `mcp__web_reader__webReader` | ❌ | 快 | 静态博客、文档站 |
 | `mcp__zread__read_file` | — | 快 | GitHub 仓库内文件 |
 | `WebFetch` | ❌ | 快 | 最后兜底 |
 
 **经验规则**：
-- SPA + 公开 → `opencli web read`
-- SPA + 登录 → Layer 4
+- SPA 或需要交互 → Layer 4（统一交给 Ego Lite）
 - 静态页 → `mcp__web_reader` 先试，慢再换 `WebFetch`
 - GitHub 文件 → `mcp__zread__read_file`（不用 clone）
 
@@ -286,9 +283,9 @@ python3 -c "from ddgs import DDGS; [print(r['title'], r['date']) for r in DDGS()
 
 进入条件：Layer 1/3 已证明需要真实浏览器交互，例如必须复用登录会话、反爬阻断或需要点击操作。
 
-只委派 `browser-control`，同时传递搜索目标、已尝试工具、失败事实，以及是否已知需要复用已有登录态。由 `browser-control` 以登录态为第一路由键选择能力槽位并记录证据；本 Skill 不自行比较或选择 CDP provider。
+只委派 `browser-control`，同时传递搜索目标、已尝试工具、失败事实，以及是否已知需要复用已有登录态。由它固定委派 Ego Ops 与 Ego Lite，并记录证据；本 Skill 不自行比较或选择 browser provider。
 
-页面是 SPA 或需要 JS 渲染本身不代表需要 WebAccess。若公开页面已能在 Layer 3 读取，就留在 Layer 3；确需浏览器时仍由 `browser-control` 判断登录态。
+若公开页面已能在 Layer 3 读取，就留在 Layer 3；SPA、JS 渲染或任何交互需求都由 `browser-control` 的 Ego Lite 链路处理。
 
 ## 6. /web-search setup 命令（一次性配置）
 
